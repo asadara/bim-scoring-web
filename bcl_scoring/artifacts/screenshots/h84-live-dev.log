@@ -1,0 +1,20 @@
+
+> bcl_scoring@0.1.0 dev
+> next dev -p 3211
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3211
+- Network:       http://10.0.0.90:3211
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1656ms
+○ Compiling /ho/review ...
+✓ Finished writing to filesystem cache in 11.3s
+ GET /ho/review 200 in 11.3min (compile: 11.3min, render: 844ms)
+⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+✓ Finished filesystem cache database compaction in 18.5s
+[?25h
+
+d:\PROJECTS\bim-scoring-web\bcl_scoring>

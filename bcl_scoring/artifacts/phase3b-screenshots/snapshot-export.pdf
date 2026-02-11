@@ -1,0 +1,692 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 5276
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0 g
+40. 793.8899999999999864 Td
+(BIM Scoring Platform — Snapshot Export \(Reference\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+40. 767.8899999999999864 Td
+(Reference only — not a compliance claim) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+40. 743.8899999999999864 Td
+(1\) Snapshot Header) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 723.8899999999999864 Td
+(Project name:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 723.8899999999999864 Td
+(Not available) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 707.8899999999999864 Td
+(Project ID:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 707.8899999999999864 Td
+(project-proto-001) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 691.8899999999999864 Td
+(Period ID:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 691.8899999999999864 Td
+(2026-W06) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 675.8899999999999864 Td
+(Approved by:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 675.8899999999999864 Td
+(Approver \(Prototype\)) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 659.8899999999999864 Td
+(Approved at:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 659.8899999999999864 Td
+(2026-02-09T10:12:00.000Z) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 643.8899999999999864 Td
+(Lock status:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 643.8899999999999864 Td
+(LOCKED) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 627.8899999999999864 Td
+(Snapshot ID:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 627.8899999999999864 Td
+(snap-proto-001) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+40. 603.8899999999999864 Td
+(2\) Final Score \(Read-only\)) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 583.8899999999999864 Td
+(Total score:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+158. 583.8899999999999864 Td
+(82.5) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 567.8899999999999864 Td
+(Breakdown) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+52. 553.8899999999999864 Td
+(P1 | Score: 16.5 | Weight: Not available) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+52. 539.8899999999999864 Td
+(P2 | Score: 17 | Weight: Not available) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+52. 525.8899999999999864 Td
+(P3 | Score: 15 | Weight: Not available) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+52. 511.8899999999999864 Td
+(P4 | Score: 17.5 | Weight: Not available) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+52. 497.8899999999999864 Td
+(P5 | Score: 16.5 | Weight: Not available) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+40. 473.8899999999999864 Td
+(3\) Evidence Review Counts) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+40. 453.8899999999999864 Td
+(ACCEPTABLE: 7) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+40. 439.8899999999999864 Td
+(NEEDS REVISION: 2) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+40. 425.8899999999999864 Td
+(REJECTED: 1) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+40. 411.8899999999999864 Td
+(Awaiting review: 0) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+40. 387.8899999999999864 Td
+(4\) Narrative Audit Trail) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 367.8899999999999864 Td
+(1. Evidence Submission \(Role 1\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 353.8899999999999864 Td
+(Role: BIM Koordinator Proyek) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 339.8899999999999864 Td
+(Meaning: Proyek submit evidence untuk indikator terkait \(submitted count: 10\).) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 325.8899999999999864 Td
+(NOT done: Tidak melakukan review, approval, atau locking period.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 307.8899999999999864 Td
+(2. Review Eligibility \(Role 2\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 293.8899999999999864 Td
+(Role: HO Reviewer) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 279.8899999999999864 Td
+(Meaning: Menilai kelayakan evidence \(Acceptable/Needs Revision/Rejected\) berdasarkan konteks) Tj
+T* (review.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 251.8899999999999864 Td
+(NOT done: Tidak melakukan approval period dan tidak mengubah skor.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 233.8899999999999864 Td
+(3. Approval Decision \(Role 3\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 219.8899999999999864 Td
+(Role: BIM Manager/KaDiv BIM) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 205.8899999999999864 Td
+(Meaning: Keputusan level period: APPROVE PERIOD. Reason: Semua evidence telah direview dan) Tj
+T* (layak untuk snapshot..) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 177.8899999999999864 Td
+(NOT done: Tidak melakukan edit evidence, indikator, atau score entry.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 159.8899999999999864 Td
+(4. Snapshot Created \(System\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 145.8899999999999864 Td
+(Role: System record layer \(prototype\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 131.8899999999999864 Td
+(Meaning: Snapshot immutable dibuat saat approval dan disimpan append-only.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 117.8899999999999864 Td
+(NOT done: Tidak mengklaim compliance final; hanya rekam jejak referensi internal.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 2036
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+40. 793.8899999999999864 Td
+(5\) ISO 19650 Reference Mapping \(Indicative\)) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 773.8899999999999864 Td
+(Reference only — not a compliance claim) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 757.8899999999999864 Td
+(Evidence Traceability) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 743.8899999999999864 Td
+(ISO Reference: ISO 19650-2 \(information requirements and exchanges\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 729.8899999999999864 Td
+(Indicative Mapping: Evidence linkage per indicator can help demonstrate traceable information) Tj
+T* (exchange context.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 697.8899999999999864 Td
+(Review Governance) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 683.8899999999999864 Td
+(ISO Reference: ISO 19650-2 \(information review and acceptance context\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 669.8899999999999864 Td
+(Indicative Mapping: Role separation between project submitter and reviewer supports indicative) Tj
+T* (governance alignment.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 637.8899999999999864 Td
+(Approval & Locking) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 623.8899999999999864 Td
+(ISO Reference: ISO 19650 principles for controlled information status transitions) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 609.8899999999999864 Td
+(Indicative Mapping: Period-level approval and lock provides an indicative status gate before final record) Tj
+T* (issuance.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0 g
+40. 577.8899999999999864 Td
+(Snapshot Record) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 563.8899999999999864 Td
+(ISO Reference: ISO 19650 information container lifecycle concepts \(reference only\)) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0 g
+50. 549.8899999999999864 Td
+(Indicative Mapping: Immutable snapshot can be used as indicative historical record for internal audit) Tj
+T* (trail.) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R ]
+/Count 2
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 7 0 R
+/F2 8 0 R
+/F3 9 0 R
+/F4 10 0 R
+/F5 11 0 R
+/F6 12 0 R
+/F7 13 0 R
+/F8 14 0 R
+/F9 15 0 R
+/F10 16 0 R
+/F11 17 0 R
+/F12 18 0 R
+/F13 19 0 R
+/F14 20 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+21 0 obj
+<<
+/Producer (jsPDF 4.1.0)
+/CreationDate (D:20260209145104+07'00')
+>>
+endobj
+22 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000007705 00000 n 
+0000009530 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000005480 00000 n 
+0000005617 00000 n 
+0000007768 00000 n 
+0000007893 00000 n 
+0000008023 00000 n 
+0000008156 00000 n 
+0000008294 00000 n 
+0000008418 00000 n 
+0000008547 00000 n 
+0000008679 00000 n 
+0000008815 00000 n 
+0000008943 00000 n 
+0000009070 00000 n 
+0000009199 00000 n 
+0000009332 00000 n 
+0000009434 00000 n 
+0000009780 00000 n 
+0000009866 00000 n 
+trailer
+<<
+/Size 23
+/Root 22 0 R
+/Info 21 0 R
+/ID [ <1A0EEC4A278027663920FC5DDC8D3E7A> <1A0EEC4A278027663920FC5DDC8D3E7A> ]
+>>
+startxref
+9970
+%%EOF

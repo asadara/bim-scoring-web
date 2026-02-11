@@ -1,0 +1,268 @@
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { useEffect, useMemo, useState } from "react";
+
+import BackendStatusBanner from "@/components/BackendStatusBanner";
+import Role1Layout from "@/components/Role1Layout";
+import {
+  DataMode,
+  LocalEvidenceWithReview,
+  NA_TEXT,
+  fetchEvidenceListReadMode,
+  fetchRole1Context,
+  listLocalEvidence,
+  mapEvidenceRowsWithReview,
+  statusLabel,
+} from "@/lib/role1TaskLayer";
+
+type GroupedEvidence = {
+  DRAFT: EvidenceViewItem[];
+  SUBMITTED: EvidenceViewItem[];
+  NEEDS_REVISION: EvidenceViewItem[];
+};
+
+type EvidenceViewItem = LocalEvidenceWithReview & {
+  isPrototypeItem: boolean;
+};
+
+function renderEvidenceValue(item: LocalEvidenceWithReview) {
+  if (item.type === "TEXT") {
+    return (
+      <p>
+        TEXT: <span>{item.text_content || NA_TEXT}</span>
+      </p>
+    );
+  }
+
+  if (item.type === "URL") {
+    return (
+      <p>
+        URL: {item.external_url ? <a href={item.external_url} target="_blank" rel="noopener noreferrer">{item.external_url}</a> : NA_TEXT}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <p>
+        view_url: {item.file_view_url ? <a href={item.file_view_url} target="_blank" rel="noopener noreferrer">{item.file_view_url}</a> : NA_TEXT}
+      </p>
+      <p>
+        download_url: {item.file_download_url ? <a href={item.file_download_url} target="_blank" rel="noopener noreferrer">{item.file_download_url}</a> : NA_TEXT}
+      </p>
+      <p>
+        reference_url: {item.file_reference_url ? <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">{item.file_reference_url}</a> : NA_TEXT}
+      </p>
+    </>
+  );
+}
+
+export default function MyEvidenceListPage() {
+  const router = useRouter();
+  const { projectId } = router.query;
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [context, setContext] = useState<Awaited<ReturnType<typeof fetchRole1Context>> | null>(null);
+  const [items, setItems] = useState<EvidenceViewItem[]>([]);
+  const [evidenceMode, setEvidenceMode] = useState<DataMode>("backend");
+  const [evidenceMessage, setEvidenceMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!router.isReady || typeof projectId !== "string") return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const nextContext = await fetchRole1Context(projectId);
+        if (!mounted) return;
+        setContext(nextContext);
+        setError(null);
+      } catch (e) {
+        if (!mounted) return;
+        setContext(null);
+        setError(e instanceof Error ? e.message : "Unknown error");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router.isReady, projectId]);
+
+  useEffect(() => {
+    if (!context || typeof projectId !== "string") return;
+
+    let mounted = true;
+    const refresh = () => {
+      fetchEvidenceListReadMode(projectId, context.active_period?.id ?? null)
+        .then((result) => {
+          if (!mounted) return;
+          const localIds = new Set(
+            listLocalEvidence(projectId, context.active_period?.id ?? null).map((row) => row.id)
+          );
+          const hydrated = mapEvidenceRowsWithReview(result.data).map((row) => ({
+            ...row,
+            isPrototypeItem: localIds.has(row.id),
+          }));
+          setItems(hydrated);
+          setEvidenceMode(result.mode);
+          setEvidenceMessage(result.backend_message);
+        })
+        .catch((e) => {
+          if (!mounted) return;
+          setItems([]);
+          setEvidenceMode("prototype");
+          setEvidenceMessage(e instanceof Error ? e.message : "Backend not available");
+        });
+    };
+
+    refresh();
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [context, projectId]);
+
+  const grouped = useMemo<GroupedEvidence>(() => {
+    const result: GroupedEvidence = {
+      DRAFT: [],
+      SUBMITTED: [],
+      NEEDS_REVISION: [],
+    };
+
+    for (const item of items) {
+      const groupKey =
+        item.effective_status === "ACCEPTABLE" || item.effective_status === "REJECTED"
+          ? "SUBMITTED"
+          : item.effective_status;
+      result[groupKey].push(item);
+    }
+
+    return result;
+  }, [items]);
+
+  if (loading) {
+    return (
+      <main className="task-shell">
+        <section className="task-panel">Loading...</section>
+      </main>
+    );
+  }
+
+  if (!context || typeof projectId !== "string") {
+    return (
+      <main className="task-shell">
+        <section className="task-panel">
+          <h1>My Evidence List</h1>
+          <p className="error-box">{error || "Project context not found."}</p>
+          <p>
+            <Link href="/projects">Kembali ke Projects</Link>
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  const sections: Array<keyof GroupedEvidence> = ["DRAFT", "SUBMITTED", "NEEDS_REVISION"];
+
+  return (
+    <Role1Layout
+      projectId={projectId}
+      title="My Evidence List"
+      subtitle="Daftar evidence prototype Anda untuk project dan period aktif."
+      project={context.project}
+      activePeriod={context.active_period}
+      periodStatusLabel={context.period_status_label}
+    >
+      <BackendStatusBanner
+        mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
+        message={context.backend_message || evidenceMessage}
+      />
+      <section className="task-panel">
+        <h2>Evidence Status Groups</h2>
+        <p className="inline-note">Local draft (prototype, not used in scoring)</p>
+        {items.length === 0 ? <p className="empty-state">Belum ada evidence tersimpan pada period ini.</p> : null}
+      </section>
+
+      {sections.map((status) => {
+        const bucket = grouped[status];
+        return (
+          <section key={status} className="task-panel group-section">
+            <h3>
+              {statusLabel(status)} ({bucket.length})
+            </h3>
+
+            {bucket.length === 0 ? <p className="empty-state">No items.</p> : null}
+
+            {bucket.length > 0 ? (
+              <div className="evidence-list">
+                {bucket.map((item) => (
+                  <article className="evidence-item" key={item.id}>
+                    <p>
+                      <strong>{item.title || NA_TEXT}</strong>
+                    </p>
+                    <p>{item.description || NA_TEXT}</p>
+                    <p>
+                      BIM Use: {item.bim_use_id || NA_TEXT} | Type: {item.type}
+                    </p>
+                    <p>Indicators: {item.indicator_ids.length ? item.indicator_ids.join(", ") : NA_TEXT}</p>
+                    {renderEvidenceValue(item)}
+
+                    {item.latest_review_outcome ? (
+                      <p>
+                        Reviewed: {item.latest_review_outcome} | Reviewer: {item.reviewed_by || NA_TEXT} | Time: {item.reviewed_at || NA_TEXT}
+                      </p>
+                    ) : null}
+                    {item.effective_status === "NEEDS_REVISION" ? (
+                      <p>Review reason: {item.latest_review_reason || item.review_reason || NA_TEXT}</p>
+                    ) : null}
+
+                    {item.isPrototypeItem ? (
+                      <p className="prototype-badge">{item.storage_label}</p>
+                    ) : (
+                      <p className="inline-note">Backend read-only evidence</p>
+                    )}
+
+                    <div className="item-actions">
+                      {context.period_locked ? (
+                        <button type="button" disabled>
+                          Edit (LOCKED)
+                        </button>
+                      ) : (
+                        <Link href={`/projects/${projectId}/evidence/add?evidenceId=${encodeURIComponent(item.id)}`}>
+                          Edit
+                        </Link>
+                      )}
+                      {item.effective_status === "NEEDS_REVISION" ? (
+                        context.period_locked ? (
+                          <button type="button" disabled>
+                            Revisi (LOCKED)
+                          </button>
+                        ) : (
+                          <Link
+                            className="revisi"
+                            href={`/projects/${projectId}/evidence/add?mode=revisi&evidenceId=${encodeURIComponent(item.id)}`}
+                          >
+                            Revisi
+                          </Link>
+                        )
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        );
+      })}
+    </Role1Layout>
+  );
+}
