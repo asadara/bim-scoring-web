@@ -109,3 +109,17 @@ Dokumen ini menjadi catatan resmi perubahan untuk pekerjaan landing page, dimula
   - `doc/landing-page-render-deploy-checklist.md`
   - `bcl_scoring/README.md`
   - `doc/landing-page-change-log.md`
+
+### 2026-02-11  Entry 005
+
+- Status: PHASE CHECKPOINT LOGGED
+- Action:
+  - Menambahkan log status phase lintas checkpoint ke:
+    - `doc/phase-status-log.md`
+  - Menetapkan status saat ini:
+    - frontend live di default Render domain
+    - custom domain pending DNS
+    - mode aplikasi tetap read-only untuk uji UX
+- Files changed:
+  - `doc/phase-status-log.md`
+  - `doc/landing-page-change-log.md`
