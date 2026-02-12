@@ -38,8 +38,8 @@ Log status phase proyek sampai checkpoint saat ini.
 ## Active Decisions
 
 1. Tetap menggunakan domain default Render sementara: `https://bim-scoring-web.onrender.com`.
-2. Menjaga `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false` sampai rollout gate remediation disetujui.
-3. Perubahan remediation scoring/evidence linkage yang sudah selesai di codebase harus melewati release gate sebelum dianggap aktif di produksi.
+2. Menjaga `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false` selama fase ujicoba UX read-only masih berjalan.
+3. Remediation scoring/evidence linkage sudah aktif di produksi; perubahan berikutnya wajib melalui release gate operasional.
 4. Guardrail governance tetap: review != approval, approval mengunci period, snapshot immutable, audit append-only.
 
 ## Evidence References
