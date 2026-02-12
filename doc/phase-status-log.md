@@ -16,7 +16,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Frontend web landing: LIVE di Render (`https://bim-scoring-web.onrender.com`).
 - Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
 - Paket contract/regression blueprint-critical terbaru: lulus (`tests=19, pass=19, fail=0`).
-- Rollout remediation ke `main` API/Web sudah ditrigger (push commit), smoke checks endpoint publik lulus.
+- Rollout remediation API/Web sudah selesai dan terverifikasi pasca-deploy pada endpoint produksi.
 - Custom domain: belum aktif (menunggu setup DNS).
 - Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
 
@@ -31,7 +31,7 @@ Log status phase proyek sampai checkpoint saat ini.
 | Go-Live Readiness | PRODUCTION-ELIGIBLE | Gate produksi terpenuhi dengan kontrol operasional. |
 | Frontend Landing Deployment | COMPLETE | Landing root diterapkan dan deploy ke Render default domain. |
 | Blueprint Alignment Remediation (R1) | COMPLETE (CODEBASE) | Step 1-6 remediation blueprint selesai di workspace dev + evidence dokumentasi tersedia. |
-| Remediation Rollout Gate | IN PROGRESS | Push ke `main` API/Web dan smoke checks publik sudah lulus; verifikasi log deploy Render final masih berjalan. |
+| Remediation Rollout Gate | COMPLETE | Push ke `main` API/Web selesai; smoke checks dan verifikasi pasca-deploy endpoint produksi lulus. |
 | Custom Domain Activation | PENDING | Domain custom ditunda sampai DNS siap/terkonfigurasi benar. |
 | UX Trial Window | IN PROGRESS | Aplikasi dijalankan read-only untuk ujicoba client-side. |
 
@@ -56,7 +56,6 @@ Log status phase proyek sampai checkpoint saat ini.
 
 ## Exit Criteria for Next Phase
 
-- Verifikasi log deploy Render menunjukkan rollout commit API/Web selesai terdeploy.
 - Verifikasi pasca-deploy menunjukkan kontrak scoring/evidence tetap sesuai blueprint.
 - Keputusan transisi write-mode disetujui terkontrol (jika diperlukan).
 - Checklist keamanan operasional tetap terpenuhi.

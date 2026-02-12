@@ -61,5 +61,8 @@ Hasil:
    - `https://bim-scoring-web.onrender.com/audit` -> `200`
    - `https://bim-scoring-api.onrender.com/health` -> `200`
    - `https://bim-scoring-api.onrender.com/ready` -> `200`
-4. Status rollout gate:
-   - `IN PROGRESS` sampai log deploy Render menunjukkan commit terbaru selesai dipublikasikan.
+4. Verifikasi pasca-deploy:
+   - Summary produksi menunjukkan skala baru (`total_score=6`, `weighted_P1=6`) untuk period sample yang sama.
+   - Bundle frontend produksi route approval memuat token label interpretasi (`Score level`).
+5. Status rollout gate:
+   - `COMPLETE`

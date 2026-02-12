@@ -254,4 +254,4 @@ Proyek dinyatakan inline jika seluruh poin berikut terpenuhi:
    - API commit: `497182e`
    - Web commit: `6c8d92b`
 2. Smoke checks endpoint publik lulus (`200`) untuk route frontend utama dan endpoint API `/health` + `/ready`.
-3. Status gate rollout saat ini: `IN PROGRESS` sampai log deploy Render mengonfirmasi commit terbaru sudah terdeploy penuh.
+3. Status gate rollout saat ini: `COMPLETE` (post-deploy verification endpoint produksi lulus).
