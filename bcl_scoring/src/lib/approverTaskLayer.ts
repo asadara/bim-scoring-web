@@ -41,8 +41,19 @@ export type SummaryBreakdownRow = {
   score: number | null;
 };
 
+export type SummaryConfidence = {
+  coverage: number | null;
+  frequency: number | null;
+  confidence: number | null;
+  indicators_with_submission: number | null;
+  total_active_indicators: number | null;
+  total_submission: number | null;
+  target_submission: number | null;
+};
+
 export type ReadOnlySummary = {
   total_score: number | null;
+  confidence: SummaryConfidence | null;
   breakdown: SummaryBreakdownRow[];
 };
 
@@ -178,6 +189,22 @@ function toSummaryBreakdown(value: unknown): SummaryBreakdownRow[] {
     .filter((row): row is SummaryBreakdownRow => Boolean(row));
 }
 
+function toSummaryConfidence(value: unknown): SummaryConfidence | null {
+  const item = safeObject(value);
+  const parsed: SummaryConfidence = {
+    coverage: asNumber(item.coverage),
+    frequency: asNumber(item.frequency),
+    confidence: asNumber(item.confidence),
+    indicators_with_submission: asNumber(item.indicators_with_submission),
+    total_active_indicators: asNumber(item.total_active_indicators),
+    total_submission: asNumber(item.total_submission),
+    target_submission: asNumber(item.target_submission),
+  };
+
+  const hasAnyValue = Object.values(parsed).some((entry) => entry !== null);
+  return hasAnyValue ? parsed : null;
+}
+
 export async function fetchReadOnlySummary(projectId: string, periodId: string | null): Promise<ReadOnlySummary> {
   const result = await fetchReadOnlySummaryReadMode(projectId, periodId);
   if (result.mode === "prototype") {
@@ -196,6 +223,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
     return {
       data: {
         total_score: null,
+        confidence: null,
         breakdown: [],
       },
       mode: "prototype",
@@ -213,6 +241,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
     return {
       data: {
         total_score: null,
+        confidence: null,
         breakdown: [],
       },
       mode: "prototype",
@@ -225,10 +254,12 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
     const payload = normalizePayload(response.data);
     const root = safeObject(payload);
     const totalScore = asNumber(root.total_score);
+    const confidence = toSummaryConfidence(root.confidence);
     const breakdown = toSummaryBreakdown(root.perspectives);
     return {
       data: {
         total_score: totalScore,
+        confidence,
         breakdown,
       },
       mode: "backend",
@@ -239,6 +270,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
     return {
       data: {
         total_score: null,
+        confidence: null,
         breakdown: [],
       },
       mode: "prototype",
@@ -360,6 +392,7 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
     const latestSnapshot = snapshots[0];
     summary = {
       total_score: latestSnapshot.final_bim_score,
+      confidence: null,
       breakdown: latestSnapshot.breakdown.map((row) => ({
         perspective_id: row.perspective_id,
         score: row.score,

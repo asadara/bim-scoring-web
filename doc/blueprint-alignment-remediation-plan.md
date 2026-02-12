@@ -255,3 +255,17 @@ Proyek dinyatakan inline jika seluruh poin berikut terpenuhi:
    - Web commit: `6c8d92b`
 2. Smoke checks endpoint publik lulus (`200`) untuk route frontend utama dan endpoint API `/health` + `/ready`.
 3. Status gate rollout saat ini: `COMPLETE` (post-deploy verification endpoint produksi lulus).
+
+## 10. Supplemental Update (2026-02-12)
+
+1. Summary API diselaraskan ke model weekly-cumulative:
+   - Skor indikator memakai rata-rata kumulatif submission mingguan sampai period aktif.
+   - Response summary menampilkan objek `confidence` (coverage, frequency, confidence, submission counters).
+2. Contract/regression proof ditambah:
+   - Test baru `summary.v2.engine.integration` untuk validasi kumulatif mingguan + confidence.
+3. Read surface web diselaraskan:
+   - Halaman approval project menampilkan `confidence` dan coverage/frequency.
+   - Halaman audit snapshot menampilkan `confidence` dari backend read-only summary.
+4. Validasi run terakhir:
+   - API contract tests: `tests=20, pass=20, fail=0`.
+   - Web build (dengan env build): sukses, seluruh route prerender lulus.

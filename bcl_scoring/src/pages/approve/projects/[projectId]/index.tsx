@@ -94,6 +94,7 @@ export default function ProjectApprovalContextPage() {
 
   const breakdownMap = new Map(context.summary.breakdown.map((row) => [row.perspective_id, row.score]));
   const interpretation = scoreInterpretation(context.summary.total_score);
+  const confidence = context.summary.confidence;
 
   return (
     <ApproverLayout
@@ -122,6 +123,15 @@ export default function ProjectApprovalContextPage() {
         <p>
           Score level: <strong>{interpretation}</strong>
         </p>
+        <p>
+          Confidence: <strong>{confidence?.confidence ?? NA_TEXT}</strong>
+        </p>
+        {confidence ? (
+          <p>
+            Coverage/Frequency: <strong>{confidence.coverage ?? NA_TEXT}</strong> /{" "}
+            <strong>{confidence.frequency ?? NA_TEXT}</strong>
+          </p>
+        ) : null}
         {!context.summary_available ? (
           <p className="warning-box">Summary backend: {NA_TEXT}</p>
         ) : null}

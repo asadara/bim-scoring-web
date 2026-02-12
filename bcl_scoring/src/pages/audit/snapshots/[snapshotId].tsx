@@ -14,7 +14,7 @@ import {
   listDecisionsForSnapshot,
 } from "@/lib/auditTaskLayer";
 import { generateSnapshotPdfBlob } from "@/lib/auditPdfExport";
-import { fetchReadOnlySummaryReadMode } from "@/lib/approverTaskLayer";
+import { SummaryConfidence, fetchReadOnlySummaryReadMode } from "@/lib/approverTaskLayer";
 import {
   ISO19650_REFERENCE_ONLY_LABEL,
   ISO19650_REFERENCE_ROWS,
@@ -53,6 +53,7 @@ export default function AuditSnapshotDetailPage() {
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [backendSummary, setBackendSummary] = useState<{
     total_score: number | null;
+    confidence: SummaryConfidence | null;
     breakdown: Array<{ perspective_id: string; score: number | null }>;
   } | null>(null);
 
@@ -98,6 +99,7 @@ export default function AuditSnapshotDetailPage() {
         if (summaryResult.available) {
           summary = {
             total_score: summaryResult.data.total_score,
+            confidence: summaryResult.data.confidence,
             breakdown: summaryResult.data.breakdown,
           };
         } else {
@@ -365,6 +367,9 @@ export default function AuditSnapshotDetailPage() {
         <h3>Backend Read-only Summary</h3>
         <p>
           Total: <strong>{backendSummary?.total_score ?? NA_TEXT}</strong>
+        </p>
+        <p>
+          Confidence: <strong>{backendSummary?.confidence?.confidence ?? NA_TEXT}</strong>
         </p>
         <p>Breakdown source: {backendSummary ? "Available" : NA_TEXT}</p>
       </section>
