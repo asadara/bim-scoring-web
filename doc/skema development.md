@@ -58,13 +58,13 @@
 | 4. Setup Frontend | COMPLETE | Frontend Next.js live di Render, route root menampilkan dashboard utama (`https://bim-scoring-web.onrender.com/`). |
 | 5. Implement Logic | COMPLETE | Formula scoring inline blueprint + weekly cumulative + confidence; guard role/write aktif. |
 | 6. Integrasi BCL | COMPLETE | Dashboard legacy (`bcl/index.html` + `dashboard.js`) sudah dimount di route root Next.js dan asset dipublish dari `public/bcl`. |
-| 7. Testing | PARTIAL (HIGH) | Contract/regression API lulus (`tests=20, pass=20, fail=0`); smoke deploy web+api sudah diotomasi (`bcl_scoring/scripts/render-smoke-check.mjs`). |
+| 7. Testing | COMPLETE | Contract/regression API lulus (`tests=20, pass=20, fail=0`); smoke deploy web+api otomatis (`bcl_scoring/scripts/render-smoke-check.mjs`); E2E browser lintas role lulus (`npm run e2e`, 1 passed). |
 | 8. Deploy | PARTIAL | Default Render domain live/stabil; custom domain masih pending DNS; write mode masih controlled (`NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false`). |
 | 9. Iterasi | IN PROGRESS | Dashboard sudah tersedia; ekspansi indikator BIM Use dan paket laporan lanjutan belum selesai penuh. |
 
 ## Backlog Prioritas Lanjutan
 
-1. Stage 7 (Testing Hardening): tambah E2E browser test untuk role flow lintas halaman (Role 1 -> Role 2 -> Role 3 -> Audit), bukan hanya contract/API dan smoke route.
+1. Stage 7 (Testing Hardening+): perluas E2E menjadi multi-skenario (reject flow, lock behavior pasca-approval, export snapshot) dan jalankan terjadwal di CI.
 2. Stage 8 (Deploy Finalization): aktifkan custom domain + TLS, lalu re-run smoke check pasca-cutover.
 3. Stage 8 (Go-Live Write Mode): siapkan release gate untuk transisi terkontrol dari read-only ke backend write mode (dengan rollback plan).
 4. Stage 9 (Iterasi Indikator): tambah indikator aktif per BIM Use agar coverage scoring tidak hanya baseline indikator template.

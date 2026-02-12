@@ -16,6 +16,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Frontend web landing: LIVE di Render (`https://bim-scoring-web.onrender.com`).
 - Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
 - Paket contract/regression blueprint-critical terbaru: lulus (`tests=20, pass=20, fail=0`).
+- E2E browser lintas role (Role 1 -> Role 2 -> Role 3 -> Audit): lulus (`npm run e2e`, `1 passed`).
 - Rollout remediation API/Web sudah selesai dan terverifikasi pasca-deploy pada endpoint produksi.
 - Landing utama sudah diselaraskan ke dashboard BCL (legacy) pada route root (`/`) dengan kompatibilitas route lama (`/bcl/index.html`).
 - Custom domain: belum aktif (menunggu setup DNS).
@@ -48,6 +49,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Landing implementation log: `doc/landing-page-change-log.md`
 - Landing deploy checklist: `doc/landing-page-render-deploy-checklist.md`
 - Render smoke script (web+api): `bcl_scoring/scripts/render-smoke-check.mjs`
+- E2E browser spec lintas role: `bcl_scoring/e2e/role-flow.spec.ts`
 - Frontend operational baseline: `bcl_scoring/README.md`
 - Backend write readiness reference: `doc/backend-write-readiness.md`
 - Blueprint remediation plan + status step: `doc/blueprint-alignment-remediation-plan.md`
