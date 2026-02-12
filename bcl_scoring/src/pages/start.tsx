@@ -57,6 +57,15 @@ export default function StartHerePage() {
               </Link>
             </div>
           </article>
+
+          <article className="summary-card">
+            <span>Admin Control</span>
+            <div className="wizard-actions">
+              <Link className="primary-cta" href="/admin">
+                Masuk Admin
+              </Link>
+            </div>
+          </article>
         </div>
       </section>
 

@@ -24,7 +24,7 @@ export default function Home() {
             Dashboard utama BIM Scoring. Akses workflow detail:{" "}
             <Link href="/start">Start</Link> | <Link href="/projects">Role 1</Link> |{" "}
             <Link href="/ho/review">Role 2</Link> | <Link href="/approve">Role 3</Link> |{" "}
-            <Link href="/audit">Audit</Link>
+            <Link href="/audit">Audit</Link> | <Link href="/admin">Admin</Link>
           </p>
         </header>
 

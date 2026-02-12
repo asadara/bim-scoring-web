@@ -499,6 +499,45 @@ a {
   vertical-align: top;
 }
 
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table-wrap table {
+  min-width: 880px;
+}
+
+.admin-lock-bar p {
+  margin: 0 0 8px;
+}
+
+.admin-lock-bar label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.admin-lock-bar input {
+  width: 100%;
+  border: 1px solid #bfcfc6;
+  border-radius: 8px;
+  padding: 8px;
+  font: inherit;
+  color: var(--task-ink);
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.admin-filter-row {
+  margin-top: 8px;
+}
+
+.admin-filter-row label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+
 @media (max-width: 720px) {
   .task-shell {
     padding: 20px 12px 28px;
