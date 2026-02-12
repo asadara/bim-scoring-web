@@ -247,3 +247,11 @@ Proyek dinyatakan inline jika seluruh poin berikut terpenuhi:
    - `node --test test/contract/summary.v2.engine.integration.test.js test/contract/scoring.engine.scale.contract.test.js test/contract/evidence.write.h8.1.contract.test.js test/contract/evidence.approval.h8.3.contract.test.js test/contract/summary.v2.schema.test.js`
 2. Hasil:
    - `tests=19, pass=19, fail=0` (TAP, run date: 2026-02-12).
+
+## 9. Status Rollout (Update 2026-02-12)
+
+1. Rollout trigger sudah dijalankan via push ke `main`:
+   - API commit: `497182e`
+   - Web commit: `6c8d92b`
+2. Smoke checks endpoint publik lulus (`200`) untuk route frontend utama dan endpoint API `/health` + `/ready`.
+3. Status gate rollout saat ini: `IN PROGRESS` sampai log deploy Render mengonfirmasi commit terbaru sudah terdeploy penuh.

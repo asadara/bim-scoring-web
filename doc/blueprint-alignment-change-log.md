@@ -44,3 +44,22 @@ Hasil:
 
 1. Perubahan di atas sudah siap secara kontrak dan regression test pada workspace dev.
 2. Aktivasi di environment produksi tetap mengikuti release gate operasional.
+
+## Eksekusi Rollout (2026-02-12)
+
+1. Push API ke `main`:
+   - Commit: `497182e`
+   - Repo: `https://github.com/asadara/bim-scoring-api`
+2. Push Web ke `main`:
+   - Commit: `6c8d92b`
+   - Repo: `https://github.com/asadara/bim-scoring-web`
+3. Smoke check publik:
+   - `https://bim-scoring-web.onrender.com/` -> `200`
+   - `https://bim-scoring-web.onrender.com/projects` -> `200`
+   - `https://bim-scoring-web.onrender.com/ho/review` -> `200`
+   - `https://bim-scoring-web.onrender.com/approve` -> `200`
+   - `https://bim-scoring-web.onrender.com/audit` -> `200`
+   - `https://bim-scoring-api.onrender.com/health` -> `200`
+   - `https://bim-scoring-api.onrender.com/ready` -> `200`
+4. Status rollout gate:
+   - `IN PROGRESS` sampai log deploy Render menunjukkan commit terbaru selesai dipublikasikan.

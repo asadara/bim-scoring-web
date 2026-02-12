@@ -16,6 +16,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Frontend web landing: LIVE di Render (`https://bim-scoring-web.onrender.com`).
 - Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
 - Paket contract/regression blueprint-critical terbaru: lulus (`tests=19, pass=19, fail=0`).
+- Rollout remediation ke `main` API/Web sudah ditrigger (push commit), smoke checks endpoint publik lulus.
 - Custom domain: belum aktif (menunggu setup DNS).
 - Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
 
@@ -30,7 +31,7 @@ Log status phase proyek sampai checkpoint saat ini.
 | Go-Live Readiness | PRODUCTION-ELIGIBLE | Gate produksi terpenuhi dengan kontrol operasional. |
 | Frontend Landing Deployment | COMPLETE | Landing root diterapkan dan deploy ke Render default domain. |
 | Blueprint Alignment Remediation (R1) | COMPLETE (CODEBASE) | Step 1-6 remediation blueprint selesai di workspace dev + evidence dokumentasi tersedia. |
-| Remediation Rollout Gate | PENDING | Menunggu release gate untuk rollout terkontrol ke environment produksi. |
+| Remediation Rollout Gate | IN PROGRESS | Push ke `main` API/Web dan smoke checks publik sudah lulus; verifikasi log deploy Render final masih berjalan. |
 | Custom Domain Activation | PENDING | Domain custom ditunda sampai DNS siap/terkonfigurasi benar. |
 | UX Trial Window | IN PROGRESS | Aplikasi dijalankan read-only untuk ujicoba client-side. |
 
@@ -50,10 +51,12 @@ Log status phase proyek sampai checkpoint saat ini.
 - Blueprint remediation plan + status step: `doc/blueprint-alignment-remediation-plan.md`
 - Blueprint remediation changelog: `doc/blueprint-alignment-change-log.md`
 - Blueprint payload samples (before/after): `doc/blueprint-alignment-payload-samples.md`
+- Rollout commit (API): `497182e` (`Align scoring contract to 0-100 and enforce evidence linkage`)
+- Rollout commit (Web): `6c8d92b` (`Complete blueprint remediation docs and UI score interpretation`)
 
 ## Exit Criteria for Next Phase
 
-- Rollout gate remediation disetujui (kontrak, test, dan governance terverifikasi).
+- Verifikasi log deploy Render menunjukkan rollout commit API/Web selesai terdeploy.
 - Verifikasi pasca-deploy menunjukkan kontrak scoring/evidence tetap sesuai blueprint.
 - Keputusan transisi write-mode disetujui terkontrol (jika diperlukan).
 - Checklist keamanan operasional tetap terpenuhi.
