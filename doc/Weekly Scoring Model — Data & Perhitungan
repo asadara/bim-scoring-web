@@ -1,0 +1,126 @@
+# Weekly Scoring Model — Data & Perhitungan
+
+## 1. Data yang Disimpan Tiap Input Mingguan
+
+Setiap minggu, input dilakukan oleh entitas berwenang sesuai governance role:
+
+- **Admin**: menjalankan **Score Submission** (pada write surface score yang ditetapkan).
+- **Role 1 / BIM Koordinator Proyek**: mengirim evidence per indikator sesuai scope tugasnya.
+
+Data mingguan yang dipakai model berisi:
+
+- `project_id`
+- `period_week` (mis. 2026-W05)
+- Daftar:
+  - `indicator_id`
+  - `score` (0–5)
+- Evidence per indikator (minimal 1 bukti)
+
+Struktur logis:
+
+Project  
+→ Week / Period  
+  → Indicator Submission  
+    → Score (0–5)  
+    → Evidence (min. 1)
+
+---
+
+## 2. Cara Hitung Rata-rata per Indikator (Inti Akurasi)
+
+Untuk setiap indikator `i` pada proyek `p`:
+
+- `n_i` = jumlah submission yang berisi indikator `i`
+- `avg_i` = (Σ score_i) / n_i
+
+Semakin besar `n_i`, semakin stabil dan semakin akurat nilai indikator tersebut.
+
+Tidak ada data ≠ skor 0.  
+Jika tidak ada submission, indikator tersebut tidak menambah `n_i`.
+
+---
+
+## 3. Skor Perspektif per Periode (Berbasis Rata-rata Indikator)
+
+Untuk perspektif `P`:
+
+1. Ambil semua indikator aktif dalam perspektif tersebut → `I(P)`
+2. Hitung:
+
+\[
+avg_P = \frac{\sum avg_i \text{ untuk } i \in I(P)}{|I(P)|}
+\]
+
+3. Skor perspektif:
+
+\[
+Skor_P = \left(\frac{avg_P}{5}\right) \times Bobot_P
+\]
+
+Bobot perspektif mengikuti bobot organisasi (fixed).
+
+---
+
+## 4. Skor Total Proyek (0–100)
+
+\[
+BIM\_Score = \sum Skor_P \text{ (P1..P5)}
+\]
+
+Rentang hasil akhir: **0–100**
+
+---
+
+## 5. “Akurasi” sebagai Metrik Terpisah (Recommended)
+
+Agar skor tidak berdiri sendiri, tambahkan metrik **Confidence**.
+
+### Coverage
+\[
+coverage = \frac{\# indikator\ dengan\ n_i > 0}{total\ indikator\ aktif}
+\]
+
+### Frequency
+\[
+frequency = \min\left(1,\ \frac{total\_submission}{target\_submission}\right)
+\]
+
+Contoh:
+- Target submission: 8 minggu
+- Jika sudah 8 atau lebih → frequency = 1
+
+### Confidence
+\[
+confidence = coverage \times frequency
+\]
+
+Contoh narasi manajemen:
+- Skor 78, confidence 0.92 → matang & datanya kaya
+- Skor 78, confidence 0.35 → angka masih mentah / belum stabil
+
+---
+
+## 6. Catatan Penting (Menghindari Bias)
+
+- Jangan menghukum minggu yang tidak input dengan skor 0.
+- Tidak ada data = tidak menambah `n_i`.
+- Untuk menonjolkan tren terbaru, dapat digunakan:
+  - Moving average (mis. 4 minggu terakhir)
+  - Sebagai opsi tampilan, bukan mengganti skor utama
+
+---
+
+# Baseline Final yang Berlaku
+
+- Skor indikator = rata-rata kumulatif dari input mingguan
+- Skor perspektif & total = turunan dari rata-rata indikator + bobot tetap
+- Confidence metric = wajib
+
+Confidence dihitung dari:
+- Coverage (indikator terisi / indikator aktif)
+- Frequency (jumlah minggu input / target minggu)
+
+Output sistem selalu menampilkan:
+
+- **BIM Score (0–100)**
+- **Confidence (0–1 atau 0–100%)**
