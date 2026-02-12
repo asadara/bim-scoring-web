@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke:render": "node scripts/render-smoke-check.mjs"
   },
   "dependencies": {
     "jspdf": "^4.1.0",
