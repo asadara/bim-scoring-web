@@ -30,6 +30,15 @@ import {
 
 const PERSPECTIVES = ["P1", "P2", "P3", "P4", "P5"];
 
+function scoreInterpretation(totalScore: number | null): string {
+  if (totalScore === null || !Number.isFinite(totalScore)) return NA_TEXT;
+  if (totalScore < 40) return "Symbolic BIM";
+  if (totalScore < 60) return "Partial BIM";
+  if (totalScore < 75) return "Functional BIM";
+  if (totalScore < 90) return "Integrated BIM";
+  return "BIM-Driven Project";
+}
+
 export default function AuditSnapshotDetailPage() {
   const router = useRouter();
   const { snapshotId } = router.query;
@@ -212,6 +221,7 @@ export default function AuditSnapshotDetailPage() {
   const { snapshot } = snapshotView;
   const submittedCount = getSubmittedCountFromSnapshot(snapshot.evidence_counts);
   const latestDecision = decisions[0] || null;
+  const interpretation = scoreInterpretation(snapshot.final_bim_score);
 
   return (
     <AuditorLayout
@@ -238,6 +248,9 @@ export default function AuditSnapshotDetailPage() {
         <h2>Final Score (Read-only)</h2>
         <p>
           Total: <strong>{snapshot.final_bim_score ?? NA_TEXT}</strong>
+        </p>
+        <p>
+          Score level: <strong>{interpretation}</strong>
         </p>
         <div className="task-grid-3">
           {PERSPECTIVES.map((pid) => (

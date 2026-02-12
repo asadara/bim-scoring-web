@@ -2,7 +2,7 @@
 title: Phase Status Log
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-11
+last_updated: 2026-02-12
 owner: DevOps / Release
 ---
 
@@ -14,8 +14,10 @@ Log status phase proyek sampai checkpoint saat ini.
 
 - Backend API production: LIVE di Render.
 - Frontend web landing: LIVE di Render (`https://bim-scoring-web.onrender.com`).
+- Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
+- Paket contract/regression blueprint-critical terbaru: lulus (`tests=19, pass=19, fail=0`).
 - Custom domain: belum aktif (menunggu setup DNS).
-- Mode operasional frontend saat ini: **read-only / prototype write disabled** untuk uji UI/UX client-side.
+- Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
 
 ## Phase Timeline
 
@@ -27,14 +29,17 @@ Log status phase proyek sampai checkpoint saat ini.
 | CRP-2 (O1.2 Production Gate) | COMPLETE | Backup/retention policy + rate limiting policy/baseline selesai. |
 | Go-Live Readiness | PRODUCTION-ELIGIBLE | Gate produksi terpenuhi dengan kontrol operasional. |
 | Frontend Landing Deployment | COMPLETE | Landing root diterapkan dan deploy ke Render default domain. |
+| Blueprint Alignment Remediation (R1) | COMPLETE (CODEBASE) | Step 1-6 remediation blueprint selesai di workspace dev + evidence dokumentasi tersedia. |
+| Remediation Rollout Gate | PENDING | Menunggu release gate untuk rollout terkontrol ke environment produksi. |
 | Custom Domain Activation | PENDING | Domain custom ditunda sampai DNS siap/terkonfigurasi benar. |
 | UX Trial Window | IN PROGRESS | Aplikasi dijalankan read-only untuk ujicoba client-side. |
 
 ## Active Decisions
 
 1. Tetap menggunakan domain default Render sementara: `https://bim-scoring-web.onrender.com`.
-2. Menjaga `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false` selama fase ujicoba UX.
-3. Tidak ada perubahan scoring logic, snapshot immutability, workflow business logic, rate limiting policy, atau audit append-only selama fase ini.
+2. Menjaga `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false` sampai rollout gate remediation disetujui.
+3. Perubahan remediation scoring/evidence linkage yang sudah selesai di codebase harus melewati release gate sebelum dianggap aktif di produksi.
+4. Guardrail governance tetap: review != approval, approval mengunci period, snapshot immutable, audit append-only.
 
 ## Evidence References
 
@@ -42,9 +47,13 @@ Log status phase proyek sampai checkpoint saat ini.
 - Landing deploy checklist: `doc/landing-page-render-deploy-checklist.md`
 - Frontend operational baseline: `bcl_scoring/README.md`
 - Backend write readiness reference: `doc/backend-write-readiness.md`
+- Blueprint remediation plan + status step: `doc/blueprint-alignment-remediation-plan.md`
+- Blueprint remediation changelog: `doc/blueprint-alignment-change-log.md`
+- Blueprint payload samples (before/after): `doc/blueprint-alignment-payload-samples.md`
 
 ## Exit Criteria for Next Phase
 
-- Ujicoba UI/UX client-side selesai dan temuan terdokumentasi.
+- Rollout gate remediation disetujui (kontrak, test, dan governance terverifikasi).
+- Verifikasi pasca-deploy menunjukkan kontrak scoring/evidence tetap sesuai blueprint.
 - Keputusan transisi write-mode disetujui terkontrol (jika diperlukan).
 - Checklist keamanan operasional tetap terpenuhi.

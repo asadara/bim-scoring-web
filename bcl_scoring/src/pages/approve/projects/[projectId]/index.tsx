@@ -9,6 +9,15 @@ import { ApproverProjectContext, fetchApproverProjectContext } from "@/lib/appro
 
 const PERSPECTIVES = ["P1", "P2", "P3", "P4", "P5"];
 
+function scoreInterpretation(totalScore: number | null): string {
+  if (totalScore === null || !Number.isFinite(totalScore)) return NA_TEXT;
+  if (totalScore < 40) return "Symbolic BIM";
+  if (totalScore < 60) return "Partial BIM";
+  if (totalScore < 75) return "Functional BIM";
+  if (totalScore < 90) return "Integrated BIM";
+  return "BIM-Driven Project";
+}
+
 export default function ProjectApprovalContextPage() {
   const router = useRouter();
   const { projectId } = router.query;
@@ -84,6 +93,7 @@ export default function ProjectApprovalContextPage() {
         : "status-chip status-na";
 
   const breakdownMap = new Map(context.summary.breakdown.map((row) => [row.perspective_id, row.score]));
+  const interpretation = scoreInterpretation(context.summary.total_score);
 
   return (
     <ApproverLayout
@@ -108,6 +118,9 @@ export default function ProjectApprovalContextPage() {
         <h2>Read-only Summary</h2>
         <p>
           BIM score total: <strong>{context.summary.total_score ?? NA_TEXT}</strong>
+        </p>
+        <p>
+          Score level: <strong>{interpretation}</strong>
         </p>
         {!context.summary_available ? (
           <p className="warning-box">Summary backend: {NA_TEXT}</p>
