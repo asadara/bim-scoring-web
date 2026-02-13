@@ -1,4 +1,3 @@
-﻿import Link from "next/link";
 import { ReactNode } from "react";
 
 import {
@@ -15,27 +14,38 @@ type Role2LayoutProps = {
   project?: ProjectRecord | null;
   activePeriod?: ScoringPeriod | null;
   periodStatusLabel?: string;
+  projectLabel?: string;
+  activePeriodLabel?: string;
   children: ReactNode;
 };
 
 export default function Role2Layout(props: Role2LayoutProps) {
-  const { title, subtitle, project, activePeriod, periodStatusLabel, children } = props;
+  const {
+    title,
+    subtitle,
+    project,
+    activePeriod,
+    periodStatusLabel,
+    projectLabel,
+    activePeriodLabel,
+    children,
+  } = props;
 
   return (
     <main className="task-shell">
       <header className="task-header">
-        <p className="task-kicker">Role 2 - HO Reviewer</p>
+        <p className="task-kicker">BIM Coordinator HO</p>
         <h1>{title}</h1>
         {subtitle ? <p className="task-subtitle">{subtitle}</p> : null}
 
         <div className="task-context-grid">
           <div className="context-card">
             <span>Project</span>
-            <strong>{formatProjectLabel(project || null)}</strong>
+            <strong>{projectLabel || formatProjectLabel(project || null)}</strong>
           </div>
           <div className="context-card">
             <span>Active period</span>
-            <strong>{formatPeriodLabel(activePeriod || null)}</strong>
+            <strong>{activePeriodLabel || formatPeriodLabel(activePeriod || null)}</strong>
           </div>
           <div className="context-card">
             <span>Period status</span>
@@ -43,15 +53,6 @@ export default function Role2Layout(props: Role2LayoutProps) {
           </div>
         </div>
       </header>
-
-      <nav className="task-nav" aria-label="Role 2 task navigation">
-        <Link href="/">Home</Link>
-        <Link href="/start">Start Here</Link>
-        <Link href="/projects">Projects</Link>
-        <Link href="/ho/review">HO Review</Link>
-        <Link href="/approve">Approvals</Link>
-        <Link href="/audit">Audit</Link>
-      </nav>
 
       {children}
     </main>

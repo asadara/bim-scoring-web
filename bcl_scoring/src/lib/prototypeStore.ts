@@ -1,6 +1,7 @@
 import {
   buildPrototypeScopeKey,
   normalizeEvidenceStatus,
+  UNKNOWN_ACTIVE_PERIOD_KEY,
   normalizePeriodKey,
   normalizeReviewOutcome,
 } from "@/lib/statusModel";
@@ -735,6 +736,7 @@ export function getPrototypePeriodLockFromStore(
   periodId: string | null
 ): StorePeriodLockRecord | null {
   const normalized = normalizePeriodId(periodId);
+  if (!normalized || normalized === UNKNOWN_ACTIVE_PERIOD_KEY) return null;
   const hit = loadStore().period_locks.find(
     (row) => row.project_id === projectId && row.period_id === normalized && row.status === "LOCKED"
   );
@@ -746,6 +748,7 @@ export function getPrototypePeriodStatusFromStore(
   periodId: string | null
 ): "LOCKED" | "OPEN" | null {
   const normalized = normalizePeriodId(periodId);
+  if (!normalized || normalized === UNKNOWN_ACTIVE_PERIOD_KEY) return null;
   const lock = getPrototypePeriodLockFromStore(projectId, normalized);
   if (lock) return "LOCKED";
 

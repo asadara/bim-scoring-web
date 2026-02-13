@@ -1,4 +1,3 @@
-﻿import Link from "next/link";
 import { ReactNode } from "react";
 
 import { NA_TEXT } from "@/lib/role1TaskLayer";
@@ -18,7 +17,7 @@ export default function ApproverLayout(props: ApproverLayoutProps) {
   return (
     <main className="task-shell">
       <header className="task-header">
-        <p className="task-kicker">Role 3 - Approver (BIM Manager/KaDiv BIM)</p>
+        <p className="task-kicker">BIM Manager</p>
         <h1>{title}</h1>
         {subtitle ? <p className="task-subtitle">{subtitle}</p> : null}
 
@@ -37,15 +36,6 @@ export default function ApproverLayout(props: ApproverLayoutProps) {
           </div>
         </div>
       </header>
-
-      <nav className="task-nav" aria-label="Approver navigation">
-        <Link href="/">Home</Link>
-        <Link href="/start">Start Here</Link>
-        <Link href="/projects">Projects</Link>
-        <Link href="/ho/review">HO Review</Link>
-        <Link href="/approve">Approvals</Link>
-        <Link href="/audit">Audit</Link>
-      </nav>
 
       {children}
     </main>

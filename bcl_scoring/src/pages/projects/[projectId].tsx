@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
+import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
   NA_TEXT,
   buildEvidenceCounts,
@@ -11,10 +12,13 @@ import {
   listLocalEvidenceWithReview,
   statusLabel,
 } from "@/lib/role1TaskLayer";
+import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
 
 export default function ProjectRole1HomePage() {
   const router = useRouter();
   const { projectId } = router.query;
+  const credential = useCredential();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +98,9 @@ export default function ProjectRole1HomePage() {
       : context.period_status_label === "OPEN"
         ? "status-chip status-open"
         : "status-chip status-na";
+  const canWriteEvidence = canWriteRole1Evidence(credential.role);
+  const hasActivePeriod = Boolean(context.active_period?.id);
+  const canAddEvidence = canWriteEvidence && !context.period_locked && hasActivePeriod;
 
   return (
     <Role1Layout
@@ -127,12 +134,34 @@ export default function ProjectRole1HomePage() {
         <p>
           Status: <span className={statusClass}>{context.period_status_label || NA_TEXT}</span>
         </p>
-        {context.period_status_label === NA_TEXT ? (
-          <p className="warning-box">Status period dari backend belum tersedia. Ditampilkan sebagai Not available.</p>
+        {!hasActivePeriod ? (
+          <p className="inline-note">
+            Belum ada period aktif untuk project ini. Admin dapat menambahkan period di halaman{" "}
+            <Link href="/admin">Admin Control Panel</Link>.
+          </p>
         ) : null}
         {context.period_locked ? (
           <p className="warning-box">
             Period sudah LOCKED; input evidence tidak dapat dilakukan.
+          </p>
+        ) : null}
+        {credential.role === "admin" ? (
+          <p className="inline-note">
+            Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence). Gunakan role{" "}
+            <strong>BIM Coordinator Project</strong> untuk menambah evidence.
+            {" "}
+            <button
+              type="button"
+              onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
+            >
+              Switch Role Sekarang
+            </button>
+          </p>
+        ) : null}
+        {!canWriteEvidence && credential.role !== "admin" ? (
+          <p className="read-only-banner">
+            Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Aksi input evidence
+            dinonaktifkan.
           </p>
         ) : null}
 
@@ -141,7 +170,7 @@ export default function ProjectRole1HomePage() {
             type="button"
             className="action-primary"
             onClick={() => router.push(`/projects/${projectId}/evidence/add`)}
-            disabled={context.period_locked}
+            disabled={!canAddEvidence}
           >
             Tambahkan Evidence untuk BIM Use
           </button>

@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
 import BackendStatusBanner from "@/components/BackendStatusBanner";
+import { canWriteRole3Approval } from "@/lib/accessControl";
 import { NA_TEXT, formatProjectLabel } from "@/lib/role1TaskLayer";
 import { ApproverProjectContext, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
+import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel } from "@/lib/userCredential";
 
 const PERSPECTIVES = ["P1", "P2", "P3", "P4", "P5"];
 
@@ -21,6 +24,7 @@ function scoreInterpretation(totalScore: number | null): string {
 export default function ProjectApprovalContextPage() {
   const router = useRouter();
   const { projectId } = router.query;
+  const credential = useCredential();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +99,16 @@ export default function ProjectApprovalContextPage() {
   const breakdownMap = new Map(context.summary.breakdown.map((row) => [row.perspective_id, row.score]));
   const interpretation = scoreInterpretation(context.summary.total_score);
   const confidence = context.summary.confidence;
+  const summaryPending = !context.summary_available;
+  const totalScoreLabel =
+    context.summary.total_score !== null && Number.isFinite(context.summary.total_score)
+      ? String(context.summary.total_score)
+      : "Pending";
+  const scoreLevelLabel = interpretation === NA_TEXT ? "Awaiting scoring result" : interpretation;
+  const confidenceLabel =
+    confidence?.confidence !== null && confidence?.confidence !== undefined
+      ? String(confidence.confidence)
+      : "Pending";
 
   return (
     <ApproverLayout
@@ -105,6 +119,12 @@ export default function ProjectApprovalContextPage() {
       periodStatusLabel={context.period_status_label}
     >
       <BackendStatusBanner mode={context.data_mode} message={context.backend_message} />
+
+      <section className="task-panel">
+        <div className="wizard-actions">
+          <Link href="/approve">Kembali ke Daftar Project Approval</Link>
+        </div>
+      </section>
 
       <section className="task-panel">
         <p>
@@ -118,13 +138,13 @@ export default function ProjectApprovalContextPage() {
       <section className="task-panel">
         <h2>Read-only Summary</h2>
         <p>
-          BIM score total: <strong>{context.summary.total_score ?? NA_TEXT}</strong>
+          BIM score total: <strong>{totalScoreLabel}</strong>
         </p>
         <p>
-          Score level: <strong>{interpretation}</strong>
+          Score level: <strong>{scoreLevelLabel}</strong>
         </p>
         <p>
-          Confidence: <strong>{confidence?.confidence ?? NA_TEXT}</strong>
+          Confidence: <strong>{confidenceLabel}</strong>
         </p>
         {confidence ? (
           <p>
@@ -132,15 +152,17 @@ export default function ProjectApprovalContextPage() {
             <strong>{confidence.frequency ?? NA_TEXT}</strong>
           </p>
         ) : null}
-        {!context.summary_available ? (
-          <p className="warning-box">Summary backend: {NA_TEXT}</p>
+        {summaryPending ? (
+          <p className="warning-box">
+            Summary belum tersedia dari backend. Lanjutkan review evidence dan gunakan keputusan approval untuk membuat snapshot.
+          </p>
         ) : null}
 
         <div className="task-grid-3">
           {PERSPECTIVES.map((pid) => (
             <article key={pid} className="summary-card">
               <span>{pid}</span>
-              <strong>{breakdownMap.get(pid) ?? NA_TEXT}</strong>
+              <strong>{breakdownMap.get(pid) ?? (summaryPending ? "Pending" : "Not scored")}</strong>
             </article>
           ))}
         </div>
@@ -161,22 +183,37 @@ export default function ProjectApprovalContextPage() {
             <span>REJECTED</span>
             <strong>{context.evidence_counts.REJECTED}</strong>
           </article>
-          <article className="summary-card">
-            <span>Awaiting review</span>
-            <strong>{context.evidence_counts.AWAITING_REVIEW}</strong>
-          </article>
+          {context.evidence_counts.AWAITING_REVIEW > 0 ? (
+            <Link className="summary-card summary-card-action" href={`/approve/projects/${projectId}/awaiting-review`}>
+              <span>Awaiting review</span>
+              <strong>{context.evidence_counts.AWAITING_REVIEW}</strong>
+              <small>Open pending queue</small>
+            </Link>
+          ) : (
+            <article className="summary-card">
+              <span>Awaiting review</span>
+              <strong>{context.evidence_counts.AWAITING_REVIEW}</strong>
+              <small>No pending review items</small>
+            </article>
+          )}
         </div>
       </section>
 
       <section className="task-panel">
         <h2>Approval Decision</h2>
+        {!canWriteRole3Approval(credential.role) ? (
+          <p className="read-only-banner">
+            Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Aksi Approve/Reject
+            dinonaktifkan.
+          </p>
+        ) : null}
         <div className="wizard-actions">
           <Link
-            className={`primary-cta ${context.period_locked ? "disabled-link" : ""}`}
-            href={context.period_locked ? "#" : `/approve/projects/${projectId}/decision`}
-            aria-disabled={context.period_locked}
+            className={`primary-cta ${context.period_locked || !canWriteRole3Approval(credential.role) ? "disabled-link" : ""}`}
+            href={context.period_locked || !canWriteRole3Approval(credential.role) ? "#" : `/approve/projects/${projectId}/decision`}
+            aria-disabled={context.period_locked || !canWriteRole3Approval(credential.role)}
             onClick={(event) => {
-              if (context.period_locked) event.preventDefault();
+              if (context.period_locked || !canWriteRole3Approval(credential.role)) event.preventDefault();
             }}
           >
             Approve / Reject Period
@@ -190,7 +227,7 @@ export default function ProjectApprovalContextPage() {
             Last decision: {context.latest_decision.decision} | {context.latest_decision.decided_by} | {context.latest_decision.decided_at} | Reason: {context.latest_decision.reason}
           </p>
         ) : (
-          <p>Last decision: {NA_TEXT}</p>
+          <p>Last decision: Belum ada keputusan untuk period ini.</p>
         )}
 
         {context.snapshots.length > 0 ? (

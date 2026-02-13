@@ -18,6 +18,7 @@ import {
   mapEvidenceRowsWithReview,
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
+  selectActivePeriod,
   syncReviewedEvidenceFromBackend,
 } from "@/lib/role1TaskLayer";
 import {
@@ -93,7 +94,7 @@ export async function fetchRole2ProjectContext(projectId: string): Promise<{
   ]);
 
   const project = projectResult.data || fallbackProject(projectId);
-  const activePeriod = periodsResult.data[0] ?? fallbackPeriod(projectId);
+  const activePeriod = selectActivePeriod(periodsResult.data) ?? fallbackPeriod(projectId);
   const backendStatus = activePeriod?.status ?? null;
   const dataMode: DataMode =
     projectResult.mode === "prototype" || periodsResult.mode === "prototype" ? "prototype" : "backend";

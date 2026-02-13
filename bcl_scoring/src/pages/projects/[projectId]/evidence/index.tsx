@@ -4,16 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
+import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
   DataMode,
   LocalEvidenceWithReview,
   NA_TEXT,
+  formatBimUseDisplay,
   fetchEvidenceListReadMode,
   fetchRole1Context,
   listLocalEvidence,
   mapEvidenceRowsWithReview,
   statusLabel,
 } from "@/lib/role1TaskLayer";
+import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
 
 type GroupedEvidence = {
   DRAFT: EvidenceViewItem[];
@@ -51,7 +55,15 @@ function renderEvidenceValue(item: LocalEvidenceWithReview) {
         download_url: {item.file_download_url ? <a href={item.file_download_url} target="_blank" rel="noopener noreferrer">{item.file_download_url}</a> : NA_TEXT}
       </p>
       <p>
-        reference_url: {item.file_reference_url ? <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">{item.file_reference_url}</a> : NA_TEXT}
+        reference_url: {item.file_reference_url ? (
+          item.file_reference_url.startsWith("data:") ? (
+            <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">
+              Local binary file (data URL)
+            </a>
+          ) : (
+            <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">{item.file_reference_url}</a>
+          )
+        ) : NA_TEXT}
       </p>
     </>
   );
@@ -60,6 +72,7 @@ function renderEvidenceValue(item: LocalEvidenceWithReview) {
 export default function MyEvidenceListPage() {
   const router = useRouter();
   const { projectId } = router.query;
+  const credential = useCredential();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +185,7 @@ export default function MyEvidenceListPage() {
   }
 
   const sections: Array<keyof GroupedEvidence> = ["DRAFT", "SUBMITTED", "NEEDS_REVISION"];
+  const canWrite = canWriteRole1Evidence(credential.role);
 
   return (
     <Role1Layout
@@ -189,6 +203,24 @@ export default function MyEvidenceListPage() {
       <section className="task-panel">
         <h2>Evidence Status Groups</h2>
         <p className="inline-note">Local draft (prototype, not used in scoring)</p>
+        {credential.role === "admin" ? (
+          <p className="inline-note">
+            Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence).
+            {" "}
+            <button
+              type="button"
+              onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
+            >
+              Switch ke BIM Coordinator Project
+            </button>
+          </p>
+        ) : null}
+        {!canWrite && credential.role !== "admin" ? (
+          <p className="read-only-banner">
+            Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Aksi edit/revisi evidence
+            dinonaktifkan.
+          </p>
+        ) : null}
         {items.length === 0 ? <p className="empty-state">Belum ada evidence tersimpan pada period ini.</p> : null}
       </section>
 
@@ -211,7 +243,7 @@ export default function MyEvidenceListPage() {
                     </p>
                     <p>{item.description || NA_TEXT}</p>
                     <p>
-                      BIM Use: {item.bim_use_id || NA_TEXT} | Type: {item.type}
+                      BIM Use: {formatBimUseDisplay(item.bim_use_id)} | Type: {item.type}
                     </p>
                     <p>Indicators: {item.indicator_ids.length ? item.indicator_ids.join(", ") : NA_TEXT}</p>
                     {renderEvidenceValue(item)}
@@ -232,9 +264,9 @@ export default function MyEvidenceListPage() {
                     )}
 
                     <div className="item-actions">
-                      {context.period_locked ? (
+                      {context.period_locked || !canWrite ? (
                         <button type="button" disabled>
-                          Edit (LOCKED)
+                          Edit ({context.period_locked ? "LOCKED" : "READ-ONLY"})
                         </button>
                       ) : (
                         <Link href={`/projects/${projectId}/evidence/add?evidenceId=${encodeURIComponent(item.id)}`}>
@@ -242,9 +274,9 @@ export default function MyEvidenceListPage() {
                         </Link>
                       )}
                       {item.effective_status === "NEEDS_REVISION" ? (
-                        context.period_locked ? (
+                        context.period_locked || !canWrite ? (
                           <button type="button" disabled>
-                            Revisi (LOCKED)
+                            Revisi ({context.period_locked ? "LOCKED" : "READ-ONLY"})
                           </button>
                         ) : (
                           <Link

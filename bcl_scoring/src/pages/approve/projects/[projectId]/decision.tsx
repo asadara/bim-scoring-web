@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
 import BackendStatusBanner from "@/components/BackendStatusBanner";
+import { canWriteRole3Approval } from "@/lib/accessControl";
 import {
   ApprovalDecision,
   LOCKED_READ_ONLY_ERROR,
@@ -15,12 +16,15 @@ import {
   normalizePrototypePeriodId,
 } from "@/lib/role1TaskLayer";
 import { ApproverProjectContext, applyApproverDecision, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
+import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel } from "@/lib/userCredential";
 
 const DECISIONS: ApprovalDecision[] = ["APPROVE PERIOD", "REJECT APPROVAL"];
 
 export default function ApprovalDecisionPage() {
   const router = useRouter();
   const { projectId } = router.query;
+  const credential = useCredential();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +101,9 @@ export default function ApprovalDecisionPage() {
   const contextValue = context;
   const locked = contextValue.period_locked;
   const blockedByBackend = isRealBackendWriteEnabled() && contextValue.data_mode === "prototype";
+  const canWrite = canWriteRole3Approval(credential.role);
+  const pendingAwaitingReview = contextValue.evidence_counts.AWAITING_REVIEW;
+  const approveBlockedByPendingReview = pendingAwaitingReview > 0;
   const periodKey = normalizePrototypePeriodId(contextValue.period_id);
 
   const decisions = listPrototypeApprovalDecisions()
@@ -116,6 +123,11 @@ export default function ApprovalDecisionPage() {
     .sort((a, b) => String(b.approved_at).localeCompare(String(a.approved_at)));
 
   async function onConfirm() {
+    if (!canWrite) {
+      setFormError("Role aktif hanya memiliki read-only access. Konfirmasi keputusan dinonaktifkan.");
+      return;
+    }
+
     if (locked || blockedByBackend) {
       setFormError(locked ? LOCKED_READ_ONLY_ERROR : "Backend unavailable");
       return;
@@ -128,6 +140,11 @@ export default function ApprovalDecisionPage() {
 
     if (!reason.trim()) {
       setFormError("Reason wajib diisi.");
+      return;
+    }
+
+    if (decision === "APPROVE PERIOD" && approveBlockedByPendingReview) {
+      setFormError("Tidak dapat APPROVE PERIOD karena masih ada evidence berstatus Awaiting review.");
       return;
     }
 
@@ -183,7 +200,19 @@ export default function ApprovalDecisionPage() {
       <section className="task-panel">
         <p className="warning-box">Approval akan mengunci period dan membentuk rekam jejak final.</p>
         <p className="prototype-badge">Prototype snapshot (not used for audit/compliance)</p>
+        {approveBlockedByPendingReview ? (
+          <p className="warning-box">
+            Masih ada <strong>{pendingAwaitingReview}</strong> evidence berstatus Awaiting review. APPROVE PERIOD
+            dinonaktifkan sampai review selesai.
+          </p>
+        ) : null}
         {locked ? <p className="warning-box">LOCKED (read-only)</p> : null}
+        {!canWrite ? (
+          <p className="read-only-banner">
+            Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Konfirmasi keputusan
+            dinonaktifkan.
+          </p>
+        ) : null}
       </section>
 
       <section className="task-panel">
@@ -197,7 +226,13 @@ export default function ApprovalDecisionPage() {
                   name="approval-decision"
                   checked={decision === item}
                   onChange={() => setDecision(item)}
-                  disabled={locked || blockedByBackend || isSubmitting}
+                  disabled={
+                    !canWrite ||
+                    locked ||
+                    blockedByBackend ||
+                    isSubmitting ||
+                    (item === "APPROVE PERIOD" && approveBlockedByPendingReview)
+                  }
                 />
                 <strong>{item}</strong>
               </span>
@@ -212,7 +247,7 @@ export default function ApprovalDecisionPage() {
               id="approval-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              disabled={locked || blockedByBackend || isSubmitting}
+              disabled={!canWrite || locked || blockedByBackend || isSubmitting}
               placeholder="Tuliskan alasan keputusan approval"
             />
           </label>
@@ -223,7 +258,7 @@ export default function ApprovalDecisionPage() {
             type="button"
             className="action-primary"
             onClick={() => void onConfirm()}
-            disabled={locked || blockedByBackend || isSubmitting}
+            disabled={!canWrite || locked || blockedByBackend || isSubmitting}
           >
             Konfirmasi Keputusan
           </button>

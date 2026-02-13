@@ -65,9 +65,16 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
     hint.includes("HTTP 504");
 
   if (!FEATURE_REAL_BACKEND_WRITE) {
+    if (mode === "backend") {
+      return (
+        <p className="backend-status-banner backend-status-ok" role="status">
+          Connected to backend (read mode)
+        </p>
+      );
+    }
     return (
-      <p className="backend-status-banner" role="status">
-        Prototype mode (backend write disabled)
+      <p className="backend-status-banner backend-status-neutral" role="status">
+        Backend read endpoint not available (prototype fallback)
       </p>
     );
   }

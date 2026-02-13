@@ -27,7 +27,7 @@ export default function Role1Layout(props: Role1LayoutProps) {
   return (
     <main className="task-shell">
       <header className="task-header">
-        <p className="task-kicker">Role 1 - BIM Koordinator Proyek</p>
+        <p className="task-kicker">BIM Coordinator Project</p>
         <h1>{title}</h1>
         <p className="task-subtitle">{subtitle}</p>
 
@@ -47,16 +47,12 @@ export default function Role1Layout(props: Role1LayoutProps) {
         </div>
       </header>
 
-      <nav className="task-nav" aria-label="Role 1 task navigation">
-        <Link href="/">Home</Link>
-        <Link href="/start">Start Here</Link>
-        <Link href="/projects">Projects</Link>
-        <Link href="/ho/review">HO Review</Link>
-        <Link href="/approve">Approvals</Link>
-        <Link href="/audit">Audit</Link>
+      <nav className="task-subnav" aria-label="Project task shortcuts">
+        <Link href="/projects">Project List</Link>
         <Link href={`/projects/${projectId}`}>Project Home</Link>
-        <Link href={`/projects/${projectId}/evidence/add`}>Tambahkan Evidence</Link>
-        <Link href={`/projects/${projectId}/evidence`}>My Evidence List</Link>
+        <Link href={`/projects/${projectId}/evidence/add`}>Tambah Evidence</Link>
+        <Link href={`/projects/${projectId}/evidence`}>Daftar Evidence</Link>
+        <Link href={`/projects/${projectId}/indicators`}>Daftar Indicators</Link>
       </nav>
 
       {children}

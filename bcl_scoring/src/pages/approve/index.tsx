@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
 import BackendStatusBanner from "@/components/BackendStatusBanner";
@@ -56,13 +56,40 @@ export default function ApproverHomePage() {
     };
   }, []);
 
+  const headerProjectLabel = useMemo(() => {
+    if (loading) return "Loading approval queue...";
+    if (rows.length === 0) return "No project pending approval";
+    if (rows.length === 1) return rows[0].project.name || rows[0].project.code || "1 project pending approval";
+    return `${rows.length} projects pending approval`;
+  }, [loading, rows]);
+
+  const headerPeriodLabel = useMemo(() => {
+    if (loading) return "Checking active period...";
+    if (rows.length === 0) return "No active period";
+    const labels = [...new Set(rows.map((row) => row.period_label).filter((value) => value && value !== NA_TEXT))];
+    if (labels.length === 1) return labels[0];
+    if (labels.length > 1) return `${labels.length} active periods (multi-project)`;
+    return "Not synced";
+  }, [loading, rows]);
+
+  const headerPeriodStatus = useMemo(() => {
+    if (loading) return "Syncing...";
+    if (rows.length === 0) return "No submitted evidence";
+    const statuses = [
+      ...new Set(rows.map((row) => row.period_status_label).filter((value) => value && value !== NA_TEXT)),
+    ];
+    if (statuses.length === 1) return statuses[0];
+    if (statuses.length > 1) return "Mixed";
+    return "Not synced";
+  }, [loading, rows]);
+
   return (
     <ApproverLayout
       title="Period Approval"
       subtitle="Approval final di level period berdasarkan summary read-only dan status review evidence."
-      projectName={null}
-      periodLabel={null}
-      periodStatusLabel={null}
+      projectName={headerProjectLabel}
+      periodLabel={headerPeriodLabel}
+      periodStatusLabel={headerPeriodStatus}
     >
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
 

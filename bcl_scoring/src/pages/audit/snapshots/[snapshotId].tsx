@@ -291,17 +291,17 @@ export default function AuditSnapshotDetailPage() {
         <ol className="audit-trail">
           <li>
             <p>
-              <strong>Evidence Submission (Role 1)</strong>
+              <strong>Evidence Submission (BIM Coordinator Project)</strong>
             </p>
-            <p>Role: BIM Koordinator Proyek.</p>
+            <p>Role: BIM Coordinator Project.</p>
             <p>Meaning: Proyek submit evidence untuk indikator terkait (submitted count: {submittedCount}).</p>
             <p>NOT done: Tidak melakukan review, approval, atau locking period.</p>
           </li>
           <li>
             <p>
-              <strong>Review Eligibility (Role 2)</strong>
+              <strong>Review Eligibility (BIM Coordinator HO)</strong>
             </p>
-            <p>Role: HO Reviewer.</p>
+            <p>Role: BIM Coordinator HO.</p>
             <p>
               Meaning: Menilai kelayakan evidence (Acceptable/Needs Revision/Rejected) berdasarkan konteks review.
             </p>
@@ -309,7 +309,7 @@ export default function AuditSnapshotDetailPage() {
           </li>
           <li>
             <p>
-              <strong>Approval Decision (Role 3)</strong>
+              <strong>Approval Decision (BIM Manager)</strong>
             </p>
             <p>Role: BIM Manager/KaDiv BIM.</p>
             <p>Meaning: Keputusan level period: {latestDecision?.decision || NA_TEXT}.</p>

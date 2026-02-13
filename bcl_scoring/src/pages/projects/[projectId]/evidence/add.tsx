@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
+import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
   EvidenceType,
   LOCKED_READ_ONLY_ERROR,
@@ -15,12 +16,15 @@ import {
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
 } from "@/lib/role1TaskLayer";
+import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
 
 type WizardForm = {
   evidence_id: string | null;
   bim_use_id: string;
   indicator_ids: string[];
   type: EvidenceType | "";
+  file_type: "PDF" | "IMAGE" | "DOC" | "SPREADSHEET" | "MODEL" | "OTHER" | "";
   title: string;
   description: string;
   external_url: string;
@@ -30,9 +34,11 @@ type WizardForm = {
   file_reference_url: string;
 };
 
+const LOCAL_FILE_SIZE_LIMIT_BYTES = 2 * 1024 * 1024; // 2 MB (localStorage-safe for prototype)
+
 const STEP_LABELS = [
   "Step 1 - Select BIM Use",
-  "Step 2 - Select indicator(s)",
+  "Step 2 - Select indicator",
   "Step 3 - Select evidence type",
   "Step 4 - Fill evidence form",
 ];
@@ -42,6 +48,7 @@ const INITIAL_FORM: WizardForm = {
   bim_use_id: "",
   indicator_ids: [],
   type: "",
+  file_type: "",
   title: "",
   description: "",
   external_url: "",
@@ -54,13 +61,83 @@ const INITIAL_FORM: WizardForm = {
 function renderTypeHint(type: WizardForm["type"]): string {
   if (type === "URL") return "Isi external_url (link eksternal).";
   if (type === "TEXT") return "Isi text content. Konten ditampilkan sebagai plain text.";
-  if (type === "FILE") return "Isi view_url/download_url atau single reference URL (upload belum tersedia).";
+  if (type === "FILE") {
+    return "Pilih jenis file, lalu upload biner lokal (prototype) atau isi URL referensi.";
+  }
   return "Pilih tipe evidence untuk melihat field input yang dibutuhkan.";
+}
+
+function inferFileType(value: string): WizardForm["file_type"] {
+  const lower = value.toLowerCase();
+  if (!lower) return "";
+  if (lower.startsWith("data:application/pdf;")) return "PDF";
+  if (lower.startsWith("data:image/")) return "IMAGE";
+  if (
+    lower.startsWith("data:text/plain;") ||
+    lower.startsWith("data:application/msword;") ||
+    lower.startsWith("data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;")
+  ) {
+    return "DOC";
+  }
+  if (
+    lower.startsWith("data:text/csv;") ||
+    lower.startsWith("data:application/vnd.ms-excel;") ||
+    lower.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;")
+  ) {
+    return "SPREADSHEET";
+  }
+  if (lower.endsWith(".pdf")) return "PDF";
+  if (/\.(png|jpg|jpeg|gif|bmp|webp|svg)$/.test(lower)) return "IMAGE";
+  if (/\.(doc|docx|txt|rtf)$/.test(lower)) return "DOC";
+  if (/\.(xls|xlsx|csv)$/.test(lower)) return "SPREADSHEET";
+  if (/\.(ifc|rvt|nwd|nwc|dwg)$/.test(lower)) return "MODEL";
+  return "";
+}
+
+function inferFileTypeFromEvidence(hit: {
+  file_reference_url: string | null;
+  file_download_url: string | null;
+  file_view_url: string | null;
+}): WizardForm["file_type"] {
+  const fromReference = inferFileType(hit.file_reference_url || "");
+  if (fromReference) return fromReference;
+  const fromDownload = inferFileType(hit.file_download_url || "");
+  if (fromDownload) return fromDownload;
+  const fromView = inferFileType(hit.file_view_url || "");
+  if (fromView) return fromView;
+  return "";
+}
+
+function inferFileTypeFromFileMeta(file: File): WizardForm["file_type"] {
+  const byName = inferFileType(file.name || "");
+  if (byName) return byName;
+  return inferFileType(`data:${file.type || ""};`);
+}
+
+function formatBytes(size: number): string {
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function buildFileAccept(type: WizardForm["file_type"]): string | undefined {
+  if (type === "PDF") return ".pdf,application/pdf";
+  if (type === "IMAGE") return "image/*";
+  if (type === "DOC") {
+    return ".doc,.docx,.txt,.rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+  }
+  if (type === "SPREADSHEET") {
+    return ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+  }
+  if (type === "MODEL") return ".ifc,.rvt,.nwd,.nwc,.dwg";
+  return undefined;
 }
 
 export default function AddEvidencePage() {
   const router = useRouter();
   const { projectId, evidenceId, mode } = router.query;
+  const credential = useCredential();
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<WizardForm>(INITIAL_FORM);
@@ -71,6 +148,7 @@ export default function AddEvidencePage() {
   const [bannerHint, setBannerHint] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [context, setContext] = useState<Awaited<ReturnType<typeof fetchRole1Context>> | null>(null);
+  const [localFileMeta, setLocalFileMeta] = useState<{ name: string; size: number } | null>(null);
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string") return;
@@ -120,8 +198,9 @@ export default function AddEvidencePage() {
     setForm({
       evidence_id: hit.id,
       bim_use_id: hit.bim_use_id || NO_BIM_USE_ID,
-      indicator_ids: hit.indicator_ids,
+      indicator_ids: hit.indicator_ids.slice(0, 1),
       type: hit.type,
+      file_type: hit.type === "FILE" ? inferFileTypeFromEvidence(hit) : "",
       title: hit.title,
       description: hit.description,
       external_url: hit.external_url || "",
@@ -130,6 +209,7 @@ export default function AddEvidencePage() {
       file_download_url: hit.file_download_url || "",
       file_reference_url: hit.file_reference_url || "",
     });
+    setLocalFileMeta(null);
   }, [context, evidenceId, projectId]);
 
   const selectedBimUse = useMemo(() => {
@@ -150,10 +230,13 @@ export default function AddEvidencePage() {
       return "Step 1 wajib: pilih BIM Use terlebih dahulu.";
     }
     if (targetStep >= 2 && form.indicator_ids.length === 0) {
-      return "Step 2 wajib: evidence harus terikat minimal 1 indikator.";
+      return "Step 2 wajib: pilih 1 indikator.";
     }
     if (targetStep >= 3 && !form.type) {
       return "Step 3 wajib: pilih tipe evidence (FILE/URL/TEXT).";
+    }
+    if (targetStep >= 3 && form.type === "FILE" && !form.file_type) {
+      return "Step 3 wajib: pilih jenis file untuk tipe FILE.";
     }
     if (targetStep >= 4) {
       if (!form.title.trim()) return "Title wajib diisi.";
@@ -191,22 +274,66 @@ export default function AddEvidencePage() {
     setSubmitError(null);
   }
 
-  function onToggleIndicator(indicatorId: string, checked: boolean) {
-    const set = new Set(form.indicator_ids);
-    if (checked) set.add(indicatorId);
-    else set.delete(indicatorId);
-    setField("indicator_ids", [...set]);
+  function onSelectIndicator(indicatorId: string) {
+    setField("indicator_ids", indicatorId ? [indicatorId] : []);
+  }
+
+  function onSelectEvidenceType(type: EvidenceType) {
+    setForm((prev) => ({
+      ...prev,
+      type,
+      file_type: type === "FILE" ? prev.file_type : "",
+    }));
+    setSubmitError(null);
+    setSubmitInfo(null);
+  }
+
+  function onSelectLocalBinaryFile(file: File | null) {
+    if (!file) {
+      setLocalFileMeta(null);
+      return;
+    }
+    if (file.size > LOCAL_FILE_SIZE_LIMIT_BYTES) {
+      setSubmitError(
+        `Ukuran file ${formatBytes(file.size)} melebihi batas prototype ${formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)}.`
+      );
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      if (!dataUrl.startsWith("data:")) {
+        setSubmitError("Gagal membaca file biner untuk mode prototype.");
+        return;
+      }
+      setForm((prev) => ({
+        ...prev,
+        file_reference_url: dataUrl,
+        file_view_url: "",
+        file_download_url: "",
+        file_type: prev.file_type || inferFileTypeFromFileMeta(file) || "OTHER",
+        title: prev.title || file.name,
+      }));
+      setLocalFileMeta({ name: file.name, size: file.size });
+      setSubmitError(null);
+      setSubmitInfo(`File lokal "${file.name}" siap dipakai (prototype local storage).`);
+    };
+    reader.onerror = () => {
+      setSubmitError("Gagal membaca file dari browser.");
+    };
+    reader.readAsDataURL(file);
   }
 
   function onSelectBimUse(value: string) {
     const group = context?.bim_uses.find((item) => item.bim_use_id === value) || null;
     const validIndicatorIds = new Set((group?.indicators || []).map((item) => item.id));
-    const filteredIndicators = form.indicator_ids.filter((id) => validIndicatorIds.has(id));
+    const firstSelected = form.indicator_ids.find((id) => validIndicatorIds.has(id)) || "";
 
     setForm((prev) => ({
       ...prev,
       bim_use_id: value,
-      indicator_ids: filteredIndicators,
+      indicator_ids: firstSelected ? [firstSelected] : [],
     }));
     setSubmitError(null);
     setSubmitInfo(null);
@@ -214,6 +341,10 @@ export default function AddEvidencePage() {
 
   async function saveByStatus(status: "DRAFT" | "SUBMITTED") {
     if (!context || typeof projectId !== "string") return;
+    if (!canWriteRole1Evidence(credential.role)) {
+      setSubmitError("Role aktif hanya memiliki read-only access. Simpan/Submit dinonaktifkan.");
+      return;
+    }
     const writeBlockedByMode = isRealBackendWriteEnabled() && context.data_mode === "prototype";
     if (context.period_locked || writeBlockedByMode) {
       setSubmitError(context.period_locked ? LOCKED_READ_ONLY_ERROR : "Backend unavailable");
@@ -301,14 +432,21 @@ export default function AddEvidencePage() {
   }
 
   const isLocked = context.period_locked;
-  const writeDisabled = isLocked || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
+  const canWrite = canWriteRole1Evidence(credential.role);
+  const fieldDisabled = isLocked || !canWrite;
+  const writeDisabled =
+    fieldDisabled || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
   const isRevisionMode = mode === "revisi";
+  const selectedIndicator =
+    form.indicator_ids.length > 0
+      ? indicators.find((indicator) => indicator.id === form.indicator_ids[0]) || null
+      : null;
 
   return (
     <Role1Layout
       projectId={projectId}
       title="Tambahkan Evidence untuk BIM Use"
-      subtitle="Light wizard Role 1: pilih BIM Use, pilih indikator, pilih tipe, lalu isi evidence."
+      subtitle="Light wizard BIM Coordinator Project: pilih BIM Use, pilih indikator, pilih tipe, lalu isi evidence."
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
@@ -332,6 +470,24 @@ export default function AddEvidencePage() {
             Period saat ini LOCKED. Semua input read-only dan aksi Save/Submit dinonaktifkan.
           </p>
         ) : null}
+        {credential.role === "admin" ? (
+          <p className="inline-note">
+            Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence).
+            {" "}
+            <button
+              type="button"
+              onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
+            >
+              Switch ke BIM Coordinator Project
+            </button>
+          </p>
+        ) : null}
+        {!canWrite && credential.role !== "admin" ? (
+          <p className="read-only-banner">
+            Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Aksi Save/Submit
+            dinonaktifkan.
+          </p>
+        ) : null}
 
         {isRevisionMode ? (
           <p className="inline-note">
@@ -347,7 +503,7 @@ export default function AddEvidencePage() {
                 id="bim-use-select"
                 value={form.bim_use_id}
                 onChange={(event) => onSelectBimUse(event.target.value)}
-                disabled={isLocked}
+                disabled={fieldDisabled}
               >
                 <option value="">Pilih BIM Use</option>
                 {context.bim_uses.map((group) => (
@@ -365,26 +521,37 @@ export default function AddEvidencePage() {
 
         {step === 2 ? (
           <div className="field-grid">
-            <p>Pilih indicator(s) yang relevan. Evidence tanpa indikator tidak bisa disimpan.</p>
+            <p>Pilih satu indikator yang paling relevan untuk evidence ini.</p>
             {form.bim_use_id ? (
-              <div className="option-grid">
-                {indicators.map((indicator) => (
-                  <label key={indicator.id} className="option-card">
-                    <span>
-                      <input
-                        type="checkbox"
-                        checked={form.indicator_ids.includes(indicator.id)}
-                        onChange={(event) => onToggleIndicator(indicator.id, event.target.checked)}
-                        disabled={isLocked}
-                      />
-                      <strong>{indicator.code}</strong>
-                    </span>
-                    <small>
-                      {indicator.title} | Perspective: {indicator.perspective_id || NA_TEXT}
-                    </small>
-                  </label>
-                ))}
-              </div>
+              <>
+                <label htmlFor="indicator-select">
+                  Indicator
+                  <select
+                    id="indicator-select"
+                    value={form.indicator_ids[0] || ""}
+                    onChange={(event) => onSelectIndicator(event.target.value)}
+                    disabled={fieldDisabled}
+                  >
+                    <option value="">Pilih indikator</option>
+                    {indicators.map((indicator) => (
+                      <option key={indicator.id} value={indicator.id}>
+                        {indicator.code} - {indicator.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedIndicator ? (
+                  <p className="inline-note">
+                    Indicator terpilih: <strong>{selectedIndicator.code}</strong> | Perspective:{" "}
+                    {selectedIndicator.perspective_id || NA_TEXT} | BIM Use:{" "}
+                    {selectedIndicator.bim_use_tags.length
+                      ? selectedIndicator.bim_use_tags.join(", ")
+                      : NA_TEXT}
+                  </p>
+                ) : (
+                  <p className="inline-note">Belum ada indikator terpilih.</p>
+                )}
+              </>
             ) : (
               <p className="warning-box">Pilih BIM Use pada Step 1 terlebih dahulu.</p>
             )}
@@ -406,14 +573,33 @@ export default function AddEvidencePage() {
                       type="radio"
                       name="evidence-type"
                       checked={form.type === type}
-                      onChange={() => setField("type", type)}
-                      disabled={isLocked}
+                      onChange={() => onSelectEvidenceType(type)}
+                      disabled={fieldDisabled}
                     />
                     <strong>{type}</strong>
                   </span>
                 </label>
               ))}
             </div>
+            {form.type === "FILE" ? (
+              <label htmlFor="file-type-select">
+                Jenis File
+                <select
+                  id="file-type-select"
+                  value={form.file_type}
+                  onChange={(event) => setField("file_type", event.target.value as WizardForm["file_type"])}
+                  disabled={fieldDisabled}
+                >
+                  <option value="">Pilih jenis file</option>
+                  <option value="PDF">PDF</option>
+                  <option value="IMAGE">Image</option>
+                  <option value="DOC">Document</option>
+                  <option value="SPREADSHEET">Spreadsheet</option>
+                  <option value="MODEL">BIM Model</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </label>
+            ) : null}
             <p className="inline-note">{renderTypeHint(form.type)}</p>
           </div>
         ) : null}
@@ -426,7 +612,7 @@ export default function AddEvidencePage() {
                 id="title-input"
                 value={form.title}
                 onChange={(event) => setField("title", event.target.value)}
-                disabled={isLocked}
+                disabled={fieldDisabled}
                 maxLength={160}
               />
             </label>
@@ -437,7 +623,7 @@ export default function AddEvidencePage() {
                 id="description-input"
                 value={form.description}
                 onChange={(event) => setField("description", event.target.value)}
-                disabled={isLocked}
+                disabled={fieldDisabled}
                 maxLength={2000}
               />
             </label>
@@ -449,7 +635,7 @@ export default function AddEvidencePage() {
                   id="external-url-input"
                   value={form.external_url}
                   onChange={(event) => setField("external_url", event.target.value)}
-                  disabled={isLocked}
+                  disabled={fieldDisabled}
                   placeholder="https://..."
                 />
               </label>
@@ -462,7 +648,7 @@ export default function AddEvidencePage() {
                   id="text-content-input"
                   value={form.text_content}
                   onChange={(event) => setField("text_content", event.target.value)}
-                  disabled={isLocked}
+                  disabled={fieldDisabled}
                   placeholder="Tuliskan konteks evidence sebagai plain text"
                 />
               </label>
@@ -470,35 +656,59 @@ export default function AddEvidencePage() {
 
             {form.type === "FILE" ? (
               <>
+                <p className="inline-note">
+                  Jenis file: <strong>{form.file_type || "Belum dipilih"}</strong>
+                </p>
+                <label htmlFor="file-binary-upload">
+                  Upload binary file (prototype local)
+                  <input
+                    id="file-binary-upload"
+                    type="file"
+                    accept={buildFileAccept(form.file_type)}
+                    onChange={(event) => onSelectLocalBinaryFile(event.target.files?.[0] || null)}
+                    disabled={fieldDisabled}
+                  />
+                </label>
+                <p className="inline-note">
+                  File disimpan di browser local storage (batas {formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).
+                </p>
+                {localFileMeta ? (
+                  <p className="inline-note">
+                    File lokal aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)})
+                  </p>
+                ) : null}
+                {form.file_reference_url.startsWith("data:") ? (
+                  <p className="inline-note">Reference URL saat ini berisi binary data URL (local prototype).</p>
+                ) : null}
                 <label htmlFor="file-view-url-input">
-                  view_url (optional)
+                  view_url ({form.file_type || "FILE"} - optional)
                   <input
                     id="file-view-url-input"
                     value={form.file_view_url}
                     onChange={(event) => setField("file_view_url", event.target.value)}
-                    disabled={isLocked}
+                    disabled={fieldDisabled}
                     placeholder="https://..."
                   />
                 </label>
 
                 <label htmlFor="file-download-url-input">
-                  download_url (optional)
+                  download_url ({form.file_type || "FILE"} - optional)
                   <input
                     id="file-download-url-input"
                     value={form.file_download_url}
                     onChange={(event) => setField("file_download_url", event.target.value)}
-                    disabled={isLocked}
+                    disabled={fieldDisabled}
                     placeholder="https://..."
                   />
                 </label>
 
                 <label htmlFor="file-reference-url-input">
-                  single reference URL (optional)
+                  single reference URL ({form.file_type || "FILE"} - optional)
                   <input
                     id="file-reference-url-input"
                     value={form.file_reference_url}
                     onChange={(event) => setField("file_reference_url", event.target.value)}
-                    disabled={isLocked}
+                    disabled={fieldDisabled}
                     placeholder="https://..."
                   />
                 </label>
@@ -547,3 +757,4 @@ export default function AddEvidencePage() {
     </Role1Layout>
   );
 }
+

@@ -9,6 +9,7 @@ import {
   appendPrototypeApprovalDecision,
   appendPrototypeSnapshot,
   buildReviewStatusCounts,
+  fetchEvidenceListReadMode,
   fetchProjectsReadMode,
   fetchProjectReadMode,
   fetchProjectPeriodsReadMode,
@@ -19,6 +20,7 @@ import {
   listPrototypeSnapshots,
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
+  selectActivePeriod,
   setPrototypePeriodLock,
 } from "@/lib/role1TaskLayer";
 import {
@@ -139,18 +141,16 @@ function requirePeriodId(periodId: string | null): string {
 }
 
 function formatPeriodLabel(params: { periodId: string | null; year: number | null; week: number | null }): string {
-  const parts: string[] = [];
-  parts.push(params.periodId || NA_TEXT);
   if (params.year !== null || params.week !== null) {
-    parts.push(`${params.year ?? NA_TEXT} W${params.week ?? NA_TEXT}`);
+    return `${params.year ?? NA_TEXT} W${params.week ?? NA_TEXT}`;
   }
-  return parts.join(" | ");
+  return NA_TEXT;
 }
 
 function formatPeriodLabelFallback(projectId: string, periodId: string | null): string {
   if (!periodId) return NA_TEXT;
   const meta = getPrototypePeriodMetaFromStore(projectId, periodId);
-  return meta?.period_label || periodId;
+  return meta?.period_label || NA_TEXT;
 }
 
 function fallbackProject(projectId: string): ProjectRecord {
@@ -310,7 +310,7 @@ export async function fetchApproverHomeContext(): Promise<ApproverHomeContext> {
   const rows = await Promise.all(
     projects.map(async (project) => {
       const periodsResult = await fetchProjectPeriodsReadMode(project.id);
-      const activePeriod = periodsResult.data[0] ?? null;
+      const activePeriod = selectActivePeriod(periodsResult.data);
 
       const periodId = activePeriod?.id ?? fallbackPeriodId(project.id);
       const backendStatus = activePeriod?.status ?? null;
@@ -368,7 +368,7 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
   const project = projectResult.data || fallbackProject(projectId);
   const periods = periodsResult.data;
 
-  const active = periods[0] ?? null;
+  const active = selectActivePeriod(periods);
   const periodId = active?.id ?? fallbackPeriodId(projectId);
   const backendStatus = active?.status ?? null;
   const periodStatusLabel = resolvePeriodStatusLabelWithPrototype(projectId, periodId, backendStatus);
@@ -378,13 +378,17 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
   let summary: ReadOnlySummary = summaryResult.data;
   let summaryAvailable = summaryResult.available;
 
-  const evidenceCounts = buildReviewStatusCounts(listLocalEvidence(projectId, periodId));
+  const evidenceResult = await fetchEvidenceListReadMode(projectId, periodId);
+  const evidenceCounts = buildReviewStatusCounts(
+    evidenceResult.data.length > 0 ? evidenceResult.data : listLocalEvidence(projectId, periodId)
+  );
   const latestDecision = getLatestApprovalDecision(projectId, periodId);
   const snapshots = listSnapshotsForPeriod(projectId, periodId);
   const dataMode: DataMode =
     projectResult.mode === "prototype" ||
     periodsResult.mode === "prototype" ||
-    summaryResult.mode === "prototype"
+    summaryResult.mode === "prototype" ||
+    evidenceResult.mode === "prototype"
       ? "prototype"
       : "backend";
 
@@ -420,6 +424,7 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
       projectResult.backend_message ||
       periodsResult.backend_message ||
       summaryResult.backend_message ||
+      evidenceResult.backend_message ||
       null,
   };
 }
@@ -465,6 +470,10 @@ export async function applyApproverDecision(input: {
 }> {
   if (!input.reason.trim()) {
     throw new Error("Reason wajib diisi.");
+  }
+
+  if (input.decision === "APPROVE PERIOD" && input.evidence_counts.AWAITING_REVIEW > 0) {
+    throw new Error("Tidak dapat APPROVE PERIOD karena masih ada evidence berstatus Awaiting review.");
   }
 
   if (getPrototypePeriodLock(input.project_id, input.period_id)) {

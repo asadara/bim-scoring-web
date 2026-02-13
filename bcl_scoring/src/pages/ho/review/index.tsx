@@ -7,6 +7,7 @@ import {
   DataMode,
   NA_TEXT,
   ProjectRecord,
+  formatPeriodLabel,
   fetchProjectPeriodsReadMode,
   fetchProjectsReadMode,
   resolvePeriodStatusLabelWithPrototype,
@@ -63,9 +64,7 @@ export default function HoReviewHomePage() {
             return {
               project,
               submitted_count: evidenceResult.data.length,
-              period_label: active
-                ? `${active.id || NA_TEXT} | ${active.year ?? NA_TEXT} W${active.week ?? NA_TEXT}`
-                : periodMeta?.period_label || periodId || NA_TEXT,
+              period_label: active ? formatPeriodLabel(active) : periodMeta?.period_label || NA_TEXT,
               period_status: resolvePeriodStatusLabelWithPrototype(
                 project.id,
                 periodId,
@@ -115,12 +114,35 @@ export default function HoReviewHomePage() {
     () => rows.reduce((sum, row) => sum + row.submitted_count, 0),
     [rows]
   );
+  const headerProjectLabel = useMemo(() => {
+    if (loading) return "Loading review queue...";
+    if (rows.length === 0) return "No project pending review";
+    if (rows.length === 1) return rows[0].project.name || rows[0].project.code || "1 project pending review";
+    return `${rows.length} projects pending review`;
+  }, [loading, rows]);
+  const headerActivePeriodLabel = useMemo(() => {
+    if (loading) return "Checking active period...";
+    if (rows.length === 0) return "No active period with submitted evidence";
+    const labels = [...new Set(rows.map((row) => row.period_label).filter((label) => label && label !== NA_TEXT))];
+    if (labels.length === 1) return labels[0];
+    return `${labels.length} active periods (multi-project)`;
+  }, [loading, rows]);
+  const headerPeriodStatusLabel = useMemo(() => {
+    if (loading) return "Syncing...";
+    if (rows.length === 0) return "No submitted evidence";
+    const statuses = [...new Set(rows.map((row) => row.period_status).filter((status) => status && status !== NA_TEXT))];
+    if (statuses.length === 1) return statuses[0];
+    if (statuses.length > 1) return "Mixed";
+    return "Not synced";
+  }, [loading, rows]);
 
   return (
     <Role2Layout
-      title="Evidence Review — HO"
+      title="Evidence Review - HO"
       subtitle="Review eligibility untuk evidence yang disubmit proyek."
-      periodStatusLabel={NA_TEXT}
+      periodStatusLabel={headerPeriodStatusLabel}
+      projectLabel={headerProjectLabel}
+      activePeriodLabel={headerActivePeriodLabel}
       activePeriod={null}
       project={null}
     >
@@ -139,7 +161,7 @@ export default function HoReviewHomePage() {
 
       <section className="task-panel">
         <p className="inline-note">
-          Mulai dari evidence SUBMITTED -&gt; tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.
+          BIM Coordinator HO memproses evidence SUBMITTED -&gt; tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.
         </p>
         <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
         <p className="prototype-badge">Prototype review (not final, not used in scoring)</p>
@@ -175,3 +197,4 @@ export default function HoReviewHomePage() {
     </Role2Layout>
   );
 }
+

@@ -4,16 +4,65 @@ import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role2Layout from "@/components/Role2Layout";
+import { canWriteRole2Review } from "@/lib/accessControl";
 import {
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
   ReviewOutcome,
+  formatBimUseDisplay,
   getLocalEvidenceWithReviewById,
   isRealBackendWriteEnabled,
 } from "@/lib/role1TaskLayer";
 import { applyReviewWrite, fetchIndicatorsStrict, fetchRole2ProjectContext } from "@/lib/role2TaskLayer";
+import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel } from "@/lib/userCredential";
 
 const OUTCOMES: ReviewOutcome[] = ["ACCEPTABLE", "NEEDS REVISION", "REJECTED"];
+
+const SAFE_DATA_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
+
+function normalizeMime(raw: string | null): string | null {
+  if (!raw) return null;
+  const value = raw.trim().toLowerCase();
+  return value || null;
+}
+
+function detectDataUrlMime(input: string): string | null {
+  const match = input.match(/^data:([^;,]+)?(?:;[^,]*)?,/i);
+  if (!match) return null;
+  return normalizeMime(match[1] || null);
+}
+
+function getFileExtensionFromMime(mime: string | null): string {
+  if (mime === "application/pdf") return "pdf";
+  if (mime === "image/png") return "png";
+  if (mime === "image/jpeg") return "jpg";
+  return "bin";
+}
+
+function isSafeAttachmentHref(href: string): { ok: boolean; reason: string | null; dataMime: string | null } {
+  const trimmed = href.trim();
+  if (!trimmed) return { ok: false, reason: "Empty URL", dataMime: null };
+
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("data:")) {
+    const dataMime = detectDataUrlMime(trimmed);
+    if (!dataMime || !SAFE_DATA_MIME_TYPES.has(dataMime)) {
+      return {
+        ok: false,
+        reason: "Blocked MIME for local data URL (allowed: PDF/PNG/JPG).",
+        dataMime: dataMime || null,
+      };
+    }
+    return { ok: true, reason: null, dataMime };
+  }
+
+  if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("blob:")) {
+    return { ok: true, reason: null, dataMime: null };
+  }
+
+  return { ok: false, reason: "Blocked protocol (allowed: https/http/blob/data).", dataMime: null };
+}
 
 function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvidenceWithReviewById>>) {
   if (item.type === "URL") {
@@ -40,38 +89,57 @@ function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvide
     );
   }
 
+  const candidates = [
+    { label: "Open file", href: item.file_view_url },
+    { label: "Download file", href: item.file_download_url },
+    { label: "Reference file", href: item.file_reference_url },
+  ].filter((entry): entry is { label: string; href: string } => Boolean(entry.href && entry.href.trim()));
+
+  const deduped = candidates.filter(
+    (entry, index) => candidates.findIndex((other) => other.href === entry.href) === index
+  );
+
+  const checked = deduped.map((entry) => {
+    const safety = isSafeAttachmentHref(entry.href);
+    return {
+      ...entry,
+      ...safety,
+    };
+  });
+
+  const allowed = checked.filter((entry) => entry.ok);
+  const blocked = checked.filter((entry) => !entry.ok);
+
   return (
     <>
-      <p>
-        view_url:{" "}
-        {item.file_view_url ? (
-          <a href={item.file_view_url} target="_blank" rel="noopener noreferrer">
-            {item.file_view_url}
-          </a>
-        ) : (
-          NA_TEXT
-        )}
-      </p>
-      <p>
-        download_url:{" "}
-        {item.file_download_url ? (
-          <a href={item.file_download_url} target="_blank" rel="noopener noreferrer">
-            {item.file_download_url}
-          </a>
-        ) : (
-          NA_TEXT
-        )}
-      </p>
-      <p>
-        reference URL:{" "}
-        {item.file_reference_url ? (
-          <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">
-            {item.file_reference_url}
-          </a>
-        ) : (
-          NA_TEXT
-        )}
-      </p>
+      <p>Attachment:</p>
+      {allowed.length === 0 ? <p className="warning-box">No safe attachment URL is available.</p> : null}
+      {allowed.length > 0 ? (
+        <div className="item-actions">
+          {allowed.map((entry, index) => {
+            const isDataUrl = entry.href.toLowerCase().startsWith("data:");
+            const extension = getFileExtensionFromMime(entry.dataMime);
+            const downloadName = `evidence-attachment-${index + 1}.${extension}`;
+            return (
+              <a
+                key={`${entry.label}-${index}`}
+                href={entry.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={isDataUrl ? downloadName : undefined}
+              >
+                {entry.label}
+              </a>
+            );
+          })}
+        </div>
+      ) : null}
+      {blocked.length > 0 ? (
+        <div className="warning-box">
+          <strong>Blocked attachment link:</strong>
+          <div>{blocked[0].reason || "Unsupported attachment format."}</div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -79,6 +147,7 @@ function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvide
 export default function HoEvidenceReviewPage() {
   const router = useRouter();
   const { projectId, evidenceId } = router.query;
+  const credential = useCredential();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -195,11 +264,20 @@ export default function HoEvidenceReviewPage() {
   const isLocked = context.period_locked;
   const isSubmitted = evidence.effective_status === "SUBMITTED";
   const blockedByBackend = isRealBackendWriteEnabled() && context.data_mode === "prototype";
-  const canApply = !isLocked && !blockedByBackend && isSubmitted && !isSubmitting;
+  const canWrite = canWriteRole2Review(credential.role);
+  const canApply = canWrite && !isLocked && !blockedByBackend && isSubmitted && !isSubmitting;
 
   async function onApplyReview() {
     if (!canApply) {
-      setFormError(isLocked ? LOCKED_READ_ONLY_ERROR : blockedByBackend ? "Backend unavailable" : null);
+      setFormError(
+        !canWrite
+          ? "Role aktif hanya memiliki read-only access. Apply Review dinonaktifkan."
+          : isLocked
+            ? LOCKED_READ_ONLY_ERROR
+            : blockedByBackend
+              ? "Backend unavailable"
+              : null
+      );
       return;
     }
     if (!evidence) return;
@@ -218,7 +296,7 @@ export default function HoEvidenceReviewPage() {
         evidence_id: evidence.id,
         review_outcome: outcome,
         review_reason: reason,
-        reviewed_by: "HO Reviewer (Prototype)",
+        reviewed_by: "BIM Coordinator HO (Prototype)",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to apply review.";
@@ -253,6 +331,11 @@ export default function HoEvidenceReviewPage() {
         <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
         <p className="prototype-badge">Prototype review (not final, not used in scoring)</p>
         {isLocked ? <p className="warning-box">LOCKED (read-only)</p> : null}
+        {!canWrite ? (
+          <p className="read-only-banner">
+            Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Apply Review dinonaktifkan.
+          </p>
+        ) : null}
         {!isSubmitted ? (
           <p className="warning-box">Evidence ini bukan status SUBMITTED sehingga Apply Review dinonaktifkan.</p>
         ) : null}
@@ -261,7 +344,7 @@ export default function HoEvidenceReviewPage() {
       <section className="task-panel">
         <h2>Evidence Context (Read-only)</h2>
         <p>
-          BIM Use: <strong>{evidence.bim_use_id || NA_TEXT}</strong>
+          BIM Use: <strong>{formatBimUseDisplay(evidence.bim_use_id)}</strong>
         </p>
         <p>
           Indicator(s): <strong>{indicatorDisplay.join("; ") || NA_TEXT}</strong>

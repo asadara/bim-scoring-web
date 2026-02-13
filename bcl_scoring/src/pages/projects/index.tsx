@@ -35,7 +35,7 @@ export default function ProjectsIndexPage() {
       <header className="task-header">
         <p className="task-kicker">BIM Scoring Platform</p>
         <h1>Projects</h1>
-        <p className="task-subtitle">Pilih project untuk membuka task layer Role 1.</p>
+        <p className="task-subtitle">Pilih project untuk membuka task layer BIM Coordinator Project.</p>
         <p className="inline-note">
           Mulai dari proyek -&gt; pilih BIM Use -&gt; submit evidence untuk indikator terkait.
         </p>
@@ -43,10 +43,7 @@ export default function ProjectsIndexPage() {
           <a href="#project-list" className="primary-cta">
             Pilih Proyek
           </a>
-          <Link href="/start">Start Here</Link>
-          <Link href="/ho/review">Open HO Review</Link>
-          <Link href="/approve">Open Approvals</Link>
-          <Link href="/audit">Open Audit</Link>
+          <Link href="/projects">Refresh List</Link>
         </div>
       </header>
 

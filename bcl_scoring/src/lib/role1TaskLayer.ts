@@ -82,6 +82,7 @@ export type IndicatorRecord = {
   description: string | null;
   perspective_id: string | null;
   bim_use_id: string | null;
+  bim_use_tags: string[];
 };
 
 export type BimUseGroup = {
@@ -257,6 +258,136 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
+const BIM_USE_ALL = "All BIM Use";
+
+const BIM_USE_BY_INDICATOR_CODE: Record<string, string[]> = {
+  "P1-01": [BIM_USE_ALL],
+  "P1-02": [BIM_USE_ALL],
+  "P1-03": [BIM_USE_ALL],
+  "P1-04": ["Coordination", "4D", "5D"],
+  "P1-05": ["Clash Detection", "Coordination"],
+  "P1-06": ["Value / Risk"],
+  "P1-07": ["Risk Reduction"],
+  "P1-08": ["Publishing / Delivery"],
+  "P2-01": ["Design Coordination"],
+  "P2-02": ["Clash Detection"],
+  "P2-03": ["BCF / Issue Mgmt"],
+  "P2-04": ["Detailed Design"],
+  "P2-05": ["5D"],
+  "P2-06": ["4D"],
+  "P2-07": ["Progress Update"],
+  "P2-08": ["Coordination"],
+  "P2-09": [BIM_USE_ALL],
+  "P2-10": ["Model-Based Delivery"],
+  "P3-01": [BIM_USE_ALL],
+  "P3-02": [BIM_USE_ALL],
+  "P3-03": ["5D / Asset Data"],
+  "P3-04": [BIM_USE_ALL],
+  "P3-05": ["Coordination"],
+  "P3-06": [BIM_USE_ALL],
+  "P3-07": [BIM_USE_ALL],
+  "P3-08": ["Clash Detection"],
+  "P4-01": [BIM_USE_ALL],
+  "P4-02": [BIM_USE_ALL],
+  "P4-03": [BIM_USE_ALL],
+  "P4-04": [BIM_USE_ALL],
+  "P4-05": [BIM_USE_ALL],
+  "P4-06": ["Coordination"],
+  "P5-01": ["Coordination"],
+  "P5-02": ["Clash Detection"],
+  "P5-03": ["5D"],
+  "P5-04": ["Coordination"],
+  "P5-05": ["4D"],
+  "P5-06": ["Asset Information"],
+  "P5-07": ["Reporting"],
+  "P5-08": ["Strategic Use"],
+};
+
+const BIM_USE_LABEL_ALIASES: Record<string, string> = {
+  all: BIM_USE_ALL,
+  "all bim use": BIM_USE_ALL,
+  "clash / coordination": "Clash Detection / Coordination",
+};
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function normalizeBimUseLabel(value: string): string | null {
+  const cleaned = normalizeWhitespace(value);
+  if (!cleaned) return null;
+  const alias = BIM_USE_LABEL_ALIASES[cleaned.toLowerCase()];
+  if (alias) return alias;
+  return cleaned;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function parseBimUseTagsFromRaw(value: string | null): string[] {
+  if (!value) return [];
+  const cleaned = normalizeWhitespace(value);
+  if (!cleaned || isUuidLike(cleaned)) return [];
+
+  const aliased = normalizeBimUseLabel(cleaned);
+  if (!aliased) return [];
+  if (aliased !== cleaned || !cleaned.includes("/")) return [aliased];
+
+  const splitTags = cleaned
+    .split("/")
+    .map((item) => normalizeBimUseLabel(item))
+    .filter((item): item is string => Boolean(item));
+
+  return uniqueStrings(splitTags);
+}
+
+function parseBimUseTagsFromUnknown(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    const flattened = value
+      .map((entry) => normalizeBimUseLabel(asString(entry)))
+      .filter((entry): entry is string => Boolean(entry));
+    return uniqueStrings(flattened);
+  }
+  return parseBimUseTagsFromRaw(asNullableString(value));
+}
+
+function resolveIndicatorBimUseTags(item: {
+  code: string;
+  bim_use_id: string | null;
+  bim_use_tags: unknown;
+}): string[] {
+  const byPayloadTags = parseBimUseTagsFromUnknown(item.bim_use_tags);
+  if (byPayloadTags.length > 0) return byPayloadTags;
+
+  const code = normalizeWhitespace(String(item.code || "")).toUpperCase();
+  const byCode = BIM_USE_BY_INDICATOR_CODE[code];
+  if (Array.isArray(byCode) && byCode.length > 0) return [...byCode];
+
+  const byRaw = parseBimUseTagsFromRaw(item.bim_use_id);
+  if (byRaw.length > 0) return byRaw;
+
+  return [];
+}
+
+export function formatBimUseDisplay(value: string | null | undefined): string {
+  const cleaned = asNullableString(value);
+  if (!cleaned || cleaned === NO_BIM_USE_ID) return NA_TEXT;
+  const normalized = normalizeBimUseLabel(cleaned);
+  return normalized || cleaned;
+}
+
 function toSafeErrorMessage(failure: SafeFetchFail): string {
   if (failure.kind === "backend_unavailable") {
     return "Backend not available";
@@ -323,7 +454,15 @@ function fallbackPeriods(projectId: string): ScoringPeriod[] {
 export function formatPeriodLabel(period: ScoringPeriod | null): string {
   if (!period) return NA_TEXT;
   const parts: string[] = [];
-  parts.push(period.id || NA_TEXT);
+
+  const hasYearWeek = period.year !== null || period.week !== null;
+  const hasRange = Boolean(period.start_date || period.end_date);
+
+  // Prefer human-readable period identity. Hide raw UUID metadata from UI.
+  if (!hasYearWeek && !hasRange) {
+    return NA_TEXT;
+  }
+
   if (period.year !== null || period.week !== null) {
     parts.push(`${period.year ?? NA_TEXT} W${period.week ?? NA_TEXT}`);
   }
@@ -335,9 +474,12 @@ export function formatPeriodLabel(period: ScoringPeriod | null): string {
 
 export function formatProjectLabel(project: ProjectRecord | null): string {
   if (!project) return NA_TEXT;
-  const name = project.name || project.code || NA_TEXT;
-  const id = project.id || NA_TEXT;
-  return `${name} (${id})`;
+  const name = asNullableString(project.name);
+  const code = asNullableString(project.code);
+  if (name && code) return `${name} - ${code}`;
+  if (name) return name;
+  if (code) return code;
+  return project.id || NA_TEXT;
 }
 
 export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[]>> {
@@ -500,13 +642,15 @@ export async function fetchProjectPeriods(projectId: string): Promise<ScoringPer
 
 export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadResult<IndicatorRecord[]>> {
   const candidates = [
-    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator_definitions`),
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicators`),
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator_definitions`),
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator-definitions`),
   ];
 
   let lastFailure: SafeFetchFail | null = null;
 
-  for (const url of candidates) {
+  for (let index = 0; index < candidates.length; index += 1) {
+    const url = candidates[index];
     const response = await safeFetchJson<unknown>(url);
     if (!response.ok) {
       lastFailure = response;
@@ -529,16 +673,29 @@ export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadRe
         const id = asString(item.id || item.indicator_id || item.project_indicator_id);
         const code = asString(item.code);
         const title = asString(item.title || item.name || item.indicator_title);
+        const bimUseId = asNullableString(item.bim_use_id);
+        const bimUseTags = resolveIndicatorBimUseTags({
+          code,
+          bim_use_id: bimUseId,
+          bim_use_tags: item.bim_use_tags,
+        });
         return {
           id,
           code,
           title,
           description: asNullableString(item.description),
           perspective_id: asNullableString(item.perspective_id || item.perspective),
-          bim_use_id: asNullableString(item.bim_use_id),
+          bim_use_id: bimUseTags[0] || bimUseId,
+          bim_use_tags: bimUseTags,
         } satisfies IndicatorRecord;
       })
       .filter((row) => row.id && row.code && row.title);
+
+    // Endpoint prioritas pertama bisa valid tetapi kosong pada project baru.
+    // Dalam kasus itu, lanjut coba endpoint fallback agar BIM Use tetap tersedia.
+    if (mapped.length === 0 && index < candidates.length - 1) {
+      continue;
+    }
 
     return {
       data: mapped,
@@ -1177,6 +1334,12 @@ export function resolvePeriodLock(status: PeriodStatus | null): boolean {
   return status === "LOCKED";
 }
 
+export function selectActivePeriod(periods: ScoringPeriod[]): ScoringPeriod | null {
+  if (!Array.isArray(periods) || periods.length === 0) return null;
+  const openPeriod = periods.find((period) => period?.status === "OPEN");
+  return openPeriod || periods[0] || null;
+}
+
 function toTimestamp(value: string | null): number {
   if (!value) return 0;
   const time = Date.parse(value);
@@ -1333,9 +1496,17 @@ function getRelevantReviewedAt(item: LocalEvidenceItem, review: PrototypeReviewR
 export function getEffectiveReviewOutcome(item: LocalEvidenceItem): ReviewOutcome | null {
   if (item.status !== "SUBMITTED") return null;
   const review = getPrototypeReview(item.id, item.project_id, item.period_id);
-  if (!review) return null;
-  if (!getRelevantReviewedAt(item, review)) return null;
-  return review.review_outcome;
+  if (review) {
+    if (!getRelevantReviewedAt(item, review)) return null;
+    return review.review_outcome;
+  }
+
+  const normalized = normalizeReviewOutcome(item.review_decision);
+  if (!normalized) return null;
+  const submittedAt = toTimestamp(item.submitted_at || item.updated_at);
+  const reviewedAt = toTimestamp(item.reviewed_at);
+  if (!reviewedAt || submittedAt > reviewedAt) return null;
+  return normalized;
 }
 
 export function buildReviewStatusCounts(items: LocalEvidenceItem[]): ReviewStatusCount {
@@ -1378,6 +1549,8 @@ export function getPrototypePeriodLock(projectId: string, periodId: string | nul
 }
 
 export function isPeriodLockedByPrototype(projectId: string, periodId: string | null): boolean {
+  const normalized = normalizePrototypePeriodId(periodId);
+  if (!normalized || normalized === UNKNOWN_ACTIVE_PERIOD_KEY) return false;
   return Boolean(getPrototypePeriodLock(projectId, periodId));
 }
 
@@ -1393,6 +1566,8 @@ export function resolvePeriodLockWithPrototype(
   backendStatus: PeriodStatus | null
 ): boolean {
   if (resolvePeriodLock(backendStatus)) return true;
+  const normalized = normalizePrototypePeriodId(periodId);
+  if (!normalized || normalized === UNKNOWN_ACTIVE_PERIOD_KEY) return false;
   return isPeriodLockedByPrototype(projectId, periodId);
 }
 
@@ -1502,6 +1677,7 @@ export function setPrototypePeriodLock(input: {
 
 function buildBimUseLabel(value: string, items: IndicatorRecord[]): string {
   const cleaned = String(value || "").trim();
+  if (cleaned === NO_BIM_USE_ID) return NA_TEXT;
   if (cleaned) return cleaned;
   if (!items.length) return NA_TEXT;
   const perspective = items[0].perspective_id || "";
@@ -1509,17 +1685,70 @@ function buildBimUseLabel(value: string, items: IndicatorRecord[]): string {
 }
 
 export function groupIndicatorsByBimUse(items: IndicatorRecord[]): BimUseGroup[] {
-  const grouped = new Map<string, IndicatorRecord[]>();
-  for (const item of items) {
-    const key = item.bim_use_id || NO_BIM_USE_ID;
-    const bucket = grouped.get(key) || [];
-    bucket.push(item);
-    grouped.set(key, bucket);
+  const grouped = new Map<string, Map<string, IndicatorRecord>>();
+  const normalizedItems = items.map((item) => {
+    const tags = uniqueStrings(
+      (Array.isArray(item.bim_use_tags) ? item.bim_use_tags : [])
+        .map((tag) => normalizeBimUseLabel(tag || ""))
+        .filter((tag): tag is string => Boolean(tag))
+    );
+    return {
+      ...item,
+      bim_use_tags: tags,
+    };
+  });
+
+  const concreteBimUses = new Set<string>();
+  for (const item of normalizedItems) {
+    for (const tag of item.bim_use_tags) {
+      if (tag !== BIM_USE_ALL) concreteBimUses.add(tag);
+    }
+  }
+
+  const addToGroup = (key: string, item: IndicatorRecord) => {
+    if (!grouped.has(key)) grouped.set(key, new Map<string, IndicatorRecord>());
+    const byId = grouped.get(key) as Map<string, IndicatorRecord>;
+    byId.set(item.id, item);
+  };
+
+  const hasAnyAllTag = normalizedItems.some((item) => item.bim_use_tags.includes(BIM_USE_ALL));
+  if (concreteBimUses.size === 0 && hasAnyAllTag) {
+    concreteBimUses.add(BIM_USE_ALL);
+  }
+
+  for (const item of normalizedItems) {
+    const tags = item.bim_use_tags;
+    if (tags.length === 0) {
+      const fallbackRaw = asNullableString(item.bim_use_id);
+      const fallbackNormalized = fallbackRaw ? normalizeBimUseLabel(fallbackRaw) : null;
+      if (fallbackNormalized && fallbackNormalized !== NO_BIM_USE_ID && !isUuidLike(fallbackNormalized)) {
+        addToGroup(fallbackNormalized, item);
+      } else {
+        addToGroup(NO_BIM_USE_ID, item);
+      }
+      continue;
+    }
+
+    const nonAllTags = tags.filter((tag) => tag !== BIM_USE_ALL);
+    for (const tag of nonAllTags) {
+      addToGroup(tag, item);
+    }
+
+    if (tags.includes(BIM_USE_ALL)) {
+      if (concreteBimUses.size > 0) {
+        for (const tag of concreteBimUses) {
+          addToGroup(tag, item);
+        }
+      } else {
+        addToGroup(BIM_USE_ALL, item);
+      }
+    }
   }
 
   return [...grouped.entries()]
-    .map(([bimUseId, rows]) => {
-      const sortedIndicators = [...rows].sort((a, b) => a.code.localeCompare(b.code));
+    .map(([bimUseId, byId]) => {
+      const rows = [...byId.values()];
+      const sortedIndicators = rows.sort((a, b) => a.code.localeCompare(b.code));
       const label = buildBimUseLabel(bimUseId === NO_BIM_USE_ID ? "" : bimUseId, sortedIndicators);
       return {
         bim_use_id: bimUseId,
@@ -1527,7 +1756,13 @@ export function groupIndicatorsByBimUse(items: IndicatorRecord[]): BimUseGroup[]
         indicators: sortedIndicators,
       } satisfies BimUseGroup;
     })
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => {
+      if (a.bim_use_id === BIM_USE_ALL && b.bim_use_id !== BIM_USE_ALL) return -1;
+      if (b.bim_use_id === BIM_USE_ALL && a.bim_use_id !== BIM_USE_ALL) return 1;
+      if (a.bim_use_id === NO_BIM_USE_ID && b.bim_use_id !== NO_BIM_USE_ID) return 1;
+      if (b.bim_use_id === NO_BIM_USE_ID && a.bim_use_id !== NO_BIM_USE_ID) return -1;
+      return a.label.localeCompare(b.label);
+    });
 }
 
 export async function fetchRole1Context(projectId: string): Promise<Role1Context> {
@@ -1545,7 +1780,7 @@ export async function fetchRole1Context(projectId: string): Promise<Role1Context
     periods = fallbackPeriods(projectId);
   }
 
-  const activePeriod = periods[0] ?? null;
+  const activePeriod = selectActivePeriod(periods);
   const periodStatus = activePeriod?.status ?? null;
   const periodStatusLabel = resolvePeriodStatusLabelWithPrototype(projectId, activePeriod?.id ?? null, periodStatus);
   const periodLocked = resolvePeriodLockWithPrototype(projectId, activePeriod?.id ?? null, periodStatus);

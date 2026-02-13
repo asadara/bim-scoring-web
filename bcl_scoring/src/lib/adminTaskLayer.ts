@@ -47,6 +47,40 @@ export type AdminConfigLock = {
   created_at?: string | null;
 };
 
+export type AdminScoringPeriod = {
+  id: string;
+  project_id: string;
+  year: number | null;
+  week: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: "OPEN" | "LOCKED" | string;
+  version: number | null;
+  locked_at?: string | null;
+  locked_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type AdminBulkPeriodGenerationResult = {
+  scope: "year" | "month";
+  project_id: string;
+  year: number;
+  month: number | null;
+  status: "OPEN" | "LOCKED" | string;
+  created_count: number;
+  skipped_count: number;
+  total_candidate_count: number;
+  created: AdminScoringPeriod[];
+  skipped: Array<{
+    year: number;
+    week: number;
+    start_date: string | null;
+    end_date: string | null;
+    reason: string;
+  }>;
+};
+
 type AdminErrorPayload =
   | string
   | {
@@ -250,4 +284,55 @@ export async function setAdminConfigLock(
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listAdminProjectPeriods(
+  session: AdminSession,
+  projectId: string
+): Promise<AdminScoringPeriod[]> {
+  return await requestAdmin<AdminScoringPeriod[]>(
+    session,
+    `/admin/projects/${encodeURIComponent(projectId)}/periods`
+  );
+}
+
+export async function createAdminProjectPeriod(
+  session: AdminSession,
+  projectId: string,
+  input: {
+    year: number;
+    week: number;
+    start_date?: string | null;
+    end_date?: string | null;
+    status?: "OPEN" | "LOCKED";
+  }
+): Promise<AdminScoringPeriod> {
+  return await requestAdmin<AdminScoringPeriod>(
+    session,
+    `/admin/projects/${encodeURIComponent(projectId)}/periods`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export async function bulkGenerateAdminProjectPeriods(
+  session: AdminSession,
+  projectId: string,
+  input: {
+    year: number;
+    scope: "year" | "month";
+    month?: number | null;
+    status?: "OPEN" | "LOCKED";
+  }
+): Promise<AdminBulkPeriodGenerationResult> {
+  return await requestAdmin<AdminBulkPeriodGenerationResult>(
+    session,
+    `/admin/projects/${encodeURIComponent(projectId)}/periods/bulk-generate`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
 }
