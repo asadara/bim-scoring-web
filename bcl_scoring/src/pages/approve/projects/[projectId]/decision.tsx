@@ -202,6 +202,7 @@ export default function ApprovalDecisionPage() {
     <ApproverLayout
       title="Approve / Reject Period"
       subtitle="Keputusan final level period untuk legitimasi organisasi."
+      projectId={typeof projectId === "string" ? projectId : null}
       projectName={formatProjectLabel(contextValue.project)}
       periodLabel={contextValue.period_label}
       periodStatusLabel={contextValue.period_status_label}

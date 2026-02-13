@@ -21,6 +21,7 @@ import {
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
   selectActivePeriod,
+  selectPeriodByJakartaDate,
   setPrototypePeriodLock,
 } from "@/lib/role1TaskLayer";
 import {
@@ -480,7 +481,7 @@ export async function fetchApproverHomeContext(): Promise<ApproverHomeContext> {
   const rows = await Promise.all(
     projects.map(async (project) => {
       const periodsResult = await fetchProjectPeriodsReadMode(project.id);
-      const activePeriod = selectActivePeriod(periodsResult.data);
+      const activePeriod = selectPeriodByJakartaDate(periodsResult.data) ?? selectActivePeriod(periodsResult.data);
 
       const periodId = activePeriod?.id ?? fallbackPeriodId(project.id);
       const backendStatus = activePeriod?.status ?? null;
@@ -529,7 +530,10 @@ export async function fetchApproverHomeRows(): Promise<ApproverProjectRow[]> {
   return context.rows;
 }
 
-export async function fetchApproverProjectContext(projectId: string): Promise<ApproverProjectContext> {
+export async function fetchApproverProjectContext(
+  projectId: string,
+  periodIdOverride?: string | null
+): Promise<ApproverProjectContext> {
   const [projectResult, periodsResult] = await Promise.all([
     fetchProjectReadMode(projectId),
     fetchProjectPeriodsReadMode(projectId),
@@ -538,8 +542,10 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
   const project = projectResult.data || fallbackProject(projectId);
   const periods = periodsResult.data;
 
-  const active = selectActivePeriod(periods);
-  const periodId = active?.id ?? fallbackPeriodId(projectId);
+  const overrideId = typeof periodIdOverride === "string" && periodIdOverride.trim() ? periodIdOverride.trim() : null;
+  const overridePeriod = overrideId ? periods.find((row) => String(row?.id) === overrideId) || null : null;
+  const active = overridePeriod ?? selectPeriodByJakartaDate(periods) ?? selectActivePeriod(periods);
+  const periodId = active?.id ?? overrideId ?? fallbackPeriodId(projectId);
   const backendStatus = active?.status ?? null;
   const periodStatusLabel = resolvePeriodStatusLabelWithPrototype(projectId, periodId, backendStatus);
   const periodLocked = resolvePeriodLockWithPrototype(projectId, periodId, backendStatus);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 
+import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT, ProjectRecord, ScoringPeriod, formatPeriodLabel, formatProjectLabel } from "@/lib/role1TaskLayer";
 
 type Role1LayoutProps = {
@@ -63,16 +64,16 @@ export default function Role1Layout(props: Role1LayoutProps) {
         </div>
       </header>
 
-      <nav className="task-subnav role-subnav" aria-label="Project task shortcuts">
-        <div className="role-subnav-title">Quick Access</div>
-        <div className="role-subnav-links">
-          <Link href="/projects">Project List</Link>
-          <Link href={`/projects/${projectId}`}>Project Home</Link>
-          <Link href={`/projects/${projectId}/evidence/add`}>Tambah Evidence</Link>
-          <Link href={`/projects/${projectId}/evidence`}>Daftar Evidence</Link>
-          <Link href={`/projects/${projectId}/indicators`}>Daftar Indicators</Link>
-        </div>
-      </nav>
+      <QuickAccessNav
+        ariaLabel="Project task shortcuts"
+        items={[
+          { label: "Project List", href: "/projects" },
+          { label: "Project Home", href: projectId ? `/projects/${projectId}` : null },
+          { label: "Tambah Evidence", href: projectId ? `/projects/${projectId}/evidence/add` : null },
+          { label: "Daftar Evidence", href: projectId ? `/projects/${projectId}/evidence` : null },
+          { label: "Daftar Indicators", href: projectId ? `/projects/${projectId}/indicators` : null },
+        ]}
+      />
 
       {children}
     </main>

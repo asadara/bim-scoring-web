@@ -215,6 +215,7 @@ export default function AuditHomePage() {
       locked_periods: lockedPeriods,
       open_periods: openPeriods,
       total_snapshots: snapshots.length,
+      latest_snapshot_id: latestSnapshot?.snapshot_id || null,
       latest_snapshot_at: latestSnapshot?.snapshot.approved_at || null,
       latest_snapshot_project:
         latestSnapshot ? projectNameById.get(latestSnapshot.snapshot.project_id) || latestSnapshot.snapshot.project_id : null,
@@ -292,11 +293,22 @@ export default function AuditHomePage() {
             <span>Snapshots available</span>
             <strong>{snapshotMetrics.total_snapshots}</strong>
           </article>
-          <article className="summary-card">
-            <span>Latest snapshot</span>
-            <strong>{snapshotMetrics.latest_snapshot_project || "Not yet created"}</strong>
-            <small>{formatDateText(snapshotMetrics.latest_snapshot_at)}</small>
-          </article>
+          {snapshotMetrics.latest_snapshot_id ? (
+            <Link
+              className="summary-card summary-card-action"
+              href={`/audit/snapshots/${encodeURIComponent(snapshotMetrics.latest_snapshot_id)}`}
+            >
+              <span>Latest snapshot</span>
+              <strong>{snapshotMetrics.latest_snapshot_project || "Latest snapshot"}</strong>
+              <small>{formatDateText(snapshotMetrics.latest_snapshot_at)}</small>
+            </Link>
+          ) : (
+            <article className="summary-card">
+              <span>Latest snapshot</span>
+              <strong>{snapshotMetrics.latest_snapshot_project || "Not yet created"}</strong>
+              <small>{formatDateText(snapshotMetrics.latest_snapshot_at)}</small>
+            </article>
+          )}
         </div>
       </section>
 

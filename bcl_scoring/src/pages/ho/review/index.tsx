@@ -156,6 +156,11 @@ export default function HoReviewHomePage() {
     () => rows.filter((row) => row.period_status === "LOCKED").length,
     [rows]
   );
+  const firstProjectId = useMemo(() => rows[0]?.project.id || null, [rows]);
+  const firstHighQueueId = useMemo(
+    () => rows.find((row) => row.queue_level === "High")?.project.id || null,
+    [rows]
+  );
   const headerProjectLabel = useMemo(() => {
     if (loading) return "Loading review queue...";
     if (rows.length === 0) return "No project pending review";
@@ -191,26 +196,59 @@ export default function HoReviewHomePage() {
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
 
       <section className="task-grid-3" aria-label="HO review summary">
-        <article className="summary-card">
-          <span>Projects needing review</span>
-          <strong>{rows.length}</strong>
-        </article>
-        <article className="summary-card">
-          <span>Submitted evidence</span>
-          <strong>{totalSubmitted}</strong>
-        </article>
-        <article className="summary-card">
-          <span>High queue projects</span>
-          <strong>{highQueueProjects}</strong>
-        </article>
+        {firstProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/ho/review/projects/${firstProjectId}`}>
+            <span>Projects needing review</span>
+            <strong>{rows.length}</strong>
+            <small>Open top queue project</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Projects needing review</span>
+            <strong>{rows.length}</strong>
+          </article>
+        )}
+        {firstProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/ho/review/projects/${firstProjectId}`}>
+            <span>Submitted evidence</span>
+            <strong>{totalSubmitted}</strong>
+            <small>Start review from top queue</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Submitted evidence</span>
+            <strong>{totalSubmitted}</strong>
+          </article>
+        )}
+        {firstHighQueueId ? (
+          <Link className="summary-card summary-card-action" href={`/ho/review/projects/${firstHighQueueId}`}>
+            <span>High queue projects</span>
+            <strong>{highQueueProjects}</strong>
+            <small>Jump to High priority</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>High queue projects</span>
+            <strong>{highQueueProjects}</strong>
+          </article>
+        )}
         <article className="summary-card">
           <span>Avg submitted / project</span>
           <strong>{averageSubmittedPerProject.toFixed(1)}</strong>
+          <small>Queue load benchmark</small>
         </article>
-        <article className="summary-card">
-          <span>Locked periods</span>
-          <strong>{lockedProjects}</strong>
-        </article>
+        {firstProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/ho/review/projects/${firstProjectId}`}>
+            <span>Locked periods</span>
+            <strong>{lockedProjects}</strong>
+            <small>See lock status per project</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Locked periods</span>
+            <strong>{lockedProjects}</strong>
+          </article>
+        )}
       </section>
 
       <section className="task-panel">

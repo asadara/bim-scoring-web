@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 
 type AuditorLayoutProps = {
@@ -7,11 +8,12 @@ type AuditorLayoutProps = {
   subtitle?: string;
   projectLabel?: string | null;
   periodLabel?: string | null;
+  snapshotId?: string | null;
   children: ReactNode;
 };
 
 export default function AuditorLayout(props: AuditorLayoutProps) {
-  const { title, subtitle, projectLabel, periodLabel, children } = props;
+  const { title, subtitle, projectLabel, periodLabel, snapshotId, children } = props;
 
   return (
     <main className="task-shell">
@@ -35,6 +37,14 @@ export default function AuditorLayout(props: AuditorLayoutProps) {
           </div>
         </div>
       </header>
+
+      <QuickAccessNav
+        ariaLabel="Audit shortcuts"
+        items={[
+          { label: "Audit Home", href: "/audit" },
+          { label: "Snapshot Detail", href: snapshotId ? `/audit/snapshots/${encodeURIComponent(snapshotId)}` : null },
+        ]}
+      />
 
       {children}
     </main>

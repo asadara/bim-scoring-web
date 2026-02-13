@@ -115,18 +115,21 @@ export default function ProjectRole1HomePage() {
       <BackendStatusBanner mode={context.data_mode} message={context.backend_message} />
 
       <section className="task-grid-3" aria-label="Evidence status summary">
-        <article className="summary-card">
+        <Link className="summary-card summary-card-action" href={`/projects/${projectId}/evidence#draft`}>
           <span>{statusLabel("DRAFT")}</span>
           <strong>{counts.DRAFT}</strong>
-        </article>
-        <article className="summary-card">
+          <small>Open draft bucket</small>
+        </Link>
+        <Link className="summary-card summary-card-action" href={`/projects/${projectId}/evidence#submitted`}>
           <span>{statusLabel("SUBMITTED")}</span>
           <strong>{counts.SUBMITTED}</strong>
-        </article>
-        <article className="summary-card">
+          <small>Open submitted bucket</small>
+        </Link>
+        <Link className="summary-card summary-card-action" href={`/projects/${projectId}/evidence#needs-revision`}>
           <span>{statusLabel("NEEDS_REVISION")}</span>
           <strong>{counts.NEEDS_REVISION}</strong>
-        </article>
+          <small>Open revision bucket</small>
+        </Link>
       </section>
 
       <section className="task-panel">

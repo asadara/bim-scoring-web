@@ -248,8 +248,10 @@ export default function MyEvidenceListPage() {
 
       {sections.map((status) => {
         const bucket = grouped[status];
+        const anchorId =
+          status === "DRAFT" ? "draft" : status === "SUBMITTED" ? "submitted" : "needs-revision";
         return (
-          <section key={status} className="task-panel group-section">
+          <section key={status} id={anchorId} className="task-panel group-section">
             <h3>
               {sectionLabel(status)} ({bucket.length})
             </h3>

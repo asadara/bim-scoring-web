@@ -114,6 +114,7 @@ export default function ProjectApprovalContextPage() {
     <ApproverLayout
       title="Period Approval"
       subtitle="Ringkasan period read-only untuk keputusan approval level period."
+      projectId={typeof projectId === "string" ? projectId : null}
       projectName={formatProjectLabel(context.project)}
       periodLabel={context.period_label}
       periodStatusLabel={context.period_status_label}

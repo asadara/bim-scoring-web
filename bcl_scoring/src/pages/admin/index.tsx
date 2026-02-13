@@ -1,16 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
-  AdminBulkPeriodGenerationResult,
   AdminConfigLock,
   AdminIndicator,
   AdminPerspective,
   AdminProject,
   AdminScoringPeriod,
   AdminSession,
-  bulkGenerateAdminProjectPeriods,
   createAdminIndicator,
-  createAdminProjectPeriod,
   createAdminProject,
   deleteAdminIndicator,
   deleteAdminProject,
@@ -20,6 +17,7 @@ import {
   listAdminPerspectives,
   listAdminProjects,
   setAdminConfigLock,
+  updateAdminProject,
 } from "@/lib/adminTaskLayer";
 import { AppRole, getRoleLabel, getStoredCredential, setStoredCredential } from "@/lib/userCredential";
 
@@ -33,19 +31,16 @@ const ROLE_OPTIONS: Array<{ value: AppRole; label: string }> = [
   { value: "viewer", label: "Viewer / Auditor" },
 ];
 
-const MONTH_OPTIONS: Array<{ value: number; label: string }> = [
-  { value: 1, label: "Januari" },
-  { value: 2, label: "Februari" },
-  { value: 3, label: "Maret" },
-  { value: 4, label: "April" },
-  { value: 5, label: "Mei" },
-  { value: 6, label: "Juni" },
-  { value: 7, label: "Juli" },
-  { value: 8, label: "Agustus" },
-  { value: 9, label: "September" },
-  { value: 10, label: "Oktober" },
-  { value: 11, label: "November" },
-  { value: 12, label: "Desember" },
+type WeekAnchor = "SUNDAY" | "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY";
+
+const WEEK_ANCHOR_OPTIONS: Array<{ value: WeekAnchor; label: string }> = [
+  { value: "MONDAY", label: "Senin" },
+  { value: "TUESDAY", label: "Selasa" },
+  { value: "WEDNESDAY", label: "Rabu" },
+  { value: "THURSDAY", label: "Kamis" },
+  { value: "FRIDAY", label: "Jumat" },
+  { value: "SATURDAY", label: "Sabtu" },
+  { value: "SUNDAY", label: "Minggu" },
 ];
 
 function toNonEmptyString(value: string): string | null {
@@ -92,14 +87,41 @@ function buildInternalCode(prefix: string): string {
   return `${prefix}-${ts}-${rnd}`;
 }
 
-function getCurrentIsoYearWeek(): { year: number; week: number } {
-  const now = new Date();
-  const date = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return { year: date.getUTCFullYear(), week: weekNo };
+function parseWeekAnchorFromConfigKey(configKey: string | null | undefined): WeekAnchor {
+  const raw = String(configKey || "").trim();
+  if (!raw) return "MONDAY";
+
+  const match = raw.match(/week_anchor\s*[:=]\s*(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)/i);
+  if (match) return String(match[1]).toUpperCase() as WeekAnchor;
+
+  // Allow plain anchor stored as "MONDAY", etc.
+  const normalized = raw.toUpperCase();
+  if (
+    normalized === "SUNDAY" ||
+    normalized === "MONDAY" ||
+    normalized === "TUESDAY" ||
+    normalized === "WEDNESDAY" ||
+    normalized === "THURSDAY" ||
+    normalized === "FRIDAY" ||
+    normalized === "SATURDAY"
+  ) {
+    return normalized as WeekAnchor;
+  }
+
+  return "MONDAY";
+}
+
+function upsertWeekAnchorConfigKey(configKey: string | null | undefined, anchor: WeekAnchor): string {
+  const raw = String(configKey || "").trim();
+  if (!raw) return `week_anchor=${anchor}`;
+
+  const replaced = raw.replace(
+    /week_anchor\s*[:=]\s*(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)/i,
+    `week_anchor=${anchor}`
+  );
+  if (replaced !== raw) return replaced;
+
+  return `${raw}; week_anchor=${anchor}`;
 }
 
 export default function AdminControlPanelPage() {
@@ -123,31 +145,12 @@ export default function AdminControlPanelPage() {
 
   const [showProjectCreateForm, setShowProjectCreateForm] = useState(false);
   const [showIndicatorCreateForm, setShowIndicatorCreateForm] = useState(false);
-  const [showPeriodCreateForm, setShowPeriodCreateForm] = useState(false);
 
   const [projectForm, setProjectForm] = useState({
     name: "",
     config_key: "",
   });
-  const [periodForm, setPeriodForm] = useState(() => {
-    const current = getCurrentIsoYearWeek();
-    return {
-      year: String(current.year),
-      week: String(current.week),
-      start_date: "",
-      end_date: "",
-      status: "OPEN" as "OPEN" | "LOCKED",
-    };
-  });
-  const [periodBulkForm, setPeriodBulkForm] = useState(() => {
-    const now = new Date();
-    return {
-      year: String(now.getUTCFullYear()),
-      scope: "year" as "year" | "month",
-      month: String(now.getUTCMonth() + 1),
-      status: "OPEN" as "OPEN" | "LOCKED",
-    };
-  });
+  const [weekAnchorDraft, setWeekAnchorDraft] = useState<WeekAnchor>("MONDAY");
   const [indicatorForm, setIndicatorForm] = useState({
     perspective_id: "",
     title: "",
@@ -201,6 +204,10 @@ export default function AdminControlPanelPage() {
   const hasActivePeriodProject = Boolean(
     selectedPeriodProject && selectedPeriodProject.is_active !== false
   );
+
+  useEffect(() => {
+    setWeekAnchorDraft(parseWeekAnchorFromConfigKey(selectedPeriodProject?.config_key));
+  }, [selectedPeriodProject?.id]);
 
   async function reloadData(currentSession: AdminSession, perspectiveFilter: string, periodProjectId: string) {
     const [projectRows, perspectiveRows, lockRow] = await Promise.all([
@@ -285,19 +292,12 @@ export default function AdminControlPanelPage() {
     if (projects.length === 0) {
       setPeriodProjectFilter("");
       setPeriods([]);
-      setShowPeriodCreateForm(false);
       return;
     }
     if (!periodProjectFilter || !projects.some((item) => item.id === periodProjectFilter)) {
       setPeriodProjectFilter(projects[0].id);
-      setShowPeriodCreateForm(false);
     }
   }, [projects, periodProjectFilter]);
-
-  useEffect(() => {
-    if (hasActivePeriodProject) return;
-    setShowPeriodCreateForm(false);
-  }, [hasActivePeriodProject]);
 
   useEffect(() => {
     setPeriodFeedback(null);
@@ -345,21 +345,14 @@ export default function AdminControlPanelPage() {
     }, "Project workspace berhasil dibuat.");
   }
 
-  async function handleCreatePeriod(event: FormEvent) {
-    event.preventDefault();
+  async function handleSaveWeeklyAnchor() {
     const projectId = toNonEmptyString(periodProjectFilter);
-    const year = Number.parseInt(periodForm.year, 10);
-    const week = Number.parseInt(periodForm.week, 10);
     if (!projectId) {
       setError("Pilih workspace project terlebih dahulu.");
       return;
     }
-    if (!Number.isInteger(year) || !Number.isInteger(week) || week < 1 || week > 53) {
-      setError("Year/week wajib valid (week 1..53).");
-      return;
-    }
     if (!hasActivePeriodProject) {
-      setError("Pilih workspace aktif terlebih dahulu sebelum menambah period.");
+      setError("Pilih workspace aktif terlebih dahulu sebelum mengubah anchor period.");
       return;
     }
 
@@ -368,75 +361,14 @@ export default function AdminControlPanelPage() {
     setNotice(null);
     setPeriodFeedback(null);
     try {
-      const created = await createAdminProjectPeriod(session, projectId, {
-        year,
-        week,
-        start_date: toNonEmptyString(periodForm.start_date),
-        end_date: toNonEmptyString(periodForm.end_date),
-        status: periodForm.status,
-      });
-      setShowPeriodCreateForm(false);
+      const nextConfigKey = upsertWeekAnchorConfigKey(selectedPeriodProject?.config_key, weekAnchorDraft);
+      await updateAdminProject(session, projectId, { config_key: nextConfigKey });
       await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
-      const createdYear = Number.isInteger(created?.year) ? created.year : year;
-      const createdWeek = Number.isInteger(created?.week) ? created.week : week;
-      const successMessage = `Period ${createdYear} W${createdWeek} berhasil ditambahkan.`;
+      const successMessage = `Anchor period mingguan disimpan: ${weekAnchorDraft}.`;
       setNotice(successMessage);
       setPeriodFeedback({ tone: "success", message: successMessage });
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Tambah period gagal.";
-      setError(message);
-      setPeriodFeedback({ tone: "error", message });
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function handleBulkGeneratePeriods(event: FormEvent) {
-    event.preventDefault();
-    const projectId = toNonEmptyString(periodProjectFilter);
-    const year = Number.parseInt(periodBulkForm.year, 10);
-    const month = Number.parseInt(periodBulkForm.month, 10);
-    const scope = periodBulkForm.scope;
-    if (!projectId) {
-      setError("Pilih workspace project terlebih dahulu.");
-      return;
-    }
-    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-      setError("Year harus valid (2000..2100).");
-      return;
-    }
-    if (scope === "month" && (!Number.isInteger(month) || month < 1 || month > 12)) {
-      setError("Pilih bulan valid untuk mode bulanan.");
-      return;
-    }
-    if (!hasActivePeriodProject) {
-      setError("Pilih workspace aktif terlebih dahulu sebelum generate period.");
-      return;
-    }
-
-    setWorking(true);
-    setError(null);
-    setNotice(null);
-    setPeriodFeedback(null);
-    try {
-      const result: AdminBulkPeriodGenerationResult = await bulkGenerateAdminProjectPeriods(session, projectId, {
-        year,
-        scope,
-        month: scope === "month" ? month : null,
-        status: periodBulkForm.status,
-      });
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
-      const baseMessage = `Generate period selesai: dibuat ${result.created_count}, dilewati ${result.skipped_count} dari total ${result.total_candidate_count}.`;
-      const nothingCreated = result.created_count === 0;
-      setNotice(baseMessage);
-      setPeriodFeedback({
-        tone: nothingCreated ? "warning" : "success",
-        message: nothingCreated
-          ? `${baseMessage} Tidak ada period baru karena semua period target sudah ada.`
-          : baseMessage,
-      });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Bulk generate period gagal.";
+      const message = e instanceof Error ? e.message : "Simpan anchor period gagal.";
       setError(message);
       setPeriodFeedback({ tone: "error", message });
     } finally {
@@ -763,16 +695,27 @@ export default function AdminControlPanelPage() {
               ))}
             </select>
           </label>
+          <label>
+            Start Hari Periode (Weekly Anchor)
+            <select
+              value={weekAnchorDraft}
+              onChange={(event) => setWeekAnchorDraft(event.target.value as WeekAnchor)}
+              disabled={working || !selectedPeriodProject}
+            >
+              {WEEK_ANCHOR_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="action-primary"
-            disabled={working || !hasActivePeriodProject}
-            onClick={() => {
-              if (!hasActivePeriodProject) return;
-              setShowPeriodCreateForm((prev) => !prev);
-            }}
+            disabled={working || !hasActivePeriodProject || !selectedPeriodProject}
+            onClick={() => void handleSaveWeeklyAnchor()}
           >
-            {showPeriodCreateForm ? "Tutup Form Tambah Period" : "Tambah Period"}
+            Simpan Anchor Weekly
           </button>
         </div>
         {selectedPeriodProject && hasActivePeriodProject ? (
@@ -780,13 +723,18 @@ export default function AdminControlPanelPage() {
             Menampilkan period untuk workspace: <strong>{selectedPeriodProject.name || "Tanpa nama"}</strong>
           </p>
         ) : null}
-        {!selectedPeriodProject ? (
-          <p className="inline-note">Pilih workspace aktif untuk membuka form tambah/generate period.</p>
-        ) : null}
+        {!selectedPeriodProject ? <p className="inline-note">Pilih workspace aktif untuk mengatur anchor period.</p> : null}
         {selectedPeriodProject && !hasActivePeriodProject ? (
           <p className="inline-note">
             Workspace terpilih berstatus <strong>Inactive</strong>. Aktifkan workspace atau pilih workspace lain
-            untuk menambah/generate period.
+            untuk mengatur anchor period.
+          </p>
+        ) : null}
+        {selectedPeriodProject ? (
+          <p className="inline-note">
+            Timezone period: <strong>Asia/Jakarta</strong>, start jam <strong>00:00</strong>. Sistem akan membuat dan
+            mengganti period otomatis setiap <strong>7 hari</strong> berdasarkan anchor di atas. Period lama otomatis
+            read-only untuk Role 1 (review/approval tetap mengikuti gate policy).
           </p>
         ) : null}
         {selectedPeriodProject ? (
@@ -843,132 +791,6 @@ export default function AdminControlPanelPage() {
           </table>
         </div>
 
-        {showPeriodCreateForm && hasActivePeriodProject && (
-          <>
-            <form className="field-grid" onSubmit={(event) => void handleCreatePeriod(event)}>
-              <label>
-                Year
-                <input
-                  type="number"
-                  value={periodForm.year}
-                  onChange={(event) => setPeriodForm((prev) => ({ ...prev, year: event.target.value }))}
-                  min={2000}
-                  max={2100}
-                  required
-                />
-              </label>
-              <label>
-                Week
-                <input
-                  type="number"
-                  value={periodForm.week}
-                  onChange={(event) => setPeriodForm((prev) => ({ ...prev, week: event.target.value }))}
-                  min={1}
-                  max={53}
-                  required
-                />
-              </label>
-              <label>
-                Start Date (opsional)
-                <input
-                  type="date"
-                  value={periodForm.start_date}
-                  onChange={(event) => setPeriodForm((prev) => ({ ...prev, start_date: event.target.value }))}
-                />
-              </label>
-              <label>
-                End Date (opsional)
-                <input
-                  type="date"
-                  value={periodForm.end_date}
-                  onChange={(event) => setPeriodForm((prev) => ({ ...prev, end_date: event.target.value }))}
-                />
-              </label>
-              <label>
-                Initial Status
-                <select
-                  value={periodForm.status}
-                  onChange={(event) =>
-                    setPeriodForm((prev) => ({ ...prev, status: event.target.value as "OPEN" | "LOCKED" }))
-                  }
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="LOCKED">LOCKED</option>
-                </select>
-              </label>
-              <p className="inline-note">
-                Jika Start/End date kosong, sistem akan mengisi otomatis berdasarkan year-week (ISO week).
-              </p>
-              <div className="wizard-actions">
-                <button type="submit" className="action-primary" disabled={working || !hasActivePeriodProject}>
-                  Simpan Period
-                </button>
-              </div>
-            </form>
-
-            <hr className="task-separator" />
-
-            <form className="field-grid" onSubmit={(event) => void handleBulkGeneratePeriods(event)}>
-              <label>
-                Mode Generate
-                <select
-                  value={periodBulkForm.scope}
-                  onChange={(event) =>
-                    setPeriodBulkForm((prev) => ({ ...prev, scope: event.target.value as "year" | "month" }))
-                  }
-                >
-                  <option value="year">1 Tahun (semua minggu)</option>
-                  <option value="month">Per Bulan (minggu overlap bulan)</option>
-                </select>
-              </label>
-              <label>
-                Year
-                <input
-                  type="number"
-                  value={periodBulkForm.year}
-                  onChange={(event) => setPeriodBulkForm((prev) => ({ ...prev, year: event.target.value }))}
-                  min={2000}
-                  max={2100}
-                  required
-                />
-              </label>
-              <label>
-                Bulan (jika mode bulanan)
-                <select
-                  value={periodBulkForm.month}
-                  onChange={(event) => setPeriodBulkForm((prev) => ({ ...prev, month: event.target.value }))}
-                  disabled={periodBulkForm.scope !== "month"}
-                >
-                  {MONTH_OPTIONS.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Initial Status
-                <select
-                  value={periodBulkForm.status}
-                  onChange={(event) =>
-                    setPeriodBulkForm((prev) => ({ ...prev, status: event.target.value as "OPEN" | "LOCKED" }))
-                  }
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="LOCKED">LOCKED</option>
-                </select>
-              </label>
-              <p className="inline-note">
-                Sistem hanya membuat period yang belum ada. Period duplikat otomatis dilewati.
-              </p>
-              <div className="wizard-actions">
-                <button type="submit" className="action-primary" disabled={working || !hasActivePeriodProject}>
-                  Generate Period Otomatis
-                </button>
-              </div>
-            </form>
-          </>
-        )}
       </section>
 
       <section className="task-panel">

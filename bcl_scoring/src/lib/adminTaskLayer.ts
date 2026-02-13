@@ -187,6 +187,17 @@ export async function createAdminProject(
   });
 }
 
+export async function updateAdminProject(
+  session: AdminSession,
+  projectId: string,
+  patch: { code?: string | null; name?: string | null; config_key?: string | null; is_active?: boolean | null }
+): Promise<AdminProject> {
+  return await requestAdmin<AdminProject>(session, `/admin/projects/${encodeURIComponent(projectId)}`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+}
+
 export async function deleteAdminProject(session: AdminSession, projectId: string): Promise<AdminProject> {
   return await requestAdmin<AdminProject>(session, `/admin/projects/${encodeURIComponent(projectId)}`, {
     method: "DELETE",

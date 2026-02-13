@@ -118,6 +118,7 @@ export default function HoProjectReviewPage() {
     <Role2Layout
       title="Review Evidence"
       subtitle="Project review context untuk evidence berstatus SUBMITTED."
+      projectId={typeof projectId === "string" ? projectId : null}
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}

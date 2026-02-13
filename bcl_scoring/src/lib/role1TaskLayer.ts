@@ -36,6 +36,8 @@ import {
   normalizeReviewOutcome,
   reviewOutcomeToEvidenceStatus,
 } from "@/lib/statusModel";
+import { formatJakartaYmd } from "@/lib/jakartaTime";
+// Period schedule is managed by backend (Supabase/Render) and selected by date range (Jakarta).
 
 export { normalizePrototypePeriodId } from "@/lib/prototypeStore";
 
@@ -809,6 +811,7 @@ export async function fetchEvidenceListReadMode(
 ): Promise<ReadResult<LocalEvidenceItem[]>> {
   const periodKey = normalizePrototypePeriodId(periodId);
   const localFallback = listLocalEvidence(projectId, periodKey);
+
   const query = periodKey ? `?period_id=${encodeURIComponent(periodKey)}` : "";
   const candidates = [
     buildApiUrl(`/periods/${encodeURIComponent(periodKey)}/evidences`),
@@ -1340,6 +1343,28 @@ export function selectActivePeriod(periods: ScoringPeriod[]): ScoringPeriod | nu
   return openPeriod || periods[0] || null;
 }
 
+function normalizeYmd(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (text.length >= 10) return text.slice(0, 10);
+  return null;
+}
+
+export function selectPeriodByJakartaDate(periods: ScoringPeriod[], now = new Date()): ScoringPeriod | null {
+  if (!Array.isArray(periods) || periods.length === 0) return null;
+  const today = formatJakartaYmd(now);
+  const hits = periods.filter((row) => {
+    const start = normalizeYmd(row.start_date);
+    const end = normalizeYmd(row.end_date);
+    if (!start || !end) return false;
+    return start <= today && today <= end;
+  });
+  if (hits.length === 0) return null;
+  // If multiple match, pick the latest-starting window.
+  hits.sort((a, b) => String(b.start_date || "").localeCompare(String(a.start_date || "")));
+  return hits[0] || null;
+}
+
 function toTimestamp(value: string | null): number {
   if (!value) return 0;
   const time = Date.parse(value);
@@ -1784,7 +1809,7 @@ export async function fetchRole1Context(projectId: string): Promise<Role1Context
     periods = fallbackPeriods(projectId);
   }
 
-  const activePeriod = selectActivePeriod(periods);
+  const activePeriod = selectPeriodByJakartaDate(periods) ?? selectActivePeriod(periods);
   const periodStatus = activePeriod?.status ?? null;
   const periodStatusLabel = resolvePeriodStatusLabelWithPrototype(projectId, activePeriod?.id ?? null, periodStatus);
   const periodLocked = resolvePeriodLockWithPrototype(projectId, activePeriod?.id ?? null, periodStatus);

@@ -243,6 +243,7 @@ export default function AuditSnapshotDetailPage() {
       subtitle="Snapshot detail sebagai catatan immutable prototype."
       projectLabel={formatProjectLabel(project || { id: snapshot.project_id, name: null, code: null, phase: null, is_active: null })}
       periodLabel={snapshot.period_id || NA_TEXT}
+      snapshotId={typeof snapshotId === "string" ? decodeURIComponent(snapshotId) : null}
     >
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
 

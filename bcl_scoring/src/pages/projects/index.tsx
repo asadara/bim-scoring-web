@@ -164,6 +164,21 @@ export default function ProjectsIndexPage() {
     () => rows.reduce((sum, row) => sum + row.evidenceCounts.NEEDS_REVISION, 0),
     [rows]
   );
+  const firstNeedsRevisionProjectId = useMemo(
+    () => rows.find((row) => row.evidenceCounts.NEEDS_REVISION > 0)?.project.id || null,
+    [rows]
+  );
+  const firstDraftProjectId = useMemo(
+    () => rows.find((row) => row.evidenceCounts.DRAFT > 0)?.project.id || null,
+    [rows]
+  );
+  const firstSubmittedProjectId = useMemo(
+    () => rows.find((row) => row.evidenceCounts.SUBMITTED > 0)?.project.id || null,
+    [rows]
+  );
+  const firstActionProjectId = useMemo(() => {
+    return firstNeedsRevisionProjectId || firstDraftProjectId || null;
+  }, [firstDraftProjectId, firstNeedsRevisionProjectId]);
 
   return (
     <main className="task-shell">
@@ -213,19 +228,50 @@ export default function ProjectsIndexPage() {
         <article className="summary-card">
           <span>Total Projects</span>
           <strong>{totalProjects}</strong>
+          <small>All active projects in scope</small>
         </article>
-        <article className="summary-card">
-          <span>Need Action (Draft/Revisi)</span>
-          <strong>{projectsNeedAction}</strong>
-        </article>
-        <article className="summary-card">
-          <span>Submitted Evidence</span>
-          <strong>{totalSubmitted}</strong>
-        </article>
-        <article className="summary-card">
-          <span>Needs Revision</span>
-          <strong>{totalNeedsRevision}</strong>
-        </article>
+
+        {firstActionProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/projects/${firstActionProjectId}`}>
+            <span>Need Action (Draft/Revisi)</span>
+            <strong>{projectsNeedAction}</strong>
+            <small>Open top-priority project</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Need Action (Draft/Revisi)</span>
+            <strong>{projectsNeedAction}</strong>
+            <small>No immediate action detected</small>
+          </article>
+        )}
+
+        {firstSubmittedProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/projects/${firstSubmittedProjectId}/evidence#submitted`}>
+            <span>Submitted Evidence</span>
+            <strong>{totalSubmitted}</strong>
+            <small>See submitted/reviewed bucket</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Submitted Evidence</span>
+            <strong>{totalSubmitted}</strong>
+            <small>No submitted evidence yet</small>
+          </article>
+        )}
+
+        {firstNeedsRevisionProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/projects/${firstNeedsRevisionProjectId}/evidence#needs-revision`}>
+            <span>Needs Revision</span>
+            <strong>{totalNeedsRevision}</strong>
+            <small>Fix evidence requiring revision</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Needs Revision</span>
+            <strong>{totalNeedsRevision}</strong>
+            <small>No revision pending</small>
+          </article>
+        )}
       </section>
 
       <section className="task-panel" id="project-list">

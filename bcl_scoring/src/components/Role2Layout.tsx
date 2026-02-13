@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import QuickAccessNav from "@/components/QuickAccessNav";
 import {
   NA_TEXT,
   ProjectRecord,
@@ -11,6 +12,7 @@ import {
 type Role2LayoutProps = {
   title: string;
   subtitle?: string;
+  projectId?: string | null;
   project?: ProjectRecord | null;
   activePeriod?: ScoringPeriod | null;
   periodStatusLabel?: string;
@@ -23,6 +25,7 @@ export default function Role2Layout(props: Role2LayoutProps) {
   const {
     title,
     subtitle,
+    projectId,
     project,
     activePeriod,
     periodStatusLabel,
@@ -70,6 +73,14 @@ export default function Role2Layout(props: Role2LayoutProps) {
           </aside>
         </div>
       </header>
+
+      <QuickAccessNav
+        ariaLabel="HO review shortcuts"
+        items={[
+          { label: "Review Home", href: "/ho/review" },
+          { label: "Project Review", href: projectId ? `/ho/review/projects/${projectId}` : null },
+        ]}
+      />
 
       {children}
     </main>

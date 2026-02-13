@@ -114,6 +114,7 @@ export default function AwaitingReviewQueuePage() {
     <ApproverLayout
       title="Awaiting Review Queue"
       subtitle="Evidence yang masih menunggu review BIM Coordinator HO sebelum period bisa diputuskan."
+      projectId={typeof projectId === "string" ? projectId : null}
       projectName={formatProjectLabel(context.project)}
       periodLabel={context.period_label}
       periodStatusLabel={context.period_status_label}

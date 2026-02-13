@@ -165,6 +165,16 @@ export default function ApproverHomePage() {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }, [insightRows]);
 
+  const firstProjectId = useMemo(() => rows[0]?.project.id || null, [rows]);
+  const firstReadyProjectId = useMemo(
+    () => insightRows.find((row) => row.readinessLabel === "Ready")?.row.project.id || null,
+    [insightRows]
+  );
+  const firstBlockedProjectId = useMemo(
+    () => insightRows.find((row) => row.readinessLabel === "Blocked")?.row.project.id || null,
+    [insightRows]
+  );
+
   return (
     <ApproverLayout
       title="Period Approval"
@@ -176,25 +186,58 @@ export default function ApproverHomePage() {
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
 
       <section className="task-grid-3" aria-label="Approver operational summary">
-        <article className="summary-card">
-          <span>Projects in queue</span>
-          <strong>{rows.length}</strong>
-        </article>
-        <article className="summary-card">
-          <span>Ready to approve</span>
-          <strong>{readyProjects}</strong>
-        </article>
-        <article className="summary-card">
-          <span>Blocked by review</span>
-          <strong>{blockedProjects}</strong>
-        </article>
-        <article className="summary-card">
-          <span>Locked periods</span>
-          <strong>{lockedProjects}</strong>
-        </article>
+        {firstProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/approve/projects/${firstProjectId}`}>
+            <span>Projects in queue</span>
+            <strong>{rows.length}</strong>
+            <small>Open first project context</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Projects in queue</span>
+            <strong>{rows.length}</strong>
+          </article>
+        )}
+        {firstReadyProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/approve/projects/${firstReadyProjectId}/decision`}>
+            <span>Ready to approve</span>
+            <strong>{readyProjects}</strong>
+            <small>Open decision for ready project</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Ready to approve</span>
+            <strong>{readyProjects}</strong>
+          </article>
+        )}
+        {firstBlockedProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/approve/projects/${firstBlockedProjectId}/awaiting-review`}>
+            <span>Blocked by review</span>
+            <strong>{blockedProjects}</strong>
+            <small>See awaiting review queue</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Blocked by review</span>
+            <strong>{blockedProjects}</strong>
+          </article>
+        )}
+        {firstProjectId ? (
+          <Link className="summary-card summary-card-action" href={`/approve/projects/${firstProjectId}`}>
+            <span>Locked periods</span>
+            <strong>{lockedProjects}</strong>
+            <small>Review lock status</small>
+          </Link>
+        ) : (
+          <article className="summary-card">
+            <span>Locked periods</span>
+            <strong>{lockedProjects}</strong>
+          </article>
+        )}
         <article className="summary-card">
           <span>Average score (visible)</span>
           <strong>{averageVisibleScore === null ? NA_TEXT : averageVisibleScore.toFixed(2)}</strong>
+          <small>Across visible summaries</small>
         </article>
       </section>
 

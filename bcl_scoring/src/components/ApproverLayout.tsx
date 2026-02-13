@@ -1,10 +1,12 @@
 import { ReactNode } from "react";
 
+import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 
 type ApproverLayoutProps = {
   title: string;
   subtitle?: string;
+  projectId?: string | null;
   projectName?: string | null;
   periodLabel?: string | null;
   periodStatusLabel?: string | null;
@@ -12,7 +14,7 @@ type ApproverLayoutProps = {
 };
 
 export default function ApproverLayout(props: ApproverLayoutProps) {
-  const { title, subtitle, projectName, periodLabel, periodStatusLabel, children } = props;
+  const { title, subtitle, projectId, projectName, periodLabel, periodStatusLabel, children } = props;
   const periodText = periodStatusLabel || NA_TEXT;
   const periodChipClass =
     periodText === "LOCKED"
@@ -53,6 +55,16 @@ export default function ApproverLayout(props: ApproverLayoutProps) {
           </aside>
         </div>
       </header>
+
+      <QuickAccessNav
+        ariaLabel="Approval shortcuts"
+        items={[
+          { label: "Approval Home", href: "/approve" },
+          { label: "Project Context", href: projectId ? `/approve/projects/${projectId}` : null },
+          { label: "Awaiting Review", href: projectId ? `/approve/projects/${projectId}/awaiting-review` : null },
+          { label: "Decision", href: projectId ? `/approve/projects/${projectId}/decision` : null },
+        ]}
+      />
 
       {children}
     </main>

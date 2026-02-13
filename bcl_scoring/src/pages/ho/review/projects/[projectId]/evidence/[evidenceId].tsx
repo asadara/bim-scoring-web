@@ -331,6 +331,7 @@ export default function HoEvidenceReviewPage() {
     <Role2Layout
       title="Apply Review"
       subtitle="Review evidence secara read-only dan tetapkan outcome + alasan."
+      projectId={typeof projectId === "string" ? projectId : null}
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}

@@ -105,6 +105,7 @@ type StoreProjectMeta = {
   project_id: string;
   project_name: string | null;
   project_code: string | null;
+  week_anchor: string | null;
   updated_at: string;
 };
 
@@ -496,6 +497,7 @@ function normalizeStorePayload(payload: unknown): PrototypeTruthStore {
       project_id: projectId,
       project_name: asNullableString(row.project_name),
       project_code: asNullableString(row.project_code),
+      week_anchor: asNullableString(row.week_anchor),
       updated_at: asString(row.updated_at) || new Date().toISOString(),
     };
   }
@@ -858,9 +860,12 @@ export function rememberPrototypeProjectMetaInStore(input: {
   project_id: string;
   project_name: string | null;
   project_code: string | null;
+  week_anchor?: string | null;
 }): void {
   const projectId = asString(input.project_id).trim();
   if (!projectId) return;
+
+  const existing = loadStore().project_meta[projectId];
 
   mutateStore((current) => ({
     ...current,
@@ -870,6 +875,7 @@ export function rememberPrototypeProjectMetaInStore(input: {
         project_id: projectId,
         project_name: asNullableString(input.project_name),
         project_code: asNullableString(input.project_code),
+        week_anchor: asNullableString(input.week_anchor) ?? existing?.week_anchor ?? null,
         updated_at: new Date().toISOString(),
       },
     },
@@ -879,6 +885,16 @@ export function rememberPrototypeProjectMetaInStore(input: {
 export function getPrototypeProjectMetaFromStore(projectId: string): StoreProjectMeta | null {
   const hit = loadStore().project_meta[projectId];
   return hit || null;
+}
+
+export function setPrototypeProjectWeekAnchor(projectId: string, weekAnchor: string | null): void {
+  const hit = getPrototypeProjectMetaFromStore(projectId);
+  rememberPrototypeProjectMetaInStore({
+    project_id: projectId,
+    project_name: hit?.project_name ?? null,
+    project_code: hit?.project_code ?? null,
+    week_anchor: weekAnchor,
+  });
 }
 
 export function rememberPrototypePeriodMetaInStore(input: {
