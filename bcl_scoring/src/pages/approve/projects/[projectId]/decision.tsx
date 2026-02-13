@@ -15,7 +15,13 @@ import {
   listPrototypeSnapshots,
   normalizePrototypePeriodId,
 } from "@/lib/role1TaskLayer";
-import { ApproverProjectContext, applyApproverDecision, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
+import {
+  APPROVAL_GATE_POLICY,
+  ApproverProjectContext,
+  applyApproverDecision,
+  evaluateApprovalGates,
+  fetchApproverProjectContext,
+} from "@/lib/approverTaskLayer";
 import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel } from "@/lib/userCredential";
 
@@ -102,8 +108,12 @@ export default function ApprovalDecisionPage() {
   const locked = contextValue.period_locked;
   const blockedByBackend = isRealBackendWriteEnabled() && contextValue.data_mode === "prototype";
   const canWrite = canWriteRole3Approval(credential.role);
-  const pendingAwaitingReview = contextValue.evidence_counts.AWAITING_REVIEW;
-  const approveBlockedByPendingReview = pendingAwaitingReview > 0;
+  const approvalGate = evaluateApprovalGates({
+    breakdown: contextValue.summary.breakdown,
+    confidence_coverage: contextValue.summary.confidence?.coverage ?? null,
+    evidence_counts: contextValue.evidence_counts,
+  });
+  const approveBlockedByPolicy = !approvalGate.is_eligible;
   const periodKey = normalizePrototypePeriodId(contextValue.period_id);
 
   const decisions = listPrototypeApprovalDecisions()
@@ -143,8 +153,8 @@ export default function ApprovalDecisionPage() {
       return;
     }
 
-    if (decision === "APPROVE PERIOD" && approveBlockedByPendingReview) {
-      setFormError("Tidak dapat APPROVE PERIOD karena masih ada evidence berstatus Awaiting review.");
+    if (decision === "APPROVE PERIOD" && approveBlockedByPolicy) {
+      setFormError(`Tidak dapat APPROVE PERIOD: ${approvalGate.failures.join(" | ")}`);
       return;
     }
 
@@ -158,6 +168,7 @@ export default function ApprovalDecisionPage() {
         reason,
         final_bim_score: contextValue.summary.total_score,
         breakdown: contextValue.summary.breakdown,
+        summary_confidence_coverage: contextValue.summary.confidence?.coverage ?? null,
         evidence_counts: contextValue.evidence_counts,
       });
     } catch (e) {
@@ -200,10 +211,9 @@ export default function ApprovalDecisionPage() {
       <section className="task-panel">
         <p className="warning-box">Approval akan mengunci period dan membentuk rekam jejak final.</p>
         <p className="prototype-badge">Prototype snapshot (not used for audit/compliance)</p>
-        {approveBlockedByPendingReview ? (
+        {approveBlockedByPolicy ? (
           <p className="warning-box">
-            Masih ada <strong>{pendingAwaitingReview}</strong> evidence berstatus Awaiting review. APPROVE PERIOD
-            dinonaktifkan sampai review selesai.
+            APPROVE PERIOD dinonaktifkan karena gating policy belum terpenuhi.
           </p>
         ) : null}
         {locked ? <p className="warning-box">LOCKED (read-only)</p> : null}
@@ -212,6 +222,48 @@ export default function ApprovalDecisionPage() {
             Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Konfirmasi keputusan
             dinonaktifkan.
           </p>
+        ) : null}
+      </section>
+
+      <section className="task-panel">
+        <h2>Approval Gating Policy</h2>
+        <div className="task-grid-3">
+          <article className="summary-card">
+            <span>Coverage</span>
+            <strong>
+              {approvalGate.metrics.coverage_ratio === null
+                ? NA_TEXT
+                : `${Math.round(approvalGate.metrics.coverage_ratio * 100)}%`}
+            </strong>
+            <small>Min {Math.round(APPROVAL_GATE_POLICY.min_coverage_ratio * 100)}%</small>
+          </article>
+          <article className="summary-card">
+            <span>Reviewed Evidence</span>
+            <strong>{approvalGate.metrics.reviewed_evidence_count}</strong>
+            <small>Min {APPROVAL_GATE_POLICY.min_reviewed_evidence}</small>
+          </article>
+          <article className="summary-card">
+            <span>Scored Perspectives</span>
+            <strong>{approvalGate.metrics.scored_perspectives_count}</strong>
+            <small>Min {APPROVAL_GATE_POLICY.min_scored_perspectives}</small>
+          </article>
+          <article className="summary-card">
+            <span>Awaiting Review</span>
+            <strong>{approvalGate.metrics.awaiting_review_count}</strong>
+            <small>Must be 0</small>
+          </article>
+          <article className="summary-card">
+            <span>Gate Status</span>
+            <strong>{approvalGate.is_eligible ? "Eligible" : "Blocked"}</strong>
+            <small>{approvalGate.is_eligible ? "Approval dapat diproses" : "Periode tetap OPEN"}</small>
+          </article>
+        </div>
+        {!approvalGate.is_eligible ? (
+          <div className="warning-box">
+            {approvalGate.failures.map((item, index) => (
+              <p key={`${item}-${index}`}>{item}</p>
+            ))}
+          </div>
         ) : null}
       </section>
 
@@ -231,7 +283,7 @@ export default function ApprovalDecisionPage() {
                     locked ||
                     blockedByBackend ||
                     isSubmitting ||
-                    (item === "APPROVE PERIOD" && approveBlockedByPendingReview)
+                    (item === "APPROVE PERIOD" && approveBlockedByPolicy)
                   }
                 />
                 <strong>{item}</strong>

@@ -1518,6 +1518,10 @@ export function buildReviewStatusCounts(items: LocalEvidenceItem[]): ReviewStatu
   };
 
   for (const item of items) {
+    if (item.status === "NEEDS_REVISION") {
+      counter.NEEDS_REVISION += 1;
+      continue;
+    }
     if (item.status !== "SUBMITTED") continue;
     const outcome = getEffectiveReviewOutcome(item);
     if (!outcome) {

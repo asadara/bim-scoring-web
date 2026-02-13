@@ -263,6 +263,16 @@ export default function HoEvidenceReviewPage() {
 
   const isLocked = context.period_locked;
   const isSubmitted = evidence.effective_status === "SUBMITTED";
+  const currentLifecycleLabel =
+    evidence.effective_status === "ACCEPTABLE"
+      ? "Reviewed - ACCEPTABLE"
+      : evidence.effective_status === "REJECTED"
+        ? "Reviewed - REJECTED"
+        : evidence.effective_status === "NEEDS_REVISION"
+          ? "Needs Revision"
+          : evidence.effective_status === "SUBMITTED"
+            ? "Submitted (Awaiting Review)"
+            : "Draft";
   const blockedByBackend = isRealBackendWriteEnabled() && context.data_mode === "prototype";
   const canWrite = canWriteRole2Review(credential.role);
   const canApply = canWrite && !isLocked && !blockedByBackend && isSubmitted && !isSubmitting;
@@ -337,7 +347,12 @@ export default function HoEvidenceReviewPage() {
           </p>
         ) : null}
         {!isSubmitted ? (
-          <p className="warning-box">Evidence ini bukan status SUBMITTED sehingga Apply Review dinonaktifkan.</p>
+          <p className="warning-box">
+            Apply Review hanya untuk status SUBMITTED. Status saat ini: <strong>{currentLifecycleLabel}</strong>.
+            {evidence.latest_review_outcome
+              ? " Evidence ini sudah direview; minta Role 1 update/resubmit jika perlu review ulang."
+              : " Minta Role 1 submit evidence terlebih dahulu."}
+          </p>
         ) : null}
       </section>
 
@@ -356,6 +371,9 @@ export default function HoEvidenceReviewPage() {
         <p>Description: {evidence.description || NA_TEXT}</p>
         <p>
           Type: <strong>{evidence.type || NA_TEXT}</strong>
+        </p>
+        <p>
+          Current lifecycle: <strong>{currentLifecycleLabel}</strong>
         </p>
 
         {renderEvidenceContent(evidence)}

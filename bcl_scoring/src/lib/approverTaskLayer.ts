@@ -91,6 +91,23 @@ export type ApproverHomeContext = {
   backend_message: string | null;
 };
 
+export const APPROVAL_GATE_POLICY = {
+  min_coverage_ratio: 0.6,
+  min_reviewed_evidence: 3,
+  min_scored_perspectives: 4,
+} as const;
+
+export type ApprovalGateEvaluation = {
+  is_eligible: boolean;
+  failures: string[];
+  metrics: {
+    coverage_ratio: number | null;
+    reviewed_evidence_count: number;
+    scored_perspectives_count: number;
+    awaiting_review_count: number;
+  };
+};
+
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() !== "") {
@@ -280,6 +297,159 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
   }
 }
 
+function normalizeCoverageRatio(value: number | null): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  if (value <= 1) return Math.max(0, Math.min(1, value));
+  return Math.max(0, Math.min(1, value / 100));
+}
+
+export function evaluateApprovalGates(input: {
+  breakdown: SummaryBreakdownRow[];
+  confidence_coverage: number | null;
+  evidence_counts: ReviewStatusCount;
+}): ApprovalGateEvaluation {
+  const coverageRatio = normalizeCoverageRatio(input.confidence_coverage);
+  const reviewedEvidenceCount =
+    input.evidence_counts.ACCEPTABLE +
+    input.evidence_counts.NEEDS_REVISION +
+    input.evidence_counts.REJECTED;
+  const scoredPerspectivesCount = input.breakdown.filter(
+    (row) => row.score !== null && Number.isFinite(row.score) && row.score > 0
+  ).length;
+  const awaitingReviewCount = input.evidence_counts.AWAITING_REVIEW;
+
+  const failures: string[] = [];
+  if (awaitingReviewCount > 0) {
+    failures.push(`Awaiting review harus 0 (saat ini ${awaitingReviewCount})`);
+  }
+  if (coverageRatio === null || coverageRatio < APPROVAL_GATE_POLICY.min_coverage_ratio) {
+    const current = coverageRatio === null ? NA_TEXT : `${Math.round(coverageRatio * 100)}%`;
+    failures.push(
+      `Coverage minimal ${Math.round(APPROVAL_GATE_POLICY.min_coverage_ratio * 100)}% (saat ini ${current})`
+    );
+  }
+  if (reviewedEvidenceCount < APPROVAL_GATE_POLICY.min_reviewed_evidence) {
+    failures.push(
+      `Evidence reviewed minimal ${APPROVAL_GATE_POLICY.min_reviewed_evidence} (saat ini ${reviewedEvidenceCount})`
+    );
+  }
+  if (scoredPerspectivesCount < APPROVAL_GATE_POLICY.min_scored_perspectives) {
+    failures.push(
+      `Perspektif terskor minimal ${APPROVAL_GATE_POLICY.min_scored_perspectives} (saat ini ${scoredPerspectivesCount})`
+    );
+  }
+
+  return {
+    is_eligible: failures.length === 0,
+    failures,
+    metrics: {
+      coverage_ratio: coverageRatio,
+      reviewed_evidence_count: reviewedEvidenceCount,
+      scored_perspectives_count: scoredPerspectivesCount,
+      awaiting_review_count: awaitingReviewCount,
+    },
+  };
+}
+
+async function fetchDashboardSummaryReadMode(
+  projectId: string,
+  year: number | null,
+  week: number | null
+): Promise<{
+  data: ReadOnlySummary;
+  mode: DataMode;
+  backend_message: string | null;
+  available: boolean;
+}> {
+  if (year === null || week === null) {
+    return {
+      data: {
+        total_score: null,
+        confidence: null,
+        breakdown: [],
+      },
+      mode: "prototype",
+      backend_message: "Period label is Not available",
+      available: false,
+    };
+  }
+
+  const query = new URLSearchParams({
+    project_id: projectId,
+    year: String(year),
+    week: String(week),
+    trend_granularity: "month",
+    audit: "true",
+  });
+  const response = await safeFetchJson<unknown>(
+    buildApiUrl(`/summary/v2/bcl/dashboard?${query.toString()}`)
+  );
+  if (!response.ok) {
+    return {
+      data: {
+        total_score: null,
+        confidence: null,
+        breakdown: [],
+      },
+      mode: "prototype",
+      backend_message: toSafeErrorMessage(response),
+      available: false,
+    };
+  }
+
+  try {
+    const payload = normalizePayload(response.data);
+    const root = safeObject(payload);
+    const cards = Array.isArray(root.cards) ? root.cards : [];
+    const scoreCard = cards.find((item) => safeObject(item).id === "score");
+    const perspectivesCard = cards.find((item) => safeObject(item).id === "perspectives");
+
+    const totalScore =
+      asNumber(safeObject(scoreCard).value) ??
+      asNumber(root.total_score);
+
+    let breakdown = toSummaryBreakdown(safeObject(perspectivesCard).items);
+    if (breakdown.length === 0) {
+      breakdown = toSummaryBreakdown(root.perspectives);
+    }
+
+    if (totalScore === null && breakdown.length === 0) {
+      return {
+        data: {
+          total_score: null,
+          confidence: null,
+          breakdown: [],
+        },
+        mode: "prototype",
+        backend_message: "Dashboard summary not available",
+        available: false,
+      };
+    }
+
+    return {
+      data: {
+        total_score: totalScore,
+        confidence: null,
+        breakdown,
+      },
+      mode: "backend",
+      backend_message: null,
+      available: true,
+    };
+  } catch (e) {
+    return {
+      data: {
+        total_score: null,
+        confidence: null,
+        breakdown: [],
+      },
+      mode: "prototype",
+      backend_message: e instanceof Error ? e.message : "Invalid dashboard payload",
+      available: false,
+    };
+  }
+}
+
 export function getLatestApprovalDecision(projectId: string, periodId: string | null): PrototypeApprovalDecisionRecord | null {
   const normalized = normalizePeriodId(periodId);
   const items = listPrototypeApprovalDecisions().filter(
@@ -377,6 +547,22 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
   const summaryResult = await fetchReadOnlySummaryReadMode(projectId, periodId);
   let summary: ReadOnlySummary = summaryResult.data;
   let summaryAvailable = summaryResult.available;
+  let dashboardSummaryResult: {
+    data: ReadOnlySummary;
+    mode: DataMode;
+    backend_message: string | null;
+    available: boolean;
+  } = {
+    data: {
+      total_score: null,
+      confidence: null,
+      breakdown: [],
+    },
+    mode: "backend",
+    backend_message: null,
+    available: false,
+  };
+  let summarySourceMode: DataMode = summaryResult.mode;
 
   const evidenceResult = await fetchEvidenceListReadMode(projectId, periodId);
   const evidenceCounts = buildReviewStatusCounts(
@@ -384,13 +570,15 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
   );
   const latestDecision = getLatestApprovalDecision(projectId, periodId);
   const snapshots = listSnapshotsForPeriod(projectId, periodId);
-  const dataMode: DataMode =
-    projectResult.mode === "prototype" ||
-    periodsResult.mode === "prototype" ||
-    summaryResult.mode === "prototype" ||
-    evidenceResult.mode === "prototype"
-      ? "prototype"
-      : "backend";
+
+  if (!summaryAvailable) {
+    dashboardSummaryResult = await fetchDashboardSummaryReadMode(projectId, active?.year ?? null, active?.week ?? null);
+    if (dashboardSummaryResult.available) {
+      summary = dashboardSummaryResult.data;
+      summaryAvailable = true;
+      summarySourceMode = dashboardSummaryResult.mode;
+    }
+  }
 
   if (!summaryAvailable && snapshots.length > 0) {
     const latestSnapshot = snapshots[0];
@@ -403,7 +591,21 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
       })),
     };
     summaryAvailable = true;
+    summarySourceMode = "prototype";
   }
+
+  const dataMode: DataMode =
+    projectResult.mode === "prototype" ||
+    periodsResult.mode === "prototype" ||
+    summarySourceMode === "prototype" ||
+    evidenceResult.mode === "prototype"
+      ? "prototype"
+      : "backend";
+
+  const summaryBackendMessage =
+    summarySourceMode === "backend"
+      ? null
+      : dashboardSummaryResult.backend_message || summaryResult.backend_message || null;
 
   return {
     project,
@@ -423,7 +625,7 @@ export async function fetchApproverProjectContext(projectId: string): Promise<Ap
     backend_message:
       projectResult.backend_message ||
       periodsResult.backend_message ||
-      summaryResult.backend_message ||
+      summaryBackendMessage ||
       evidenceResult.backend_message ||
       null,
   };
@@ -462,6 +664,7 @@ export async function applyApproverDecision(input: {
   reason: string;
   final_bim_score: number | null;
   breakdown: SummaryBreakdownRow[];
+  summary_confidence_coverage: number | null;
   evidence_counts: ReviewStatusCount;
 }): Promise<{
   decision_record: PrototypeApprovalDecisionRecord;
@@ -472,8 +675,15 @@ export async function applyApproverDecision(input: {
     throw new Error("Reason wajib diisi.");
   }
 
-  if (input.decision === "APPROVE PERIOD" && input.evidence_counts.AWAITING_REVIEW > 0) {
-    throw new Error("Tidak dapat APPROVE PERIOD karena masih ada evidence berstatus Awaiting review.");
+  if (input.decision === "APPROVE PERIOD") {
+    const gates = evaluateApprovalGates({
+      breakdown: input.breakdown,
+      confidence_coverage: input.summary_confidence_coverage,
+      evidence_counts: input.evidence_counts,
+    });
+    if (!gates.is_eligible) {
+      throw new Error(`Tidak dapat APPROVE PERIOD karena gating policy belum terpenuhi: ${gates.failures.join(" | ")}`);
+    }
   }
 
   if (getPrototypePeriodLock(input.project_id, input.period_id)) {

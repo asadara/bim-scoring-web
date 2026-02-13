@@ -162,6 +162,17 @@ export default function MyEvidenceListPage() {
     return result;
   }, [items]);
 
+  const indicatorLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!context) return map;
+    for (const indicator of context.indicators) {
+      const code = indicator.code || NA_TEXT;
+      const title = indicator.title || NA_TEXT;
+      map.set(indicator.id, `${code} - ${title}`);
+    }
+    return map;
+  }, [context]);
+
   if (loading) {
     return (
       <main className="task-shell">
@@ -185,6 +196,17 @@ export default function MyEvidenceListPage() {
   }
 
   const sections: Array<keyof GroupedEvidence> = ["DRAFT", "SUBMITTED", "NEEDS_REVISION"];
+  const sectionLabel = (status: keyof GroupedEvidence): string => {
+    if (status === "SUBMITTED") return "Submitted / Reviewed";
+    return statusLabel(status);
+  };
+  const effectiveStatusLabel = (status: LocalEvidenceWithReview["effective_status"]): string => {
+    if (status === "ACCEPTABLE") return "Reviewed - ACCEPTABLE";
+    if (status === "REJECTED") return "Reviewed - REJECTED";
+    if (status === "NEEDS_REVISION") return "Needs Revision";
+    if (status === "SUBMITTED") return "Awaiting Review";
+    return "Draft";
+  };
   const canWrite = canWriteRole1Evidence(credential.role);
 
   return (
@@ -229,7 +251,7 @@ export default function MyEvidenceListPage() {
         return (
           <section key={status} className="task-panel group-section">
             <h3>
-              {statusLabel(status)} ({bucket.length})
+              {sectionLabel(status)} ({bucket.length})
             </h3>
 
             {bucket.length === 0 ? <p className="empty-state">No items.</p> : null}
@@ -245,7 +267,15 @@ export default function MyEvidenceListPage() {
                     <p>
                       BIM Use: {formatBimUseDisplay(item.bim_use_id)} | Type: {item.type}
                     </p>
-                    <p>Indicators: {item.indicator_ids.length ? item.indicator_ids.join(", ") : NA_TEXT}</p>
+                    <p>
+                      Indicators:{" "}
+                      {item.indicator_ids.length
+                        ? item.indicator_ids.map((id) => indicatorLabelMap.get(id) || id).join("; ")
+                        : NA_TEXT}
+                    </p>
+                    <p>
+                      Lifecycle status: <strong>{effectiveStatusLabel(item.effective_status)}</strong>
+                    </p>
                     {renderEvidenceValue(item)}
 
                     {item.latest_review_outcome ? (
