@@ -11,6 +11,8 @@ export type AdminProject = {
   name: string | null;
   config_key: string | null;
   is_active: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type AdminPerspective = {
@@ -20,6 +22,8 @@ export type AdminPerspective = {
   description: string | null;
   weight: number | null;
   is_active: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type AdminIndicator = {
@@ -30,6 +34,8 @@ export type AdminIndicator = {
   title: string | null;
   description: string | null;
   is_active: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type AdminConfigLock = {

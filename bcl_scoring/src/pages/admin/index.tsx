@@ -41,6 +41,31 @@ function parseWeightInput(value: string): number | null {
   return parsed;
 }
 
+function formatDateTime(value?: string | null): string {
+  if (!value) return "N/A";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "N/A";
+  return parsed.toLocaleString();
+}
+
+function buildCodePrefix(text: string, fallback: string): string {
+  const initials = text
+    .replace(/[^A-Za-z0-9 ]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+  return initials || fallback;
+}
+
+function buildInternalCode(prefix: string): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${prefix}-${ts}-${rnd}`;
+}
+
 export default function AdminControlPanelPage() {
   const [session, setSession] = useState<AdminSession>({ actorId: "admin-web", role: "Admin" });
   const [loading, setLoading] = useState(true);
@@ -54,21 +79,21 @@ export default function AdminControlPanelPage() {
   const [configLock, setConfigLock] = useState<AdminConfigLock | null>(null);
   const [indicatorPerspectiveFilter, setIndicatorPerspectiveFilter] = useState<string>("ALL");
 
+  const [showProjectCreateForm, setShowProjectCreateForm] = useState(false);
+  const [showPerspectiveCreateForm, setShowPerspectiveCreateForm] = useState(false);
+  const [showIndicatorCreateForm, setShowIndicatorCreateForm] = useState(false);
+
   const [projectForm, setProjectForm] = useState({
-    code: "",
     name: "",
     config_key: "",
   });
   const [perspectiveForm, setPerspectiveForm] = useState({
-    code: "",
     title: "",
     description: "",
     weight: "",
   });
   const [indicatorForm, setIndicatorForm] = useState({
     perspective_id: "",
-    bim_use_id: "",
-    code: "",
     title: "",
     description: "",
   });
@@ -76,7 +101,13 @@ export default function AdminControlPanelPage() {
 
   const sortedPerspectiveOptions = useMemo(() => {
     return [...perspectives].sort((a, b) =>
-      String(a.code || "").localeCompare(String(b.code || ""))
+      String(a.title || a.code || "").localeCompare(String(b.title || b.code || ""))
+    );
+  }, [perspectives]);
+
+  const perspectiveTitleById = useMemo(() => {
+    return new Map(
+      perspectives.map((item) => [item.id, item.title || item.code || "Perspective tanpa judul"])
     );
   }, [perspectives]);
 
@@ -156,24 +187,24 @@ export default function AdminControlPanelPage() {
     }
     await runAction(async () => {
       await createAdminProject(session, {
-        code: toNonEmptyString(projectForm.code) || undefined,
         name,
         config_key: toNonEmptyString(projectForm.config_key) || undefined,
         is_active: true,
       });
-      setProjectForm({ code: "", name: "", config_key: "" });
+      setProjectForm({ name: "", config_key: "" });
+      setShowProjectCreateForm(false);
       await reloadData(session, indicatorPerspectiveFilter);
     }, "Project workspace berhasil dibuat.");
   }
 
   async function handleCreatePerspective(event: FormEvent) {
     event.preventDefault();
-    const code = toNonEmptyString(perspectiveForm.code);
     const title = toNonEmptyString(perspectiveForm.title);
-    if (!code || !title) {
-      setError("Perspective code dan title wajib diisi.");
+    if (!title) {
+      setError("Title perspective wajib diisi.");
       return;
     }
+    const code = buildInternalCode(`PSP${buildCodePrefix(title, "GEN")}`);
     await runAction(async () => {
       await createAdminPerspective(session, {
         code,
@@ -182,38 +213,39 @@ export default function AdminControlPanelPage() {
         weight: parseWeightInput(perspectiveForm.weight),
         is_active: true,
       });
-      setPerspectiveForm({ code: "", title: "", description: "", weight: "" });
+      setPerspectiveForm({ title: "", description: "", weight: "" });
+      setShowPerspectiveCreateForm(false);
       await reloadData(session, indicatorPerspectiveFilter);
-    }, "Perspective berhasil ditambahkan.");
+    }, "Perspective berhasil ditambahkan (kode internal dibuat otomatis).");
   }
 
   async function handleCreateIndicator(event: FormEvent) {
     event.preventDefault();
     const perspective_id = toNonEmptyString(indicatorForm.perspective_id);
-    const code = toNonEmptyString(indicatorForm.code);
     const title = toNonEmptyString(indicatorForm.title);
-    if (!perspective_id || !code || !title) {
-      setError("Perspective, code, dan title indikator wajib diisi.");
+    if (!perspective_id || !title) {
+      setError("Perspective dan judul indikator wajib diisi.");
       return;
     }
+    const perspectiveLabel = perspectiveTitleById.get(perspective_id) || "GEN";
+    const code = buildInternalCode(`IND${buildCodePrefix(`${perspectiveLabel} ${title}`, "GEN")}`);
+
     await runAction(async () => {
       await createAdminIndicator(session, {
         perspective_id,
         code,
         title,
         description: toNonEmptyString(indicatorForm.description) || undefined,
-        bim_use_id: toNonEmptyString(indicatorForm.bim_use_id) || undefined,
         is_active: true,
       });
       setIndicatorForm((prev) => ({
         ...prev,
-        bim_use_id: "",
-        code: "",
         title: "",
         description: "",
       }));
+      setShowIndicatorCreateForm(false);
       await reloadData(session, indicatorPerspectiveFilter);
-    }, "Indicator berhasil ditambahkan.");
+    }, "Indicator berhasil ditambahkan (kode internal dibuat otomatis).");
   }
 
   async function handleToggleLock(nextLock: boolean) {
@@ -361,70 +393,47 @@ export default function AdminControlPanelPage() {
 
       <section className="task-panel">
         <h2>Project Workspace (Admin CRUD)</h2>
-        <form className="field-grid" onSubmit={(event) => void handleCreateProject(event)}>
-          <label>
-            Project Code
-            <input
-              value={projectForm.code}
-              onChange={(event) => setProjectForm((prev) => ({ ...prev, code: event.target.value }))}
-              placeholder="PRJ-NEW-001"
-            />
-          </label>
-          <label>
-            Project Name
-            <input
-              value={projectForm.name}
-              onChange={(event) => setProjectForm((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="Nama Workspace Proyek"
-              required
-            />
-          </label>
-          <label>
-            Config Key
-            <input
-              value={projectForm.config_key}
-              onChange={(event) => setProjectForm((prev) => ({ ...prev, config_key: event.target.value }))}
-              placeholder="PRJ-001"
-            />
-          </label>
-          <div className="wizard-actions">
-            <button type="submit" className="action-primary" disabled={working}>
-              Tambah Project
-            </button>
-          </div>
-        </form>
+        <p className="task-subtitle">Daftar workspace eksisting ditampilkan lebih dulu sebelum aksi CRUD.</p>
+        <div className="wizard-actions">
+          <button
+            type="button"
+            className="action-primary"
+            disabled={working}
+            onClick={() => setShowProjectCreateForm((prev) => !prev)}
+          >
+            {showProjectCreateForm ? "Tutup Form Tambah" : "Tambah Workspace"}
+          </button>
+        </div>
 
         <div className="admin-table-wrap">
           <table className="audit-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Config Key</th>
+                <th>Nama Workspace</th>
                 <th>Status</th>
+                <th>Dibuat</th>
+                <th>Diperbarui</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {projects.length === 0 && (
                 <tr>
-                  <td colSpan={6}>No project found.</td>
+                  <td colSpan={5}>Belum ada workspace project.</td>
                 </tr>
               )}
               {projects.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{item.code || "N/A"}</td>
-                  <td>{item.name || "N/A"}</td>
-                  <td>{item.config_key || "N/A"}</td>
+                  <td>{item.name || "Tanpa nama"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
+                  <td>{formatDateTime(item.created_at)}</td>
+                  <td>{formatDateTime(item.updated_at)}</td>
                   <td>
                     <button
                       type="button"
                       disabled={working}
                       onClick={() => {
-                        const yes = window.confirm(`Delete project ${item.name || item.id}?`);
+                        const yes = window.confirm(`Hapus workspace "${item.name || "tanpa nama"}"?`);
                         if (!yes) return;
                         void handleDeleteProject(item.id);
                       }}
@@ -437,85 +446,80 @@ export default function AdminControlPanelPage() {
             </tbody>
           </table>
         </div>
+
+        {showProjectCreateForm && (
+          <form className="field-grid" onSubmit={(event) => void handleCreateProject(event)}>
+            <label>
+              Nama Workspace
+              <input
+                value={projectForm.name}
+                onChange={(event) => setProjectForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Nama Workspace Proyek"
+                required
+              />
+            </label>
+            <label>
+              Config Key (opsional)
+              <input
+                value={projectForm.config_key}
+                onChange={(event) => setProjectForm((prev) => ({ ...prev, config_key: event.target.value }))}
+                placeholder="Key konfigurasi internal"
+              />
+            </label>
+            <div className="wizard-actions">
+              <button type="submit" className="action-primary" disabled={working}>
+                Simpan Workspace
+              </button>
+            </div>
+          </form>
+        )}
       </section>
 
       <section className="task-panel">
         <h2>Perspectives (Org Level)</h2>
-        <form className="field-grid" onSubmit={(event) => void handleCreatePerspective(event)}>
-          <label>
-            Perspective Code
-            <input
-              value={perspectiveForm.code}
-              onChange={(event) => setPerspectiveForm((prev) => ({ ...prev, code: event.target.value }))}
-              placeholder="P6"
-              required
-            />
-          </label>
-          <label>
-            Title
-            <input
-              value={perspectiveForm.title}
-              onChange={(event) => setPerspectiveForm((prev) => ({ ...prev, title: event.target.value }))}
-              placeholder="Governance Insight"
-              required
-            />
-          </label>
-          <label>
-            Weight (optional)
-            <input
-              value={perspectiveForm.weight}
-              onChange={(event) => setPerspectiveForm((prev) => ({ ...prev, weight: event.target.value }))}
-              placeholder="15"
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={perspectiveForm.description}
-              onChange={(event) =>
-                setPerspectiveForm((prev) => ({ ...prev, description: event.target.value }))
-              }
-              placeholder="Deskripsi perspective"
-            />
-          </label>
-          <div className="wizard-actions">
-            <button type="submit" className="action-primary" disabled={working}>
-              Tambah Perspective
-            </button>
-          </div>
-        </form>
+        <p className="task-subtitle">Tampilan fokus ke metadata manusiawi tanpa ID/kode teknis.</p>
+        <div className="wizard-actions">
+          <button
+            type="button"
+            className="action-primary"
+            disabled={working}
+            onClick={() => setShowPerspectiveCreateForm((prev) => !prev)}
+          >
+            {showPerspectiveCreateForm ? "Tutup Form Tambah" : "Tambah Perspective"}
+          </button>
+        </div>
 
         <div className="admin-table-wrap">
           <table className="audit-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Code</th>
-                <th>Title</th>
-                <th>Weight</th>
+                <th>Perspective</th>
+                <th>Deskripsi</th>
+                <th>Bobot</th>
                 <th>Status</th>
+                <th>Diperbarui</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {perspectives.length === 0 && (
                 <tr>
-                  <td colSpan={6}>No perspectives found.</td>
+                  <td colSpan={6}>Belum ada perspective.</td>
                 </tr>
               )}
               {perspectives.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{item.code || "N/A"}</td>
-                  <td>{item.title || "N/A"}</td>
+                  <td>{item.title || "Tanpa judul"}</td>
+                  <td>{item.description || "N/A"}</td>
                   <td>{item.weight ?? "N/A"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
+                  <td>{formatDateTime(item.updated_at)}</td>
                   <td>
                     <button
                       type="button"
                       disabled={working}
                       onClick={() => {
-                        const yes = window.confirm(`Delete perspective ${item.code || item.id}?`);
+                        const yes = window.confirm(`Hapus perspective "${item.title || "tanpa judul"}"?`);
                         if (!yes) return;
                         void handleDeletePerspective(item.id);
                       }}
@@ -528,68 +532,59 @@ export default function AdminControlPanelPage() {
             </tbody>
           </table>
         </div>
+
+        {showPerspectiveCreateForm && (
+          <form className="field-grid" onSubmit={(event) => void handleCreatePerspective(event)}>
+            <label>
+              Judul Perspective
+              <input
+                value={perspectiveForm.title}
+                onChange={(event) => setPerspectiveForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Governance & Strategy"
+                required
+              />
+            </label>
+            <label>
+              Bobot (opsional)
+              <input
+                value={perspectiveForm.weight}
+                onChange={(event) => setPerspectiveForm((prev) => ({ ...prev, weight: event.target.value }))}
+                placeholder="15"
+              />
+            </label>
+            <label>
+              Deskripsi
+              <textarea
+                value={perspectiveForm.description}
+                onChange={(event) =>
+                  setPerspectiveForm((prev) => ({ ...prev, description: event.target.value }))
+                }
+                placeholder="Deskripsi perspective"
+              />
+            </label>
+            <p className="inline-note">Kode internal perspective dibuat otomatis saat simpan.</p>
+            <div className="wizard-actions">
+              <button type="submit" className="action-primary" disabled={working}>
+                Simpan Perspective
+              </button>
+            </div>
+          </form>
+        )}
       </section>
 
       <section className="task-panel">
         <h2>Indicators</h2>
-        <form className="field-grid" onSubmit={(event) => void handleCreateIndicator(event)}>
-          <label>
-            Perspective
-            <select
-              value={indicatorForm.perspective_id}
-              onChange={(event) =>
-                setIndicatorForm((prev) => ({ ...prev, perspective_id: event.target.value }))
-              }
-              required
-            >
-              <option value="">Select perspective</option>
-              {sortedPerspectiveOptions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.code || item.id} - {item.title || "No title"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            BIM Use ID
-            <input
-              value={indicatorForm.bim_use_id}
-              onChange={(event) => setIndicatorForm((prev) => ({ ...prev, bim_use_id: event.target.value }))}
-              placeholder="BU-01"
-            />
-          </label>
-          <label>
-            Indicator Code
-            <input
-              value={indicatorForm.code}
-              onChange={(event) => setIndicatorForm((prev) => ({ ...prev, code: event.target.value }))}
-              placeholder="P2-07"
-              required
-            />
-          </label>
-          <label>
-            Title
-            <input
-              value={indicatorForm.title}
-              onChange={(event) => setIndicatorForm((prev) => ({ ...prev, title: event.target.value }))}
-              placeholder="Model coordination issue closure"
-              required
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={indicatorForm.description}
-              onChange={(event) => setIndicatorForm((prev) => ({ ...prev, description: event.target.value }))}
-              placeholder="Deskripsi indikator"
-            />
-          </label>
-          <div className="wizard-actions">
-            <button type="submit" className="action-primary" disabled={working}>
-              Tambah Indicator
-            </button>
-          </div>
-        </form>
+        <p className="task-subtitle">Daftar indikator menampilkan informasi operasional yang mudah dibaca.</p>
+        <div className="wizard-actions">
+          <button
+            type="button"
+            className="action-primary"
+            disabled={working}
+            onClick={() => setShowIndicatorCreateForm((prev) => !prev)}
+          >
+            {showIndicatorCreateForm ? "Tutup Form Tambah" : "Tambah Indicator"}
+          </button>
+        </div>
 
         <div className="wizard-actions admin-filter-row">
           <label>
@@ -601,7 +596,7 @@ export default function AdminControlPanelPage() {
               <option value="ALL">All</option>
               {sortedPerspectiveOptions.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.code || item.id}
+                  {item.title || item.code || "Perspective tanpa judul"}
                 </option>
               ))}
             </select>
@@ -612,35 +607,33 @@ export default function AdminControlPanelPage() {
           <table className="audit-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Perspective ID</th>
-                <th>Code</th>
-                <th>Title</th>
-                <th>BIM Use</th>
+                <th>Perspective</th>
+                <th>Judul Indikator</th>
+                <th>Deskripsi</th>
                 <th>Status</th>
+                <th>Diperbarui</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {indicators.length === 0 && (
                 <tr>
-                  <td colSpan={7}>No indicators found.</td>
+                  <td colSpan={6}>Belum ada indikator.</td>
                 </tr>
               )}
               {indicators.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{item.perspective_id || "N/A"}</td>
-                  <td>{item.code || "N/A"}</td>
-                  <td>{item.title || "N/A"}</td>
-                  <td>{item.bim_use_id || "N/A"}</td>
+                  <td>{perspectiveTitleById.get(item.perspective_id || "") || "N/A"}</td>
+                  <td>{item.title || "Tanpa judul"}</td>
+                  <td>{item.description || "N/A"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
+                  <td>{formatDateTime(item.updated_at)}</td>
                   <td>
                     <button
                       type="button"
                       disabled={working}
                       onClick={() => {
-                        const yes = window.confirm(`Delete indicator ${item.code || item.id}?`);
+                        const yes = window.confirm(`Hapus indikator "${item.title || "tanpa judul"}"?`);
                         if (!yes) return;
                         void handleDeleteIndicator(item.id);
                       }}
@@ -653,6 +646,51 @@ export default function AdminControlPanelPage() {
             </tbody>
           </table>
         </div>
+
+        {showIndicatorCreateForm && (
+          <form className="field-grid" onSubmit={(event) => void handleCreateIndicator(event)}>
+            <label>
+              Perspective
+              <select
+                value={indicatorForm.perspective_id}
+                onChange={(event) =>
+                  setIndicatorForm((prev) => ({ ...prev, perspective_id: event.target.value }))
+                }
+                required
+              >
+                <option value="">Pilih perspective</option>
+                {sortedPerspectiveOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title || item.code || "Perspective tanpa judul"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Judul Indikator
+              <input
+                value={indicatorForm.title}
+                onChange={(event) => setIndicatorForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Model coordination issue closure"
+                required
+              />
+            </label>
+            <label>
+              Deskripsi
+              <textarea
+                value={indicatorForm.description}
+                onChange={(event) => setIndicatorForm((prev) => ({ ...prev, description: event.target.value }))}
+                placeholder="Deskripsi indikator"
+              />
+            </label>
+            <p className="inline-note">Kode internal indikator dibuat otomatis saat simpan.</p>
+            <div className="wizard-actions">
+              <button type="submit" className="action-primary" disabled={working}>
+                Simpan Indicator
+              </button>
+            </div>
+          </form>
+        )}
       </section>
     </main>
   );
