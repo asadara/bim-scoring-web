@@ -7,13 +7,24 @@ import { DataMode } from "@/lib/role1TaskLayer";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 import {
   ApproverProjectRow,
+  fetchApproverProjectContext,
   fetchApproverHomeContext,
 } from "@/lib/approverTaskLayer";
+
+type ApproverInsightRow = {
+  row: ApproverProjectRow;
+  awaitingReview: number | null;
+  needsRevisionCount: number | null;
+  totalScore: number | null;
+  readinessLabel: string;
+  readinessNote: string;
+};
 
 export default function ApproverHomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ApproverProjectRow[]>([]);
+  const [insightRows, setInsightRows] = useState<ApproverInsightRow[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
 
@@ -26,12 +37,65 @@ export default function ApproverHomePage() {
         const data = await fetchApproverHomeContext();
         if (!mounted) return;
         setRows(data.rows);
+
+        const insightList = await Promise.all(
+          data.rows.map(async (row) => {
+            try {
+              const context = await fetchApproverProjectContext(row.project.id);
+              const awaitingReview = context.evidence_counts.AWAITING_REVIEW;
+              const needsRevisionCount = context.evidence_counts.NEEDS_REVISION;
+              const totalScore = context.summary.total_score;
+              const readinessLabel =
+                row.period_status_label === "LOCKED"
+                  ? "Locked"
+                  : !row.period_id
+                    ? "Period Not available"
+                    : awaitingReview > 0
+                      ? "Blocked"
+                      : context.summary_available
+                        ? "Ready"
+                        : "Waiting summary";
+              const readinessNote =
+                row.period_status_label === "LOCKED"
+                  ? "Period sudah terkunci"
+                  : !row.period_id
+                    ? "Admin perlu set period aktif"
+                    : awaitingReview > 0
+                      ? `${awaitingReview} evidence belum direview`
+                      : context.summary_available
+                        ? "Approval dapat diproses"
+                        : "Summary score belum tersedia";
+
+              return {
+                row,
+                awaitingReview,
+                needsRevisionCount,
+                totalScore,
+                readinessLabel,
+                readinessNote,
+              } satisfies ApproverInsightRow;
+            } catch {
+              return {
+                row,
+                awaitingReview: null,
+                needsRevisionCount: null,
+                totalScore: null,
+                readinessLabel: row.period_status_label === "LOCKED" ? "Locked" : "Unknown",
+                readinessNote: "Detail gate belum tersedia",
+              } satisfies ApproverInsightRow;
+            }
+          })
+        );
+
+        if (!mounted) return;
+        setInsightRows(insightList);
         setDataMode(data.data_mode);
         setBackendMessage(data.backend_message);
         setError(null);
       } catch (e) {
         if (!mounted) return;
         setRows([]);
+        setInsightRows([]);
         setDataMode("prototype");
         setBackendMessage(e instanceof Error ? e.message : "Backend not available");
         setError(e instanceof Error ? e.message : "Unknown error");
@@ -83,6 +147,24 @@ export default function ApproverHomePage() {
     return "Not synced";
   }, [loading, rows]);
 
+  const readyProjects = useMemo(
+    () => insightRows.filter((row) => row.readinessLabel === "Ready").length,
+    [insightRows]
+  );
+  const blockedProjects = useMemo(
+    () => insightRows.filter((row) => row.readinessLabel === "Blocked").length,
+    [insightRows]
+  );
+  const lockedProjects = useMemo(
+    () => rows.filter((row) => row.period_status_label === "LOCKED").length,
+    [rows]
+  );
+  const averageVisibleScore = useMemo(() => {
+    const values = insightRows.map((row) => row.totalScore).filter((value): value is number => value !== null);
+    if (values.length === 0) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }, [insightRows]);
+
   return (
     <ApproverLayout
       title="Period Approval"
@@ -92,6 +174,29 @@ export default function ApproverHomePage() {
       periodStatusLabel={headerPeriodStatus}
     >
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
+
+      <section className="task-grid-3" aria-label="Approver operational summary">
+        <article className="summary-card">
+          <span>Projects in queue</span>
+          <strong>{rows.length}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Ready to approve</span>
+          <strong>{readyProjects}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Blocked by review</span>
+          <strong>{blockedProjects}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Locked periods</span>
+          <strong>{lockedProjects}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Average score (visible)</span>
+          <strong>{averageVisibleScore === null ? NA_TEXT : averageVisibleScore.toFixed(2)}</strong>
+        </article>
+      </section>
 
       <section className="task-panel">
         <p className="inline-note">
@@ -106,23 +211,53 @@ export default function ApproverHomePage() {
         ) : null}
 
         {!loading && !error && rows.length > 0 ? (
-          <div className="evidence-list">
-            {rows.map((row) => (
-              <article className="evidence-item" key={row.project.id}>
-                <p>
-                  <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
-                </p>
-                <p>Active period: {row.period_label || NA_TEXT}</p>
-                <p>Period status: {row.period_status_label || NA_TEXT}</p>
-                <p>Approval status: {row.approval_status || NA_TEXT}</p>
-
-                <div className="item-actions">
-                  <Link className="revisi" href={`/approve/projects/${row.project.id}`}>
-                    Buka Approval
-                  </Link>
-                </div>
-              </article>
-            ))}
+          <div className="admin-table-wrap">
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Period</th>
+                  <th>Gate Evidence</th>
+                  <th>Score</th>
+                  <th>Approval Readiness</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insightRows.map((insight) => (
+                  <tr key={insight.row.project.id}>
+                    <td>
+                      <strong>{insight.row.project.name || insight.row.project.code || NA_TEXT}</strong>
+                      <br />
+                      <small>Approval status: {insight.row.approval_status || NA_TEXT}</small>
+                    </td>
+                    <td>
+                      {insight.row.period_label || NA_TEXT}
+                      <br />
+                      <small>Status: {insight.row.period_status_label || NA_TEXT}</small>
+                    </td>
+                    <td>
+                      Awaiting review: {insight.awaitingReview ?? NA_TEXT}
+                      <br />
+                      <small>Needs revision: {insight.needsRevisionCount ?? NA_TEXT}</small>
+                    </td>
+                    <td>{insight.totalScore === null ? NA_TEXT : insight.totalScore.toFixed(2)}</td>
+                    <td>
+                      <strong>{insight.readinessLabel}</strong>
+                      <br />
+                      <small>{insight.readinessNote}</small>
+                    </td>
+                    <td>
+                      <div className="item-actions">
+                        <Link className="revisi" href={`/approve/projects/${insight.row.project.id}`}>
+                          Buka Approval
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
       </section>

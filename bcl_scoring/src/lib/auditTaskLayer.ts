@@ -19,6 +19,15 @@ export type AuditSnapshotView = {
   snapshot: PrototypeSnapshotRecord;
 };
 
+export type AuditGovernanceEvent = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  actor_id: string | null;
+  created_at: string;
+};
+
 function normalizeSnapshotId(snapshot: PrototypeSnapshotRecord, index: number): string {
   if (snapshot.snapshot_id && snapshot.snapshot_id.trim()) return snapshot.snapshot_id.trim();
   return `${snapshot.project_id}::${snapshot.period_id}::${snapshot.approved_at}::${index}`;
@@ -213,6 +222,83 @@ export async function fetchAuditSnapshotsReadMode(): Promise<{
   return await fetchBackendSnapshots();
 }
 
+function toGovernanceEvent(row: unknown, index: number): AuditGovernanceEvent | null {
+  const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+  const createdAt = asNullableString(item.created_at) || null;
+  const action = asNullableString(item.action) || null;
+  const entityType = asNullableString(item.entity_type) || null;
+  if (!createdAt || !action || !entityType) return null;
+
+  return {
+    id: asNullableString(item.id) || `${createdAt}::${action}::${index}`,
+    action,
+    entity_type: entityType,
+    entity_id: asNullableString(item.entity_id),
+    actor_id: asNullableString(item.actor_id),
+    created_at: createdAt,
+  };
+}
+
+export async function fetchAdminAuditLogsReadMode(input: {
+  role: string;
+  actor_id?: string | null;
+  limit?: number;
+}): Promise<{
+  data: AuditGovernanceEvent[];
+  mode: DataMode;
+  backend_message: string | null;
+}> {
+  const role = asString(input.role).trim().toLowerCase();
+  if (role !== "admin") {
+    return {
+      data: [],
+      mode: "prototype",
+      backend_message: "Recent governance events require Admin role",
+    };
+  }
+
+  const params = new URLSearchParams({
+    limit: String(input.limit && input.limit > 0 ? input.limit : 20),
+  });
+
+  const headers = new Headers();
+  headers.set("x-actor-role", "admin");
+  headers.set("x-actor-id", asString(input.actor_id).trim() || "audit-read");
+
+  const response = await safeFetchJson<unknown>(buildApiUrl(`/admin/audit-logs?${params.toString()}`), {
+    headers,
+  });
+
+  if (!response.ok) {
+    return {
+      data: [],
+      mode: "prototype",
+      backend_message: toSafeErrorMessage(response),
+    };
+  }
+
+  const unwrapped = unwrapPayload(response.data);
+  if (!unwrapped.ok) {
+    return {
+      data: [],
+      mode: "prototype",
+      backend_message: unwrapped.error,
+    };
+  }
+
+  const rows = Array.isArray(unwrapped.data) ? unwrapped.data : [];
+  const mapped = rows
+    .map((row, index) => toGovernanceEvent(row, index))
+    .filter((row): row is AuditGovernanceEvent => Boolean(row))
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+
+  return {
+    data: mapped,
+    mode: "backend",
+    backend_message: null,
+  };
+}
+
 export function getAuditSnapshotById(snapshotId: string): AuditSnapshotView | null {
   const all = listAuditSnapshots();
   const hit = all.find((row) => row.snapshot_id === snapshotId);
@@ -228,7 +314,7 @@ export function listDecisionsForSnapshot(snapshot: PrototypeSnapshotRecord): Pro
 export function getSnapshotLockStatus(snapshot: PrototypeSnapshotRecord): string {
   const lock = getPrototypePeriodLock(snapshot.project_id, snapshot.period_id);
   if (lock?.status) return lock.status;
-  return getPrototypePeriodStatusFromStore(snapshot.project_id, snapshot.period_id) || NA_TEXT;
+  return getPrototypePeriodStatusFromStore(snapshot.project_id, snapshot.period_id) || "LOCKED";
 }
 
 export function getSubmittedCountFromSnapshot(counts: ReviewStatusCount): number {

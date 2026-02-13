@@ -13,27 +13,44 @@ type ApproverLayoutProps = {
 
 export default function ApproverLayout(props: ApproverLayoutProps) {
   const { title, subtitle, projectName, periodLabel, periodStatusLabel, children } = props;
+  const periodText = periodStatusLabel || NA_TEXT;
+  const periodChipClass =
+    periodText === "LOCKED"
+      ? "status-chip status-lock"
+      : periodText === "OPEN"
+        ? "status-chip status-open"
+        : "status-chip status-na";
 
   return (
     <main className="task-shell">
-      <header className="task-header">
-        <p className="task-kicker">BIM Manager</p>
-        <h1>{title}</h1>
-        {subtitle ? <p className="task-subtitle">{subtitle}</p> : null}
+      <header className="task-header role-hero role-hero-role3">
+        <div className="role-hero-grid">
+          <div className="role-hero-main">
+            <p className="task-kicker">BIM Manager</p>
+            <h1>{title}</h1>
+            {subtitle ? <p className="task-subtitle">{subtitle}</p> : null}
+            <div className="landing-chip-row">
+              <span className={periodChipClass}>Period: {periodText}</span>
+              <span className="status-chip status-na">Approval gate</span>
+            </div>
+          </div>
 
-        <div className="task-context-grid">
-          <div className="context-card">
-            <span>Project</span>
-            <strong>{projectName || NA_TEXT}</strong>
-          </div>
-          <div className="context-card">
-            <span>Active period</span>
-            <strong>{periodLabel || NA_TEXT}</strong>
-          </div>
-          <div className="context-card">
-            <span>Period status</span>
-            <strong>{periodStatusLabel || NA_TEXT}</strong>
-          </div>
+          <aside className="role-context-panel">
+            <div className="role-context-grid">
+              <div className="context-card role-context-card">
+                <span>Project</span>
+                <strong>{projectName || NA_TEXT}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Active period</span>
+                <strong>{periodLabel || NA_TEXT}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Period status</span>
+                <strong>{periodText}</strong>
+              </div>
+            </div>
+          </aside>
         </div>
       </header>
 

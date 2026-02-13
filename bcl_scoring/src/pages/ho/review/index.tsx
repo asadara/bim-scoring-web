@@ -23,9 +23,29 @@ type ProjectReviewRow = {
   submitted_count: number;
   period_label: string;
   period_status: string;
+  queue_level: "High" | "Medium" | "Low";
+  recommended_action: string;
   data_mode: DataMode;
   backend_message: string | null;
 };
+
+function resolveQueueLevel(submittedCount: number): "High" | "Medium" | "Low" {
+  if (submittedCount >= 12) return "High";
+  if (submittedCount >= 5) return "Medium";
+  return "Low";
+}
+
+function resolveRecommendedAction(params: {
+  submittedCount: number;
+  periodStatus: string;
+  queueLevel: "High" | "Medium" | "Low";
+}): string {
+  if (params.periodStatus === "LOCKED") return "Read-only (period locked)";
+  if (params.submittedCount === 0) return "Tidak ada evidence submitted";
+  if (params.queueLevel === "High") return "Prioritaskan review batch terbesar";
+  if (params.queueLevel === "Medium") return "Review rutin dan jaga SLA";
+  return "Quick review, close queue cepat";
+}
 
 export default function HoReviewHomePage() {
   const [loading, setLoading] = useState(true);
@@ -70,6 +90,16 @@ export default function HoReviewHomePage() {
                 periodId,
                 active?.status ?? null
               ),
+              queue_level: resolveQueueLevel(evidenceResult.data.length),
+              recommended_action: resolveRecommendedAction({
+                submittedCount: evidenceResult.data.length,
+                periodStatus: resolvePeriodStatusLabelWithPrototype(
+                  project.id,
+                  periodId,
+                  active?.status ?? null
+                ),
+                queueLevel: resolveQueueLevel(evidenceResult.data.length),
+              }),
               data_mode: rowMode,
               backend_message:
                 periodsResult.backend_message ||
@@ -112,6 +142,18 @@ export default function HoReviewHomePage() {
 
   const totalSubmitted = useMemo(
     () => rows.reduce((sum, row) => sum + row.submitted_count, 0),
+    [rows]
+  );
+  const highQueueProjects = useMemo(
+    () => rows.filter((row) => row.queue_level === "High").length,
+    [rows]
+  );
+  const averageSubmittedPerProject = useMemo(() => {
+    if (rows.length === 0) return 0;
+    return totalSubmitted / rows.length;
+  }, [rows, totalSubmitted]);
+  const lockedProjects = useMemo(
+    () => rows.filter((row) => row.period_status === "LOCKED").length,
     [rows]
   );
   const headerProjectLabel = useMemo(() => {
@@ -157,6 +199,18 @@ export default function HoReviewHomePage() {
           <span>Submitted evidence</span>
           <strong>{totalSubmitted}</strong>
         </article>
+        <article className="summary-card">
+          <span>High queue projects</span>
+          <strong>{highQueueProjects}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Avg submitted / project</span>
+          <strong>{averageSubmittedPerProject.toFixed(1)}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Locked periods</span>
+          <strong>{lockedProjects}</strong>
+        </article>
       </section>
 
       <section className="task-panel">
@@ -174,23 +228,51 @@ export default function HoReviewHomePage() {
         ) : null}
 
         {!loading && !error && rows.length > 0 ? (
-          <div className="evidence-list">
-            {rows.map((row) => (
-              <article className="evidence-item" key={row.project.id}>
-                <p>
-                  <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
-                </p>
-                <p>Submitted evidence: {row.submitted_count}</p>
-                <p>
-                  Active period: {row.period_label} | Period status: {row.period_status}
-                </p>
-                <div className="item-actions">
-                  <Link className="revisi" href={`/ho/review/projects/${row.project.id}`}>
-                    Review Evidence
-                  </Link>
-                </div>
-              </article>
-            ))}
+          <div className="admin-table-wrap">
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Active Period</th>
+                  <th>Submitted Queue</th>
+                  <th>Priority</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.project.id}>
+                    <td>
+                      <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
+                      <br />
+                      <small>Code: {row.project.code || NA_TEXT}</small>
+                    </td>
+                    <td>
+                      {row.period_label}
+                      <br />
+                      <small>Status: {row.period_status}</small>
+                    </td>
+                    <td>
+                      <strong>{row.submitted_count}</strong>
+                      <br />
+                      <small>Evidence menunggu review</small>
+                    </td>
+                    <td>
+                      <strong>{row.queue_level}</strong>
+                      <br />
+                      <small>{row.recommended_action}</small>
+                    </td>
+                    <td>
+                      <div className="item-actions">
+                        <Link className="revisi" href={`/ho/review/projects/${row.project.id}`}>
+                          Review Evidence
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
       </section>

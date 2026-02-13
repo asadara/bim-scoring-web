@@ -342,25 +342,66 @@ function normalizeLockRecord(row: unknown): StorePeriodLockRecord | null {
 
 function normalizeSnapshotRecord(row: unknown): StoreSnapshotRecord | null {
   if (!isObject(row)) return null;
-  const projectId = asString(row.project_id).trim();
-  const periodId = normalizePeriodId(asNullableString(row.period_id));
-  const approvedBy = asString(row.approved_by).trim();
-  const approvedAt = asString(row.approved_at);
-  if (!projectId || !approvedBy || !approvedAt) return null;
+  const payload = isObject(row.payload) ? row.payload : {};
+  const approval = isObject(payload.approval) ? payload.approval : {};
+  const scoringSummary = isObject(payload.scoring_summary)
+    ? payload.scoring_summary
+    : isObject(row.scoring_summary)
+      ? row.scoring_summary
+      : {};
 
-  const breakdown = parseArray<unknown>(row.breakdown)
+  const projectId =
+    asString(row.project_id).trim() ||
+    asString(payload.project_id).trim() ||
+    asString(payload.projectId).trim();
+  const periodIdRaw =
+    asNullableString(row.period_id) ||
+    asNullableString(payload.period_id) ||
+    asNullableString(payload.periodId) ||
+    (isObject(payload.period) ? asNullableString(payload.period.id) : null);
+  const periodId = normalizePeriodId(periodIdRaw);
+  if (!projectId) return null;
+
+  const approvedBy =
+    asString(row.approved_by).trim() ||
+    asString(row.approver_user_id).trim() ||
+    asString(approval.approver_user_id).trim() ||
+    "Approver (Prototype)";
+  const approvedAt =
+    asString(row.approved_at) ||
+    asString(row.created_at) ||
+    asString(approval.approved_at) ||
+    new Date().toISOString();
+
+  const breakdownSource = parseArray<unknown>(
+    row.breakdown ??
+    row.perspective_breakdown ??
+    scoringSummary.perspectives ??
+    payload.perspectives
+  );
+  const breakdown = breakdownSource
     .map((entry) => {
       if (!isObject(entry)) return null;
-      const perspectiveId = asString(entry.perspective_id).trim();
+      const perspectiveId =
+        asString(entry.perspective_id).trim() ||
+        asString(entry.id).trim() ||
+        asString(entry.perspective).trim();
       if (!perspectiveId) return null;
       return {
         perspective_id: perspectiveId,
-        score: asFiniteNumber(entry.score),
+        score:
+          asFiniteNumber(entry.score) ??
+          asFiniteNumber(entry.weighted_score) ??
+          asFiniteNumber(entry.average_score) ??
+          asFiniteNumber(entry.total_score),
       };
     })
     .filter((entry): entry is { perspective_id: string; score: number | null } => Boolean(entry));
 
-  const countsRaw = isObject(row.evidence_counts) ? row.evidence_counts : {};
+  const countsRaw =
+    (isObject(row.evidence_counts) ? row.evidence_counts : null) ||
+    (isObject(payload.evidence_counts) ? payload.evidence_counts : null) ||
+    {};
   const evidenceCounts: StoreReviewStatusCount = {
     ACCEPTABLE: asFiniteNumber(countsRaw.ACCEPTABLE) ?? 0,
     NEEDS_REVISION: asFiniteNumber(countsRaw.NEEDS_REVISION) ?? 0,
@@ -377,7 +418,10 @@ function normalizeSnapshotRecord(row: unknown): StoreSnapshotRecord | null {
     scope_key: buildPrototypeScopeKey(projectId, periodId),
     approved_by: approvedBy,
     approved_at: approvedAt,
-    final_bim_score: asFiniteNumber(row.final_bim_score),
+    final_bim_score:
+      asFiniteNumber(row.final_bim_score) ??
+      asFiniteNumber(row.total_score) ??
+      asFiniteNumber(scoringSummary.total_score),
     breakdown,
     evidence_counts: evidenceCounts,
     note: "Prototype snapshot (not used for audit/compliance)",

@@ -137,9 +137,20 @@ export default function AuditSnapshotDetailPage() {
   }, [snapshotView]);
 
   const scoreBreakdownMap = useMemo(() => {
-    const source = snapshotView?.snapshot.breakdown || [];
-    return new Map(source.map((row) => [row.perspective_id, row.score]));
-  }, [snapshotView]);
+    const map = new Map<string, number | null>();
+    const primary = snapshotView?.snapshot.breakdown || [];
+    for (const row of primary) {
+      map.set(row.perspective_id, row.score);
+    }
+    const fallback = backendSummary?.breakdown || [];
+    for (const row of fallback) {
+      const current = map.get(row.perspective_id);
+      if (current === null || typeof current === "undefined") {
+        map.set(row.perspective_id, row.score);
+      }
+    }
+    return map;
+  }, [snapshotView, backendSummary]);
 
   function onExportJson() {
     if (!snapshotView) return;
@@ -223,7 +234,8 @@ export default function AuditSnapshotDetailPage() {
   const { snapshot } = snapshotView;
   const submittedCount = getSubmittedCountFromSnapshot(snapshot.evidence_counts);
   const latestDecision = decisions[0] || null;
-  const interpretation = scoreInterpretation(snapshot.final_bim_score);
+  const effectiveTotalScore = snapshot.final_bim_score ?? backendSummary?.total_score ?? null;
+  const interpretation = scoreInterpretation(effectiveTotalScore);
 
   return (
     <AuditorLayout
@@ -249,7 +261,7 @@ export default function AuditSnapshotDetailPage() {
       <section className="task-panel">
         <h2>Final Score (Read-only)</h2>
         <p>
-          Total: <strong>{snapshot.final_bim_score ?? NA_TEXT}</strong>
+          Total: <strong>{effectiveTotalScore ?? NA_TEXT}</strong>
         </p>
         <p>
           Score level: <strong>{interpretation}</strong>

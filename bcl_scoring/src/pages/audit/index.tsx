@@ -3,20 +3,103 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuditorLayout from "@/components/AuditorLayout";
 import BackendStatusBanner from "@/components/BackendStatusBanner";
-import { AuditSnapshotView, fetchAuditSnapshotsReadMode } from "@/lib/auditTaskLayer";
+import {
+  AuditGovernanceEvent,
+  AuditSnapshotView,
+  fetchAdminAuditLogsReadMode,
+  fetchAuditSnapshotsReadMode,
+} from "@/lib/auditTaskLayer";
 import { getPrototypeProjectMetaFromStore } from "@/lib/prototypeStore";
 import {
   DataMode,
   NA_TEXT,
   ProjectRecord,
+  ScoringPeriod,
+  fetchProjectPeriodsReadMode,
   fetchProjectsReadMode,
 } from "@/lib/role1TaskLayer";
+import { useCredential } from "@/lib/useCredential";
+
+function formatDateText(value: string | null | undefined): string {
+  if (!value) return NA_TEXT;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return NA_TEXT;
+  return parsed.toLocaleString();
+}
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  SNAPSHOT_CREATED: "Snapshot created",
+  PERIOD_APPROVED: "Period approved",
+  PERIOD_REJECTED: "Period approval rejected",
+  EVIDENCE_REVIEWED: "Evidence reviewed",
+  SUBMITTED: "Evidence submitted",
+  CREATED: "Record created",
+  UPDATED: "Record updated",
+  ADMIN_CONFIG_LOCK_UPDATED: "Configuration lock updated",
+  ADMIN_PERIOD_CREATED: "Scoring period created",
+  ADMIN_PERIOD_BULK_GENERATED: "Scoring periods bulk generated",
+};
+
+const ENTITY_LABEL_MAP: Record<string, string> = {
+  project: "Project",
+  user: "User",
+  role_mapping: "Role mapping",
+  perspective: "Perspective",
+  indicator: "Indicator",
+  config_lock: "Configuration lock",
+  period: "Scoring period",
+  period_batch: "Scoring period batch",
+  snapshot: "Snapshot",
+};
+
+function toTitleCase(raw: string): string {
+  const source = raw.trim().toLowerCase();
+  if (!source) return NA_TEXT;
+  return source
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function formatActionLabel(action: string): string {
+  const normalized = action.trim().toUpperCase();
+  if (!normalized) return NA_TEXT;
+
+  const direct = ACTION_LABEL_MAP[normalized];
+  if (direct) return direct;
+
+  const adminCrud = /^ADMIN_(.+)_(CREATED|UPDATED|DELETED)$/.exec(normalized);
+  if (adminCrud) {
+    const entityRaw = adminCrud[1].replace(/_/g, " ");
+    const verbRaw = adminCrud[2].toLowerCase();
+    return `Admin ${toTitleCase(entityRaw)} ${verbRaw}`;
+  }
+
+  return toTitleCase(normalized.replace(/_/g, " "));
+}
+
+function shortenEntityId(value: string | null): string {
+  if (!value) return "";
+  const text = value.trim();
+  if (text.length <= 14) return text;
+  return `${text.slice(0, 8)}...${text.slice(-4)}`;
+}
+
+function formatEntityLabel(entityType: string, entityId: string | null): string {
+  const normalized = entityType.trim().toLowerCase();
+  const entity = ENTITY_LABEL_MAP[normalized] || toTitleCase(normalized.replace(/_/g, " "));
+  const shortId = shortenEntityId(entityId);
+  return shortId ? `${entity} (${shortId})` : entity;
+}
 
 export default function AuditHomePage() {
+  const credential = useCredential();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<AuditSnapshotView[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [periodsByProjectId, setPeriodsByProjectId] = useState<Record<string, ScoringPeriod[]>>({});
+  const [events, setEvents] = useState<AuditGovernanceEvent[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
 
@@ -28,19 +111,60 @@ export default function AuditHomePage() {
         setLoading(true);
         const snapshotResult = await fetchAuditSnapshotsReadMode();
         const projectsResult = await fetchProjectsReadMode();
+        const projectRows = projectsResult.data;
+
+        const periodPairs = await Promise.all(
+          projectRows.map(async (project) => ({
+            projectId: project.id,
+            result: await fetchProjectPeriodsReadMode(project.id),
+          }))
+        );
+
+        const periodMap: Record<string, ScoringPeriod[]> = {};
+        for (const pair of periodPairs) {
+          periodMap[pair.projectId] = pair.result.data;
+        }
+
+        const includeAdminAuditLog = credential.role === "admin";
+        const auditLogResult = includeAdminAuditLog
+          ? await fetchAdminAuditLogsReadMode({
+              role: credential.role,
+              actor_id: credential.user_id,
+              limit: 20,
+            })
+          : {
+              data: [] as AuditGovernanceEvent[],
+              mode: "backend" as DataMode,
+              backend_message: null as string | null,
+            };
+
+        const messages: Array<string | null> = [
+          snapshotResult.backend_message,
+          projectsResult.backend_message,
+          ...periodPairs.map((pair) => pair.result.backend_message),
+          includeAdminAuditLog ? auditLogResult.backend_message : null,
+        ];
+
+        const hasPrototypeFallback =
+          snapshotResult.mode === "prototype" ||
+          projectsResult.mode === "prototype" ||
+          periodPairs.some((pair) => pair.result.mode === "prototype") ||
+          (includeAdminAuditLog && auditLogResult.mode === "prototype");
 
         if (!mounted) return;
         setSnapshots(snapshotResult.data);
-        setProjects(projectsResult.data);
-        setDataMode(
-          snapshotResult.mode === "prototype" || projectsResult.mode === "prototype" ? "prototype" : "backend"
-        );
-        setBackendMessage(snapshotResult.backend_message || projectsResult.backend_message);
+        setProjects(projectRows);
+        setPeriodsByProjectId(periodMap);
+        setEvents(auditLogResult.data);
+        setDataMode(hasPrototypeFallback ? "prototype" : "backend");
+        setBackendMessage(messages.find((message) => Boolean(message)) || null);
         setError(null);
       } catch (e) {
         if (!mounted) return;
         setSnapshots([]);
         setProjects([]);
+        setPeriodsByProjectId({});
+        setEvents([]);
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
         if (mounted) setLoading(false);
@@ -60,7 +184,7 @@ export default function AuditHomePage() {
       window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
     };
-  }, []);
+  }, [credential.role, credential.user_id]);
 
   const projectNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -75,14 +199,106 @@ export default function AuditHomePage() {
     return map;
   }, [projects, snapshots]);
 
+  const snapshotMetrics = useMemo(() => {
+    const periodRows = Object.values(periodsByProjectId).flat();
+    const lockedPeriods = periodRows.filter((row) => row.status === "LOCKED").length;
+    const openPeriods = periodRows.filter((row) => row.status !== "LOCKED").length;
+
+    const sortedSnapshots = [...snapshots].sort((a, b) =>
+      String(b.snapshot.approved_at).localeCompare(String(a.snapshot.approved_at))
+    );
+    const latestSnapshot = sortedSnapshots[0] || null;
+
+    return {
+      total_projects: projects.length,
+      total_periods: periodRows.length,
+      locked_periods: lockedPeriods,
+      open_periods: openPeriods,
+      total_snapshots: snapshots.length,
+      latest_snapshot_at: latestSnapshot?.snapshot.approved_at || null,
+      latest_snapshot_project:
+        latestSnapshot ? projectNameById.get(latestSnapshot.snapshot.project_id) || latestSnapshot.snapshot.project_id : null,
+    };
+  }, [periodsByProjectId, projectNameById, projects.length, snapshots]);
+
+  const coverageRows = useMemo(() => {
+    const ids = new Set<string>();
+    projects.forEach((project) => ids.add(project.id));
+    snapshots.forEach((entry) => ids.add(entry.snapshot.project_id));
+    Object.keys(periodsByProjectId).forEach((projectId) => ids.add(projectId));
+
+    const rows = [...ids].map((projectId) => {
+      const periods = periodsByProjectId[projectId] || [];
+      const snapshotRows = snapshots.filter((entry) => entry.snapshot.project_id === projectId);
+      const latestSnapshotAt = snapshotRows
+        .map((entry) => entry.snapshot.approved_at)
+        .sort((a, b) => String(b).localeCompare(String(a)))[0] || null;
+
+      return {
+        project_id: projectId,
+        project_label: projectNameById.get(projectId) || projectId,
+        period_count: periods.length,
+        locked_period_count: periods.filter((row) => row.status === "LOCKED").length,
+        snapshot_count: snapshotRows.length,
+        latest_snapshot_at: latestSnapshotAt,
+      };
+    });
+
+    return rows.sort((a, b) => a.project_label.localeCompare(b.project_label));
+  }, [periodsByProjectId, projectNameById, projects, snapshots]);
+
+  const timelineEvents = useMemo(() => {
+    if (events.length > 0) return events;
+
+    return snapshots.slice(0, 10).map((entry, index) => ({
+      id: `${entry.snapshot_id}-${index}`,
+      action: "SNAPSHOT_CREATED",
+      entity_type: "snapshot",
+      entity_id: entry.snapshot_id,
+      actor_id: entry.snapshot.approved_by || null,
+      created_at: entry.snapshot.approved_at,
+    } satisfies AuditGovernanceEvent));
+  }, [events, snapshots]);
+
   return (
     <AuditorLayout
       title="Read-only Auditor View"
       subtitle="Snapshot list untuk pemeriksaan jejak proses Evidence -> Review -> Approval -> Snapshot."
-      projectLabel={null}
-      periodLabel={null}
+      projectLabel="All projects (snapshot list)"
+      periodLabel="All periods"
     >
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
+
+      <section className="task-panel">
+        <h2>Audit Coverage Summary</h2>
+        <div className="task-grid-3">
+          <article className="summary-card">
+            <span>Projects in scope</span>
+            <strong>{snapshotMetrics.total_projects}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Periods tracked</span>
+            <strong>{snapshotMetrics.total_periods}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Periods locked</span>
+            <strong>{snapshotMetrics.locked_periods}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Periods open</span>
+            <strong>{snapshotMetrics.open_periods}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Snapshots available</span>
+            <strong>{snapshotMetrics.total_snapshots}</strong>
+          </article>
+          <article className="summary-card">
+            <span>Latest snapshot</span>
+            <strong>{snapshotMetrics.latest_snapshot_project || "Not yet created"}</strong>
+            <small>{formatDateText(snapshotMetrics.latest_snapshot_at)}</small>
+          </article>
+        </div>
+      </section>
 
       <section className="task-panel">
         <p className="inline-note">
@@ -92,7 +308,11 @@ export default function AuditHomePage() {
         {error ? <p className="error-box">{error}</p> : null}
 
         {!loading && !error && snapshots.length === 0 ? (
-          <p className="empty-state">No snapshots available in prototype storage.</p>
+          <div className="empty-state">
+            <p>No immutable snapshot found yet.</p>
+            <p>Snapshot akan muncul setelah period mendapat keputusan <strong>APPROVE PERIOD</strong> (Role 3).</p>
+            <p>Audit page tetap menampilkan coverage project/period agar status governance tetap terbaca.</p>
+          </div>
         ) : null}
 
         {!loading && !error && snapshots.length > 0 ? (
@@ -115,6 +335,76 @@ export default function AuditHomePage() {
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section className="task-panel">
+        <h2>Project Coverage Matrix</h2>
+        <div className="admin-table-wrap">
+          <table className="audit-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Periods</th>
+                <th>Locked</th>
+                <th>Snapshots</th>
+                <th>Latest Snapshot</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coverageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>No project coverage available.</td>
+                </tr>
+              ) : (
+                coverageRows.map((row) => (
+                  <tr key={row.project_id}>
+                    <td>{row.project_label}</td>
+                    <td>{row.period_count}</td>
+                    <td>{row.locked_period_count}</td>
+                    <td>{row.snapshot_count}</td>
+                    <td>{formatDateText(row.latest_snapshot_at)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="task-panel">
+        <h2>Recent Governance Events</h2>
+        <div className="admin-table-wrap">
+          <table className="audit-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Actor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {timelineEvents.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>No governance events yet.</td>
+                </tr>
+              ) : (
+                timelineEvents.slice(0, 20).map((event) => (
+                  <tr key={event.id}>
+                    <td>{formatDateText(event.created_at)}</td>
+                    <td>
+                      {formatActionLabel(event.action)}
+                      <br />
+                      <small>{event.action}</small>
+                    </td>
+                    <td>{formatEntityLabel(event.entity_type, event.entity_id)}</td>
+                    <td>{event.actor_id || NA_TEXT}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </AuditorLayout>
   );
