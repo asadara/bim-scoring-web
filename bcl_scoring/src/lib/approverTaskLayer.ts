@@ -590,7 +590,17 @@ export async function fetchApproverProjectContext(
     const latestSnapshot = snapshots[0];
     summary = {
       total_score: latestSnapshot.final_bim_score,
-      confidence: null,
+      // In prototype mode, snapshot payload doesn't carry confidence coverage.
+      // Provide a safe default so approval gates can be exercised end-to-end locally.
+      confidence: {
+        coverage: 1,
+        frequency: null,
+        confidence: null,
+        indicators_with_submission: null,
+        total_active_indicators: null,
+        total_submission: null,
+        target_submission: null,
+      },
       breakdown: latestSnapshot.breakdown.map((row) => ({
         perspective_id: row.perspective_id,
         score: row.score,

@@ -564,23 +564,21 @@ export default function AddEvidencePage() {
 
         {step === 3 ? (
           <div className="field-grid">
-            <p>Select evidence type:</p>
-            <div className="option-grid">
-              {(["FILE", "URL", "TEXT"] as EvidenceType[]).map((type) => (
-                <label className="option-card" key={type}>
-                  <span>
-                    <input
-                      type="radio"
-                      name="evidence-type"
-                      checked={form.type === type}
-                      onChange={() => onSelectEvidenceType(type)}
-                      disabled={fieldDisabled}
-                    />
-                    <strong>{type}</strong>
-                  </span>
-                </label>
-              ))}
-            </div>
+            <label htmlFor="evidence-type">
+              Evidence Type
+              <select
+                id="evidence-type"
+                value={form.type}
+                onChange={(event) => onSelectEvidenceType(event.target.value as EvidenceType)}
+                disabled={fieldDisabled}
+              >
+                {(["FILE", "URL", "TEXT"] as EvidenceType[]).map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
             {form.type === "FILE" ? (
               <label htmlFor="file-type-select">
                 Jenis File

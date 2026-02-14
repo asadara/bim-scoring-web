@@ -270,30 +270,27 @@ export default function ApprovalDecisionPage() {
 
       <section className="task-panel">
         <h2>Konfirmasi Keputusan</h2>
-        <div className="option-grid">
-          {DECISIONS.map((item) => (
-            <label key={item} className="option-card">
-              <span>
-                <input
-                  type="radio"
-                  name="approval-decision"
-                  checked={decision === item}
-                  onChange={() => setDecision(item)}
-                  disabled={
-                    !canWrite ||
-                    locked ||
-                    blockedByBackend ||
-                    isSubmitting ||
-                    (item === "APPROVE PERIOD" && approveBlockedByPolicy)
-                  }
-                />
-                <strong>{item}</strong>
-              </span>
-            </label>
-          ))}
-        </div>
-
         <div className="field-grid">
+          <label htmlFor="approval-decision">
+            Decision
+            <select
+              id="approval-decision"
+              value={decision}
+              onChange={(event) => setDecision(event.target.value as ApprovalDecision | "")}
+              disabled={!canWrite || locked || blockedByBackend || isSubmitting}
+            >
+              <option value="">Pilih decision</option>
+              {DECISIONS.map((item) => (
+                <option
+                  key={item}
+                  value={item}
+                  disabled={item === "APPROVE PERIOD" && approveBlockedByPolicy}
+                >
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
           <label htmlFor="approval-reason">
             Reason (required)
             <textarea

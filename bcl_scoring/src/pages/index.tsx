@@ -280,6 +280,8 @@ export default function Home() {
     () => periods.find((item) => item.id === selectedPeriodId) || null,
     [periods, selectedPeriodId]
   );
+  const selectedPeriodYear = selectedPeriod?.year ?? null;
+  const selectedPeriodWeek = selectedPeriod?.week ?? null;
 
   const cards = useMemo(() => (Array.isArray(bundle?.cards) ? bundle!.cards! : []), [bundle]);
 
@@ -558,8 +560,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!selectedProjectId || !selectedPeriodId) return;
-    const period = periods.find((item) => item.id === selectedPeriodId);
-    if (!period) return;
+    const year = asNumber(selectedPeriodYear, Number.NaN);
+    const week = asNumber(selectedPeriodWeek, Number.NaN);
+    if (!Number.isFinite(year) || !Number.isFinite(week)) return;
 
     let cancelled = false;
 
@@ -567,7 +570,7 @@ export default function Home() {
       setLoading(true);
       setError(null);
       try {
-        const bundleData = await fetchBundle(selectedProjectId, period.year, period.week);
+        const bundleData = await fetchBundle(selectedProjectId, year, week);
 
         const perspectiveScores = await Promise.all(
           PERSPECTIVES.map((item) =>
@@ -591,7 +594,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [periods, selectedPeriodId, selectedProjectId]);
+  }, [selectedProjectId, selectedPeriodId, selectedPeriodYear, selectedPeriodWeek]);
 
   useEffect(() => {
     setActivePerspectiveId(null);

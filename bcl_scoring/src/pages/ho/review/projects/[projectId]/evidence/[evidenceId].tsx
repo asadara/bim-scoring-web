@@ -382,24 +382,23 @@ export default function HoEvidenceReviewPage() {
 
       <section className="task-panel">
         <h2>Apply Review</h2>
-        <div className="option-grid">
-          {OUTCOMES.map((item) => (
-            <label className="option-card" key={item}>
-              <span>
-                <input
-                  type="radio"
-                  name="review-outcome"
-                  checked={outcome === item}
-                  onChange={() => setOutcome(item)}
-                  disabled={!canApply}
-                />
-                <strong>{item}</strong>
-              </span>
-            </label>
-          ))}
-        </div>
-
         <div className="field-grid">
+          <label htmlFor="review-outcome">
+            Outcome
+            <select
+              id="review-outcome"
+              value={outcome}
+              onChange={(event) => setOutcome(event.target.value as ReviewOutcome | "")}
+              disabled={!canApply}
+            >
+              <option value="">Pilih outcome</option>
+              {OUTCOMES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
           <label htmlFor="review-reason">
             Reason (required)
             <textarea

@@ -128,6 +128,8 @@ export default function AdminControlPanelPage() {
   const [session, setSession] = useState<AdminSession>({ actorId: "admin-web", role: "Admin" });
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [periodLoading, setPeriodLoading] = useState(false);
+  const [indicatorLoading, setIndicatorLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [periodFeedback, setPeriodFeedback] = useState<{
@@ -207,37 +209,59 @@ export default function AdminControlPanelPage() {
 
   useEffect(() => {
     setWeekAnchorDraft(parseWeekAnchorFromConfigKey(selectedPeriodProject?.config_key));
-  }, [selectedPeriodProject?.id]);
+  }, [selectedPeriodProject?.id, selectedPeriodProject?.config_key]);
 
-  async function reloadData(currentSession: AdminSession, perspectiveFilter: string, periodProjectId: string) {
+  async function reloadBase(currentSession: AdminSession): Promise<string | null> {
     const [projectRows, perspectiveRows, lockRow] = await Promise.all([
       listAdminProjects(currentSession),
       listAdminPerspectives(currentSession),
       getAdminConfigLock(currentSession),
     ]);
+
     setProjects(projectRows);
     setPerspectives(perspectiveRows);
     setConfigLock(lockRow);
 
-    const perspectiveId = toNonEmptyString(perspectiveFilter);
-    if (!perspectiveId) {
-      setIndicators([]);
-    } else {
-      const indicatorRows = await listAdminIndicators(currentSession, { perspective_id: perspectiveId });
-      setIndicators(indicatorRows);
+    if (projectRows.length === 0) {
+      setPeriodProjectFilter("");
+      setPeriods([]);
+      return null;
     }
 
-    const targetProjectId =
-      toNonEmptyString(periodProjectId) || (projectRows[0]?.id ? String(projectRows[0].id) : null);
-    if (!targetProjectId) {
+    // Keep current selection if still valid; otherwise default to the first project.
+    const preferred = toNonEmptyString(periodProjectFilter);
+    const nextProjectId =
+      preferred && projectRows.some((item) => item.id === preferred)
+        ? preferred
+        : projectRows[0].id;
+    setPeriodProjectFilter(nextProjectId);
+    return nextProjectId;
+  }
+
+  async function reloadIndicatorsForPerspective(currentSession: AdminSession, perspectiveId: string): Promise<void> {
+    const normalized = toNonEmptyString(perspectiveId);
+    if (!normalized) {
+      setIndicators([]);
+      return;
+    }
+    const indicatorRows = await listAdminIndicators(currentSession, { perspective_id: normalized });
+    setIndicators(indicatorRows);
+  }
+
+  async function reloadPeriodsForProject(currentSession: AdminSession, projectId: string): Promise<void> {
+    const normalized = toNonEmptyString(projectId);
+    if (!normalized) {
       setPeriods([]);
       return;
     }
-    if (targetProjectId !== periodProjectId) {
-      setPeriodProjectFilter(targetProjectId);
-    }
-    const periodRows = await listAdminProjectPeriods(currentSession, targetProjectId);
+    const periodRows = await listAdminProjectPeriods(currentSession, normalized);
     setPeriods(periodRows);
+  }
+
+  async function reloadAll(currentSession: AdminSession): Promise<void> {
+    const nextProjectId = await reloadBase(currentSession);
+    await reloadIndicatorsForPerspective(currentSession, indicatorPerspectiveFilter);
+    await reloadPeriodsForProject(currentSession, nextProjectId || periodProjectFilter);
   }
 
   useEffect(() => {
@@ -260,7 +284,7 @@ export default function AdminControlPanelPage() {
       setLoading(true);
       setError(null);
       try {
-        await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+        await reloadBase(session);
         if (!mounted) return;
       } catch (e) {
         if (!mounted) return;
@@ -272,12 +296,31 @@ export default function AdminControlPanelPage() {
     return () => {
       mounted = false;
     };
-  }, [session, indicatorPerspectiveFilter, periodProjectFilter]);
+  }, [session]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
   }, [session]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setIndicatorLoading(true);
+      try {
+        await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
+        if (!mounted) return;
+      } catch (e) {
+        if (!mounted) return;
+        setError(e instanceof Error ? e.message : "Failed to load indicators");
+      } finally {
+        if (mounted) setIndicatorLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [session, indicatorPerspectiveFilter]);
 
   useEffect(() => {
     if (!indicatorPerspectiveFilter) return;
@@ -289,19 +332,36 @@ export default function AdminControlPanelPage() {
   }, [sortedPerspectiveOptions, indicatorPerspectiveFilter]);
 
   useEffect(() => {
-    if (projects.length === 0) {
-      setPeriodProjectFilter("");
-      setPeriods([]);
-      return;
-    }
-    if (!periodProjectFilter || !projects.some((item) => item.id === periodProjectFilter)) {
-      setPeriodProjectFilter(projects[0].id);
-    }
-  }, [projects, periodProjectFilter]);
-
-  useEffect(() => {
     setPeriodFeedback(null);
   }, [periodProjectFilter]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const normalized = toNonEmptyString(periodProjectFilter);
+      if (!normalized) {
+        setPeriods([]);
+        return;
+      }
+
+      setPeriodLoading(true);
+      setPeriods([]);
+      setPeriodFeedback(null);
+      try {
+        await reloadPeriodsForProject(session, normalized);
+        if (!mounted) return;
+      } catch (e) {
+        if (!mounted) return;
+        const message = e instanceof Error ? e.message : "Failed to load periods";
+        setPeriodFeedback({ tone: "error", message });
+      } finally {
+        if (mounted) setPeriodLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [session, periodProjectFilter]);
 
   async function runAction(action: () => Promise<void>, successMessage: string) {
     setWorking(true);
@@ -341,7 +401,7 @@ export default function AdminControlPanelPage() {
       });
       setProjectForm({ name: "", config_key: "" });
       setShowProjectCreateForm(false);
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+      await reloadBase(session);
     }, "Project workspace berhasil dibuat.");
   }
 
@@ -363,7 +423,8 @@ export default function AdminControlPanelPage() {
     try {
       const nextConfigKey = upsertWeekAnchorConfigKey(selectedPeriodProject?.config_key, weekAnchorDraft);
       await updateAdminProject(session, projectId, { config_key: nextConfigKey });
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+      await reloadBase(session);
+      await reloadPeriodsForProject(session, projectId);
       const successMessage = `Anchor period mingguan disimpan: ${weekAnchorDraft}.`;
       setNotice(successMessage);
       setPeriodFeedback({ tone: "success", message: successMessage });
@@ -403,7 +464,7 @@ export default function AdminControlPanelPage() {
         description: "",
       }));
       setShowIndicatorCreateForm(false);
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+      await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
     }, "Indicator berhasil ditambahkan (kode internal dibuat otomatis).");
   }
 
@@ -415,21 +476,21 @@ export default function AdminControlPanelPage() {
         reason: toNonEmptyString(lockReason),
       });
       setLockReason("");
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+      await reloadBase(session);
     }, nextLock ? "Config lock diaktifkan." : "Config lock dibuka.");
   }
 
   async function handleDeleteProject(id: string) {
     await runAction(async () => {
       await deleteAdminProject(session, id);
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+      await reloadBase(session);
     }, "Project berhasil dihapus.");
   }
 
   async function handleDeleteIndicator(id: string) {
     await runAction(async () => {
       await deleteAdminIndicator(session, id);
-      await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+      await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
     }, "Indicator berhasil dihapus.");
   }
 
@@ -492,7 +553,7 @@ export default function AdminControlPanelPage() {
               disabled={working || loading}
               onClick={() => {
                 void runAction(async () => {
-                  await reloadData(session, indicatorPerspectiveFilter, periodProjectFilter);
+                  await reloadAll(session);
                 }, "Data admin dimuat ulang.");
               }}
             >
@@ -773,7 +834,12 @@ export default function AdminControlPanelPage() {
                   <td colSpan={5}>Pilih workspace project terlebih dahulu.</td>
                 </tr>
               )}
-              {periodProjectFilter && periods.length === 0 && (
+              {periodProjectFilter && periodLoading && (
+                <tr>
+                  <td colSpan={5}>Memuat scoring period...</td>
+                </tr>
+              )}
+              {periodProjectFilter && !periodLoading && periods.length === 0 && (
                 <tr>
                   <td colSpan={5}>Belum ada scoring period untuk project ini.</td>
                 </tr>
@@ -898,7 +964,12 @@ export default function AdminControlPanelPage() {
                   <td colSpan={5}>Pilih perspective terlebih dahulu.</td>
                 </tr>
               )}
-              {indicatorPerspectiveFilter && indicators.length === 0 && (
+              {indicatorPerspectiveFilter && indicatorLoading && (
+                <tr>
+                  <td colSpan={5}>Memuat indikator...</td>
+                </tr>
+              )}
+              {indicatorPerspectiveFilter && !indicatorLoading && indicators.length === 0 && (
                 <tr>
                   <td colSpan={5}>Belum ada indikator pada perspective ini.</td>
                 </tr>

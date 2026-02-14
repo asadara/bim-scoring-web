@@ -29,7 +29,27 @@ function isAbsoluteUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
+const DEV_API_OVERRIDE_STORAGE_KEY = "bim_dev_api_base_override_v1";
+
+function readDevApiBaseOverride(): string | null {
+  if (typeof window === "undefined") return null;
+  // Safety: only allow override when running locally in development.
+  const appEnv = (process.env.NEXT_PUBLIC_APP_ENV || "").trim().toLowerCase();
+  if (appEnv !== "development") return null;
+  const host = window.location.hostname;
+  if (host !== "localhost" && host !== "127.0.0.1") return null;
+
+  const raw = window.localStorage.getItem(DEV_API_OVERRIDE_STORAGE_KEY);
+  if (!raw) return null;
+  const value = raw.trim();
+  if (!value) return null;
+  if (!isAbsoluteUrl(value)) return null;
+  return value.replace(/\/+$/, "");
+}
+
 export function getApiBaseUrl(): string {
+  const override = readDevApiBaseOverride();
+  if (override) return override;
   return getApiBaseUrlFromEnv();
 }
 
@@ -54,12 +74,41 @@ function snippet(text: string, limit = 220): string {
   return `${trimmed.slice(0, limit)}...`;
 }
 
+const DEFAULT_FETCH_TIMEOUT_MS = 25_000;
+
+function getFetchTimeoutMs(): number {
+  const raw = process.env.NEXT_PUBLIC_FETCH_TIMEOUT_MS;
+  if (typeof raw !== "string" || !raw.trim()) return DEFAULT_FETCH_TIMEOUT_MS;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_FETCH_TIMEOUT_MS;
+  return value;
+}
+
+function isAbortError(error: unknown): boolean {
+  // DOMException name is "AbortError" in browsers.
+  if (!error || typeof error !== "object") return false;
+  return (error as { name?: unknown }).name === "AbortError";
+}
+
 export async function safeFetchJson<T>(
   url: string,
   init?: RequestInit
 ): Promise<SafeFetchResult<T>> {
+  const timeoutMs = getFetchTimeoutMs();
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const response = await fetch(url, init);
+    // Respect external cancel signals while still enforcing our timeout.
+    if (init?.signal) {
+      if (init.signal.aborted) {
+        controller.abort();
+      } else {
+        init.signal.addEventListener("abort", () => controller.abort(), { once: true });
+      }
+    }
+
+    const response = await fetch(url, { ...init, signal: controller.signal });
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
@@ -86,11 +135,20 @@ export async function safeFetchJson<T>(
       };
     }
   } catch (error) {
+    if (isAbortError(error)) {
+      return {
+        ok: false,
+        kind: "backend_unavailable",
+        error: `Request timeout after ${timeoutMs}ms`,
+      };
+    }
     return {
       ok: false,
       kind: "backend_unavailable",
       error: toErrorMessage(error),
     };
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }
 
