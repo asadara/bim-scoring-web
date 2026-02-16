@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "render:domain:list": "node scripts/render-custom-domain.mjs list",
+    "render:domain:add": "node scripts/render-custom-domain.mjs add",
+    "render:domain:status": "node scripts/render-custom-domain.mjs status",
+    "render:domain:wait": "node scripts/render-custom-domain.mjs wait",
     "smoke:render": "node scripts/render-smoke-check.mjs",
+    "smoke:custom-domain": "node scripts/custom-domain-cutover-check.mjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed"
   },

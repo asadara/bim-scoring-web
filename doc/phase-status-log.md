@@ -2,7 +2,7 @@
 title: Phase Status Log
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-12
+last_updated: 2026-02-16
 owner: DevOps / Release
 ---
 
@@ -16,10 +16,14 @@ Log status phase proyek sampai checkpoint saat ini.
 - Frontend web landing: LIVE di Render (`https://bim-scoring-web.onrender.com`).
 - Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
 - Paket contract/regression blueprint-critical terbaru: lulus (`tests=20, pass=20, fail=0`).
-- E2E browser lintas role (Role 1 -> Role 2 -> Role 3 -> Audit): lulus (`npm run e2e`, `1 passed`).
+- E2E browser lintas role + hardening scenario (reject flow, post-approval lock, snapshot export): lulus (`npm run e2e`, `3 passed`).
+- CI gate Stage 7 aktif: PR gate ke `main` + nightly schedule untuk Playwright E2E (`.github/workflows/e2e-role-flow.yml`).
 - Rollout remediation API/Web sudah selesai dan terverifikasi pasca-deploy pada endpoint produksi.
 - Landing utama sudah diselaraskan ke dashboard BCL (legacy) pada route root (`/`) dengan kompatibilitas route lama (`/bcl/index.html`).
-- Custom domain: belum aktif (menunggu setup DNS).
+- Stage 8 custom domain cutover pack siap (checklist + smoke script), aktivasi domain masih menunggu eksekusi DNS provider.
+- Dry-run smoke cutover script pada domain default Render lulus (`npm run smoke:custom-domain` dengan `CUSTOM_DOMAIN=bim-scoring-web.onrender.com`).
+- Render API custom domain control aktif (`render:domain:list/add/status/wait`); daftar domain custom saat ini masih kosong.
+- Keputusan terbaru: finalisasi custom domain di-skip sementara; fokus Stage 8 dialihkan ke backup plan migrasi hosting.
 - Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
 
 ## Phase Timeline
@@ -34,7 +38,8 @@ Log status phase proyek sampai checkpoint saat ini.
 | Frontend Landing Deployment | COMPLETE | Landing root diterapkan dan deploy ke Render default domain (mode dashboard BCL aktif). |
 | Blueprint Alignment Remediation (R1) | COMPLETE (CODEBASE) | Step 1-6 remediation blueprint selesai di workspace dev + evidence dokumentasi tersedia. |
 | Remediation Rollout Gate | COMPLETE | Push ke `main` API/Web selesai; smoke checks dan verifikasi pasca-deploy endpoint produksi lulus. |
-| Custom Domain Activation | PENDING | Domain custom ditunda sampai DNS siap/terkonfigurasi benar. |
+| Custom Domain Activation | DEFERRED (BY DECISION) | Finalisasi custom domain ditunda sementara untuk memberi prioritas pada rencana backup migrasi hosting. |
+| Hosting Migration Backup Plan | IN PROGRESS | Rencana cadangan migrasi hosting disiapkan sebagai jalur continuity jika perlu pindah provider. |
 | UX Trial Window | IN PROGRESS | Aplikasi dijalankan read-only untuk ujicoba client-side. |
 
 ## Active Decisions
@@ -43,13 +48,18 @@ Log status phase proyek sampai checkpoint saat ini.
 2. Menjaga `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false` selama fase ujicoba UX read-only masih berjalan.
 3. Remediation scoring/evidence linkage sudah aktif di produksi; perubahan berikutnya wajib melalui release gate operasional.
 4. Guardrail governance tetap: review != approval, approval mengunci period, snapshot immutable, audit append-only.
+5. Custom domain cutover ditunda; prioritas deploy dialihkan ke kesiapan backup migrasi hosting.
 
 ## Evidence References
 
 - Landing implementation log: `doc/landing-page-change-log.md`
+- Hosting migration backup plan: `doc/hosting-migration-backup-plan.md`
 - Landing deploy checklist: `doc/landing-page-render-deploy-checklist.md`
 - Render smoke script (web+api): `bcl_scoring/scripts/render-smoke-check.mjs`
+- Custom domain cutover smoke script: `bcl_scoring/scripts/custom-domain-cutover-check.mjs`
+- Render custom domain API script: `bcl_scoring/scripts/render-custom-domain.mjs`
 - E2E browser spec lintas role: `bcl_scoring/e2e/role-flow.spec.ts`
+- E2E CI workflow (PR + nightly): `.github/workflows/e2e-role-flow.yml`
 - Frontend operational baseline: `bcl_scoring/README.md`
 - Backend write readiness reference: `doc/backend-write-readiness.md`
 - Blueprint remediation plan + status step: `doc/blueprint-alignment-remediation-plan.md`

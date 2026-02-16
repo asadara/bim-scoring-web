@@ -12,6 +12,7 @@ const SCOPE_KEY = `proto:${PROJECT_ID}:${PERIOD_ID}`;
 const PERIOD_META_KEY = SCOPE_KEY;
 
 type AppRole = "admin" | "role1" | "role2" | "role3" | "viewer";
+type ReviewOutcomeOption = "ACCEPTABLE" | "NEEDS REVISION" | "REJECTED";
 
 function nowIso(minutesOffset = 0) {
   return new Date(Date.now() + minutesOffset * 60_000).toISOString();
@@ -184,6 +185,9 @@ function buildSeedStore() {
 }
 
 async function setRole(page: Parameters<typeof test>[0]["page"], role: AppRole, userId: string | null) {
+  if (page.url().startsWith("about:")) {
+    await page.goto("/");
+  }
   await page.evaluate(({ key, payload }) => {
     window.localStorage.setItem(key, JSON.stringify(payload));
     window.dispatchEvent(new CustomEvent("bim:credential-updated", { detail: payload }));
@@ -191,6 +195,32 @@ async function setRole(page: Parameters<typeof test>[0]["page"], role: AppRole, 
     key: CREDENTIAL_STORE_KEY,
     payload: { role, user_id: userId, updated_at: new Date().toISOString() },
   });
+}
+
+async function applyReview(
+  page: Parameters<typeof test>[0]["page"],
+  input: { evidenceId: string; outcome: ReviewOutcomeOption; reason: string }
+) {
+  await setRole(page, "role2", "u-role2-e2e");
+  await page.goto(`/ho/review/projects/${PROJECT_ID}/evidence/${input.evidenceId}`);
+  await expect(page.locator("h1", { hasText: "Apply Review" })).toBeVisible();
+  await page.locator("#review-outcome").selectOption(input.outcome);
+  await page.locator("#review-reason").fill(input.reason);
+  await page.getByRole("button", { name: "Apply Review" }).click();
+  await expect(page.getByText("Review berhasil disimpan.")).toBeVisible();
+}
+
+async function approvePeriod(
+  page: Parameters<typeof test>[0]["page"],
+  reason: string
+) {
+  await setRole(page, "role3", "u-role3-e2e");
+  await page.goto(`/approve/projects/${PROJECT_ID}/decision`);
+  await expect(page.getByRole("heading", { name: "Konfirmasi Keputusan" })).toBeVisible();
+  await page.locator("#approval-decision").selectOption("APPROVE PERIOD");
+  await page.locator("#approval-reason").fill(reason);
+  await page.getByRole("button", { name: "Konfirmasi Keputusan" }).click();
+  await expect(page.getByText("Keputusan berhasil disimpan.")).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -251,4 +281,49 @@ test("role flow e2e: role1 -> role2 -> role3 -> audit", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Snapshot Header" })).toBeVisible();
   await expect(page.getByText("Final Score (Read-only)")).toBeVisible();
   await expect(page.getByText(PROJECT_ID, { exact: false }).first()).toBeVisible();
+});
+
+test("review reject flow: evidence becomes reviewed and no longer writable", async ({ page }) => {
+  await applyReview(page, {
+    evidenceId: EVIDENCE_ID,
+    outcome: "REJECTED",
+    reason: "E2E rejected review",
+  });
+
+  await expect(page.locator("span.status-chip", { hasText: /REJECTED/ }).first()).toBeVisible();
+  await expect(page.getByText("Reason: E2E rejected review").first()).toBeVisible();
+  await expect(page.getByText("Apply Review hanya untuk status SUBMITTED.")).toBeVisible();
+  await expect(page.locator("#review-outcome")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Apply Review" })).toBeDisabled();
+});
+
+test("post-approval lock: write actions disabled and snapshot export works", async ({ page }) => {
+  await applyReview(page, {
+    evidenceId: EVIDENCE_ID,
+    outcome: "ACCEPTABLE",
+    reason: "E2E acceptable review for lock scenario",
+  });
+  await approvePeriod(page, "E2E approve period for lock scenario");
+
+  const snapshotText = await page.locator("p", { hasText: "Snapshot ID:" }).first().innerText();
+  const snapshotId = snapshotText.replace("Snapshot ID:", "").trim();
+  expect(snapshotId).not.toEqual("");
+
+  await expect(page.getByText("LOCKED (read-only)")).toBeVisible();
+  await expect(page.locator("#approval-decision")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Konfirmasi Keputusan" })).toBeDisabled();
+
+  await setRole(page, "role1", "u-role1-e2e");
+  await page.goto(`/projects/${PROJECT_ID}/evidence/add`);
+  await expect(page.getByText("Period saat ini LOCKED. Semua input read-only dan aksi Save/Submit dinonaktifkan.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save Draft" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Submit for Review" })).toBeDisabled();
+
+  await setRole(page, "viewer", null);
+  await page.goto(`/audit/snapshots/${encodeURIComponent(snapshotId)}`);
+  await expect(page.getByRole("heading", { name: "Read-only Auditor View" })).toBeVisible();
+  await page.getByRole("button", { name: "Export JSON" }).click();
+  await expect(page.getByText("Export JSON selesai (download started).")).toBeVisible();
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  await expect(page.getByText("PDF generated (download started).")).toBeVisible({ timeout: 15_000 });
 });

@@ -43,3 +43,30 @@ Catatan:
 1. Redeploy artifact frontend sebelumnya yang known-good.
 2. Pertahankan config env production tetap benar.
 3. Ulang smoke checks minimal di root `/` dan `/projects`.
+
+## 7) Custom Domain Cutover (Stage 8)
+
+1. Tambahkan custom domain pada service web di Render, lalu ambil target DNS dari dashboard Render.
+2. Konfigurasi DNS di registrar/domain provider sesuai target yang diberikan Render.
+3. Tunggu status domain di Render menjadi terverifikasi dan sertifikat TLS terbit.
+4. Opsi otomatis via Render API script:
+
+```bash
+npm run render:domain:list
+CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:add
+CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:status
+CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:wait
+```
+
+5. Jalankan smoke check cutover:
+
+```bash
+CUSTOM_DOMAIN=<domain-custom-anda> API_BASE_URL=https://bim-scoring-api.onrender.com npm run smoke:custom-domain
+```
+
+6. Validasi hasil wajib:
+   - DNS resolve
+   - TLS valid dan tidak hampir expired
+   - HTTP redirect ke HTTPS
+   - route kritikal (`/`, `/projects`, `/ho/review`, `/approve`, `/audit`) status `200`
+   - API `/health` dan `/ready` tetap `200`

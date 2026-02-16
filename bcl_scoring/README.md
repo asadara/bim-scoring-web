@@ -72,6 +72,25 @@ npm run start
 4. If write flag enabled for controlled test, one write request succeeds end-to-end.
 5. If write flag disabled, UI remains in safe/prototype-mode behavior.
 
+### Custom Domain Smoke (Stage 8)
+
+Run after DNS + TLS cutover:
+
+```bash
+CUSTOM_DOMAIN=<domain-custom-anda> API_BASE_URL=https://bim-scoring-api.onrender.com npm run smoke:custom-domain
+```
+
+### Render Custom Domain Control
+
+Using Render API credentials (`RENDER_API_KEY`, `RENDER_WEB_SERVICE_ID`):
+
+```bash
+npm run render:domain:list
+CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:add
+CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:status
+CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:wait
+```
+
 ## Known Limitations
 
 - No external APM integration; operational visibility relies on backend structured logs and health/readiness checks.
