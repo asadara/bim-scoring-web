@@ -36,7 +36,7 @@ import {
   normalizeReviewOutcome,
   reviewOutcomeToEvidenceStatus,
 } from "@/lib/statusModel";
-import { formatJakartaYmd } from "@/lib/jakartaTime";
+import { addJakartaDays, formatJakartaYmd } from "@/lib/jakartaTime";
 // Period schedule is managed by backend (Supabase/Render) and selected by date range (Jakarta).
 
 export { normalizePrototypePeriodId } from "@/lib/prototypeStore";
@@ -444,7 +444,7 @@ function fallbackPeriods(projectId: string): ScoringPeriod[] {
       version: null,
     };
     const label = meta?.period_label || "";
-    const match = label.match(/^(\d{4})\s+W(\d{1,2})$/i);
+    const match = label.match(/^(\d{4})\s+W(\d{1,2})\b/i);
     if (match) {
       item.year = Number(match[1]);
       item.week = Number(match[2]);
@@ -453,25 +453,90 @@ function fallbackPeriods(projectId: string): ScoringPeriod[] {
   });
 }
 
+const MONTH_SHORT_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"] as const;
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function parseYmdParts(value: string | null): { year: number; monthIndex: number; day: number } | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || !Number.isFinite(day)) return null;
+  if (monthIndex < 0 || monthIndex > 11) return null;
+  if (day < 1 || day > 31) return null;
+  return { year, monthIndex, day };
+}
+
+function formatYmdLabel(value: string | null): { day: string; month: string; year: string } | null {
+  const parts = parseYmdParts(value);
+  if (!parts) return null;
+  return {
+    day: pad2(parts.day),
+    month: MONTH_SHORT_ID[parts.monthIndex] || NA_TEXT,
+    year: String(parts.year),
+  };
+}
+
+function isoWeekMondayYmd(year: number, week: number): string | null {
+  if (!Number.isInteger(year) || !Number.isInteger(week)) return null;
+  if (week < 1 || week > 53) return null;
+
+  // ISO week: week 1 is the week containing Jan 4th, weeks start on Monday.
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const isoDow = jan4.getUTCDay() === 0 ? 7 : jan4.getUTCDay(); // Mon=1..Sun=7
+  const mondayWeek1 = new Date(jan4.getTime() - (isoDow - 1) * 86_400_000);
+  const monday = new Date(mondayWeek1.getTime() + (week - 1) * 7 * 86_400_000);
+  return `${monday.getUTCFullYear()}-${pad2(monday.getUTCMonth() + 1)}-${pad2(monday.getUTCDate())}`;
+}
+
+function formatPeriodRangeLabel(startYmd: string | null, endYmd: string | null): string | null {
+  const start = formatYmdLabel(startYmd);
+  const end = formatYmdLabel(endYmd);
+  if (!start && !end) return null;
+  if (start && !end) return `${start.day} ${start.month} ${start.year}`;
+  if (!start && end) return `${end.day} ${end.month} ${end.year}`;
+  if (!start || !end) return null;
+
+  if (start.year === end.year && start.month === end.month) {
+    return `${start.day}-${end.day} ${start.month} ${start.year}`;
+  }
+  if (start.year === end.year) {
+    return `${start.day} ${start.month}-${end.day} ${end.month} ${start.year}`;
+  }
+  return `${start.day} ${start.month} ${start.year}-${end.day} ${end.month} ${end.year}`;
+}
+
 export function formatPeriodLabel(period: ScoringPeriod | null): string {
   if (!period) return NA_TEXT;
-  const parts: string[] = [];
 
   const hasYearWeek = period.year !== null || period.week !== null;
-  const hasRange = Boolean(period.start_date || period.end_date);
+  const startYmd = normalizeYmd(period.start_date);
+  const endYmd = normalizeYmd(period.end_date);
 
-  // Prefer human-readable period identity. Hide raw UUID metadata from UI.
-  if (!hasYearWeek && !hasRange) {
-    return NA_TEXT;
+  const year = period.year;
+  const week = period.week;
+
+  const weekLabel =
+    hasYearWeek
+      ? `${year ?? NA_TEXT} W${week !== null ? pad2(week) : NA_TEXT}`
+      : null;
+
+  let rangeLabel = formatPeriodRangeLabel(startYmd, endYmd);
+  if (!rangeLabel && year !== null && week !== null) {
+    const computedStart = isoWeekMondayYmd(year, week);
+    const computedEnd = computedStart ? addJakartaDays(computedStart, 6) : null;
+    rangeLabel = formatPeriodRangeLabel(computedStart, computedEnd);
   }
 
-  if (period.year !== null || period.week !== null) {
-    parts.push(`${period.year ?? NA_TEXT} W${period.week ?? NA_TEXT}`);
-  }
-  if (period.start_date || period.end_date) {
-    parts.push(`${period.start_date ?? NA_TEXT} - ${period.end_date ?? NA_TEXT}`);
-  }
-  return parts.join(" | ");
+  if (weekLabel && rangeLabel) return `${weekLabel} (${rangeLabel})`;
+  if (weekLabel) return weekLabel;
+  if (rangeLabel) return rangeLabel;
+  return NA_TEXT;
 }
 
 export function formatProjectLabel(project: ProjectRecord | null): string {

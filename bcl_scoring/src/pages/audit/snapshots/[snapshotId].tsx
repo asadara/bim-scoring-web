@@ -24,11 +24,21 @@ import {
   DataMode,
   NA_TEXT,
   ProjectRecord,
+  ScoringPeriod,
+  fetchProjectPeriodsReadMode,
   fetchProjectReadMode,
+  formatPeriodLabel,
   formatProjectLabel,
 } from "@/lib/role1TaskLayer";
 
 const PERSPECTIVES = ["P1", "P2", "P3", "P4", "P5"];
+
+function formatDateText(value: string | null | undefined): string {
+  if (!value) return NA_TEXT;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return NA_TEXT;
+  return parsed.toLocaleString();
+}
 
 function scoreInterpretation(totalScore: number | null): string {
   if (totalScore === null || !Number.isFinite(totalScore)) return NA_TEXT;
@@ -47,6 +57,7 @@ export default function AuditSnapshotDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [snapshotView, setSnapshotView] = useState<AuditSnapshotView | null>(null);
   const [project, setProject] = useState<ProjectRecord | null>(null);
+  const [period, setPeriod] = useState<ScoringPeriod | null>(null);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
   const [exportInfo, setExportInfo] = useState<string | null>(null);
@@ -71,11 +82,19 @@ export default function AuditSnapshotDetailPage() {
           throw new Error("Snapshot not found.");
         }
 
-        const projectResult = await fetchProjectReadMode(hit.snapshot.project_id);
+        const [projectResult, periodResult] = await Promise.all([
+          fetchProjectReadMode(hit.snapshot.project_id),
+          fetchProjectPeriodsReadMode(hit.snapshot.project_id),
+        ]);
         let projectInfo: ProjectRecord | null = projectResult.data;
         let pageDataMode: DataMode =
-          snapshotResult.mode === "prototype" || projectResult.mode === "prototype" ? "prototype" : "backend";
-        let pageBackendMessage = snapshotResult.backend_message || projectResult.backend_message;
+          snapshotResult.mode === "prototype" ||
+          projectResult.mode === "prototype" ||
+          periodResult.mode === "prototype"
+            ? "prototype"
+            : "backend";
+        let pageBackendMessage =
+          snapshotResult.backend_message || projectResult.backend_message || periodResult.backend_message;
 
         if (!projectInfo) {
           const meta = getPrototypeProjectMetaFromStore(hit.snapshot.project_id);
@@ -89,6 +108,12 @@ export default function AuditSnapshotDetailPage() {
           pageDataMode = "prototype";
           pageBackendMessage = pageBackendMessage || "Backend not available";
         }
+
+        const periodId = hit.snapshot.period_id;
+        const periodInfo =
+          typeof periodId === "string" && periodId.trim()
+            ? periodResult.data.find((row) => row.id === periodId) || null
+            : null;
 
         let summary: typeof backendSummary = null;
         const summaryResult = await fetchReadOnlySummaryReadMode(hit.snapshot.project_id, hit.snapshot.period_id);
@@ -109,6 +134,7 @@ export default function AuditSnapshotDetailPage() {
         if (!mounted) return;
         setSnapshotView(hit);
         setProject(projectInfo);
+        setPeriod(periodInfo);
         setDataMode(pageDataMode);
         setBackendMessage(pageBackendMessage);
         setBackendSummary(summary);
@@ -117,6 +143,7 @@ export default function AuditSnapshotDetailPage() {
         if (!mounted) return;
         setSnapshotView(null);
         setProject(null);
+        setPeriod(null);
         setDataMode("prototype");
         setBackendMessage(e instanceof Error ? e.message : "Backend not available");
         setBackendSummary(null);
@@ -236,13 +263,14 @@ export default function AuditSnapshotDetailPage() {
   const latestDecision = decisions[0] || null;
   const effectiveTotalScore = snapshot.final_bim_score ?? backendSummary?.total_score ?? null;
   const interpretation = scoreInterpretation(effectiveTotalScore);
+  const periodLabel = period ? formatPeriodLabel(period) : snapshot.period_id || NA_TEXT;
 
   return (
     <AuditorLayout
       title="Read-only Auditor View"
       subtitle="Snapshot detail sebagai catatan immutable prototype."
       projectLabel={formatProjectLabel(project || { id: snapshot.project_id, name: null, code: null, phase: null, is_active: null })}
-      periodLabel={snapshot.period_id || NA_TEXT}
+      periodLabel={periodLabel}
       snapshotId={typeof snapshotId === "string" ? decodeURIComponent(snapshotId) : null}
     >
       <BackendStatusBanner mode={dataMode} message={backendMessage} />
@@ -251,9 +279,10 @@ export default function AuditSnapshotDetailPage() {
         <h2>Snapshot Header</h2>
         <p>Project: {project?.name || project?.code || snapshot.project_id || NA_TEXT}</p>
         <p>Project ID: {snapshot.project_id || NA_TEXT}</p>
-        <p>Period: {snapshot.period_id || NA_TEXT}</p>
+        <p>Period: {periodLabel}</p>
+        <p>Period ID: {snapshot.period_id || NA_TEXT}</p>
         <p>Approved by: {snapshot.approved_by || NA_TEXT}</p>
-        <p>Approved at: {snapshot.approved_at || NA_TEXT}</p>
+        <p>Approved at: {formatDateText(snapshot.approved_at)}</p>
         <p>Lock status: {getSnapshotLockStatus(snapshot)}</p>
         <p>Snapshot ID: {snapshotView.snapshot_id || NA_TEXT}</p>
         <p className="prototype-badge">Prototype snapshot (not used for audit/compliance)</p>

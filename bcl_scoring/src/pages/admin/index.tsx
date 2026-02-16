@@ -10,7 +10,6 @@ import {
   createAdminIndicator,
   createAdminProject,
   deleteAdminIndicator,
-  deleteAdminProject,
   getAdminConfigLock,
   listAdminIndicators,
   listAdminProjectPeriods,
@@ -480,11 +479,14 @@ export default function AdminControlPanelPage() {
     }, nextLock ? "Config lock diaktifkan." : "Config lock dibuka.");
   }
 
-  async function handleDeleteProject(id: string) {
+  async function handleSetProjectActive(projectId: string, nextActive: boolean) {
     await runAction(async () => {
-      await deleteAdminProject(session, id);
+      await updateAdminProject(session, projectId, { is_active: nextActive });
       await reloadBase(session);
-    }, "Project berhasil dihapus.");
+      if (periodProjectFilter === projectId) {
+        await reloadPeriodsForProject(session, projectId);
+      }
+    }, nextActive ? "Workspace diaktifkan." : "Workspace dinonaktifkan.");
   }
 
   async function handleDeleteIndicator(id: string) {
@@ -654,6 +656,9 @@ export default function AdminControlPanelPage() {
       <section className="task-panel">
         <h2>Project Workspace (Admin CRUD)</h2>
         <p className="task-subtitle">Daftar workspace eksisting ditampilkan lebih dulu sebelum aksi CRUD.</p>
+        <p className="inline-note">
+          Untuk keamanan, aksi hapus workspace dinonaktifkan. Gunakan Deactivate untuk menonaktifkan workspace tanpa menghapus data.
+        </p>
         <div className="wizard-actions">
           <button
             type="button"
@@ -693,12 +698,17 @@ export default function AdminControlPanelPage() {
                       type="button"
                       disabled={working}
                       onClick={() => {
-                        const yes = window.confirm(`Hapus workspace "${item.name || "tanpa nama"}"?`);
+                        const nextActive = item.is_active === false;
+                        const label = item.name || "tanpa nama";
+                        const prompt = nextActive
+                          ? `Aktifkan workspace "${label}"?`
+                          : `Nonaktifkan workspace "${label}"?\n\nCatatan: Data tidak dihapus, hanya disembunyikan dari alur aktif.`;
+                        const yes = window.confirm(prompt);
                         if (!yes) return;
-                        void handleDeleteProject(item.id);
+                        void handleSetProjectActive(item.id, nextActive);
                       }}
                     >
-                      Delete
+                      {item.is_active === false ? "Activate" : "Deactivate"}
                     </button>
                   </td>
                 </tr>

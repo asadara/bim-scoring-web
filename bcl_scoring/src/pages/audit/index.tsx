@@ -15,6 +15,7 @@ import {
   NA_TEXT,
   ProjectRecord,
   ScoringPeriod,
+  formatPeriodLabel,
   fetchProjectPeriodsReadMode,
   fetchProjectsReadMode,
 } from "@/lib/role1TaskLayer";
@@ -102,6 +103,8 @@ export default function AuditHomePage() {
   const [events, setEvents] = useState<AuditGovernanceEvent[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
+  const [snapshotProjectFilter, setSnapshotProjectFilter] = useState<string>("");
+  const [snapshotQuery, setSnapshotQuery] = useState<string>("");
 
   useEffect(() => {
     let mounted = true;
@@ -199,6 +202,31 @@ export default function AuditHomePage() {
     return map;
   }, [projects, snapshots]);
 
+  const projectFilterOptions = useMemo(() => {
+    const ids = new Set<string>();
+    projects.forEach((project) => ids.add(project.id));
+    snapshots.forEach((entry) => ids.add(entry.snapshot.project_id));
+    Object.keys(periodsByProjectId).forEach((projectId) => ids.add(projectId));
+
+    const rows = [...ids].map((projectId) => ({
+      id: projectId,
+      label: projectNameById.get(projectId) || projectId,
+    }));
+    rows.sort((a, b) => a.label.localeCompare(b.label));
+    return rows;
+  }, [periodsByProjectId, projectNameById, projects, snapshots]);
+
+  const periodLabelByProjectPeriodId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [projectId, periods] of Object.entries(periodsByProjectId)) {
+      for (const period of periods) {
+        if (!period?.id) continue;
+        map.set(`${projectId}|${period.id}`, formatPeriodLabel(period));
+      }
+    }
+    return map;
+  }, [periodsByProjectId]);
+
   const snapshotMetrics = useMemo(() => {
     const periodRows = Object.values(periodsByProjectId).flat();
     const lockedPeriods = periodRows.filter((row) => row.status === "LOCKED").length;
@@ -222,6 +250,35 @@ export default function AuditHomePage() {
     };
   }, [periodsByProjectId, projectNameById, projects.length, snapshots]);
 
+  const visibleSnapshots = useMemo(() => {
+    const projectFilter = snapshotProjectFilter.trim();
+    const query = snapshotQuery.trim().toLowerCase();
+
+    const rows = [...snapshots].sort((a, b) =>
+      String(b.snapshot.approved_at).localeCompare(String(a.snapshot.approved_at))
+    );
+
+    return rows.filter((entry) => {
+      if (projectFilter && entry.snapshot.project_id !== projectFilter) return false;
+      if (!query) return true;
+
+      const projectLabel = projectNameById.get(entry.snapshot.project_id) || "";
+      const haystack = [
+        entry.snapshot_id,
+        entry.snapshot.project_id,
+        entry.snapshot.period_id,
+        entry.snapshot.approved_by,
+        entry.snapshot.approved_at,
+        projectLabel,
+      ]
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [projectNameById, snapshotProjectFilter, snapshotQuery, snapshots]);
+
   const coverageRows = useMemo(() => {
     const ids = new Set<string>();
     projects.forEach((project) => ids.add(project.id));
@@ -231,9 +288,10 @@ export default function AuditHomePage() {
     const rows = [...ids].map((projectId) => {
       const periods = periodsByProjectId[projectId] || [];
       const snapshotRows = snapshots.filter((entry) => entry.snapshot.project_id === projectId);
-      const latestSnapshotAt = snapshotRows
-        .map((entry) => entry.snapshot.approved_at)
-        .sort((a, b) => String(b).localeCompare(String(a)))[0] || null;
+      const sortedSnapshots = snapshotRows
+        .slice()
+        .sort((a, b) => String(b.snapshot.approved_at).localeCompare(String(a.snapshot.approved_at)));
+      const latest = sortedSnapshots[0] || null;
 
       return {
         project_id: projectId,
@@ -241,7 +299,8 @@ export default function AuditHomePage() {
         period_count: periods.length,
         locked_period_count: periods.filter((row) => row.status === "LOCKED").length,
         snapshot_count: snapshotRows.length,
-        latest_snapshot_at: latestSnapshotAt,
+        latest_snapshot_id: latest?.snapshot_id || null,
+        latest_snapshot_at: latest?.snapshot.approved_at || null,
       };
     });
 
@@ -316,6 +375,31 @@ export default function AuditHomePage() {
         <p className="inline-note">
           Mulai dari snapshot list -&gt; baca narrative trail &amp; reference ISO mapping.
         </p>
+        <div className="wizard-actions admin-filter-row">
+          <label>
+            Project filter
+            <select
+              value={snapshotProjectFilter}
+              onChange={(event) => setSnapshotProjectFilter(event.target.value)}
+              disabled={projectFilterOptions.length === 0}
+            >
+              <option value="">All projects</option>
+              {projectFilterOptions.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Search
+            <input
+              value={snapshotQuery}
+              onChange={(event) => setSnapshotQuery(event.target.value)}
+              placeholder="Cari snapshot_id / project / period / approver..."
+            />
+          </label>
+        </div>
         {loading ? <p>Loading...</p> : null}
         {error ? <p className="error-box">{error}</p> : null}
 
@@ -329,14 +413,28 @@ export default function AuditHomePage() {
 
         {!loading && !error && snapshots.length > 0 ? (
           <div className="evidence-list">
-            {snapshots.map((entry) => (
+            {visibleSnapshots.length === 0 ? (
+              <div className="empty-state">
+                <p>Tidak ada snapshot yang cocok dengan filter saat ini.</p>
+              </div>
+            ) : null}
+            {visibleSnapshots.map((entry) => {
+              const periodKey = `${entry.snapshot.project_id}|${entry.snapshot.period_id || ""}`;
+              const periodLabel =
+                (entry.snapshot.period_id
+                  ? periodLabelByProjectPeriodId.get(periodKey)
+                  : null) ||
+                entry.snapshot.period_id ||
+                NA_TEXT;
+
+              return (
               <article className="evidence-item" key={entry.snapshot_id}>
                 <p>
                   <strong>{projectNameById.get(entry.snapshot.project_id) || entry.snapshot.project_id || NA_TEXT}</strong>
                 </p>
                 <p>Project ID: {entry.snapshot.project_id || NA_TEXT}</p>
-                <p>Period: {entry.snapshot.period_id || NA_TEXT}</p>
-                <p>Approved at: {entry.snapshot.approved_at || NA_TEXT}</p>
+                <p>Period: {periodLabel}</p>
+                <p>Approved at: {formatDateText(entry.snapshot.approved_at)}</p>
                 <p>Approved by: {entry.snapshot.approved_by || NA_TEXT}</p>
                 <div className="item-actions">
                   <Link className="revisi" href={`/audit/snapshots/${encodeURIComponent(entry.snapshot_id)}`}>
@@ -344,7 +442,8 @@ export default function AuditHomePage() {
                   </Link>
                 </div>
               </article>
-            ))}
+            );
+            })}
           </div>
         ) : null}
       </section>
@@ -374,7 +473,15 @@ export default function AuditHomePage() {
                     <td>{row.period_count}</td>
                     <td>{row.locked_period_count}</td>
                     <td>{row.snapshot_count}</td>
-                    <td>{formatDateText(row.latest_snapshot_at)}</td>
+                    <td>
+                      {row.latest_snapshot_id ? (
+                        <Link href={`/audit/snapshots/${encodeURIComponent(row.latest_snapshot_id)}`}>
+                          {formatDateText(row.latest_snapshot_at)}
+                        </Link>
+                      ) : (
+                        formatDateText(row.latest_snapshot_at)
+                      )}
+                    </td>
                   </tr>
                 ))
               )}

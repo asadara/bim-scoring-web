@@ -13,6 +13,7 @@ import {
   fetchProjectsReadMode,
   fetchProjectReadMode,
   fetchProjectPeriodsReadMode,
+  formatPeriodLabel,
   getPrototypePeriodLock,
   isRealBackendWriteEnabled,
   listLocalEvidence,
@@ -156,13 +157,6 @@ function requirePeriodId(periodId: string | null): string {
     throw new Error("Period is Not available");
   }
   return normalized;
-}
-
-function formatPeriodLabel(params: { periodId: string | null; year: number | null; week: number | null }): string {
-  if (params.year !== null || params.week !== null) {
-    return `${params.year ?? NA_TEXT} W${params.week ?? NA_TEXT}`;
-  }
-  return NA_TEXT;
 }
 
 function formatPeriodLabelFallback(projectId: string, periodId: string | null): string {
@@ -494,7 +488,7 @@ export async function fetchApproverHomeContext(): Promise<ApproverHomeContext> {
         project,
         period_id: periodId,
         period_label: activePeriod
-          ? formatPeriodLabel({ periodId, year: activePeriod.year, week: activePeriod.week })
+          ? formatPeriodLabel(activePeriod)
           : formatPeriodLabelFallback(project.id, periodId),
         period_status_label: periodStatusLabel,
         approval_status:
@@ -628,7 +622,7 @@ export async function fetchApproverProjectContext(
     period_id: periodId,
     period_version: active?.version ?? null,
     period_label: active
-      ? formatPeriodLabel({ periodId, year: active.year, week: active.week })
+      ? formatPeriodLabel(active)
       : formatPeriodLabelFallback(projectId, periodId),
     period_status_label: periodStatusLabel,
     period_locked: periodLocked,
