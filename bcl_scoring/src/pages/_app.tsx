@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import "@/styles/task-layer.css";
 import MainNav from "@/components/MainNav";
 import { canRoleAccessPath, normalizePath } from "@/lib/accessControl";
+import { startAuthCredentialSync, syncCredentialFromAuth } from "@/lib/authClient";
 import { validatePublicRuntimeEnv } from "@/lib/runtimeEnv";
 import { UserCredential, getRoleLabel, getStoredCredential } from "@/lib/userCredential";
 
@@ -15,6 +16,10 @@ validatePublicRuntimeEnv();
 const DEFAULT_CREDENTIAL: UserCredential = {
   role: "viewer",
   user_id: null,
+  full_name: null,
+  employee_number: null,
+  auth_provider: null,
+  pending_role: false,
   updated_at: "",
 };
 
@@ -24,22 +29,45 @@ export default function App({ Component, pageProps }: AppProps) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    let stopAuthSync = () => {};
+
     const sync = () => {
       setCredential(getStoredCredential());
-      setReady(true);
     };
 
-    sync();
+    (async () => {
+      await syncCredentialFromAuth();
+      if (!active) return;
+      sync();
+      setReady(true);
+      stopAuthSync = startAuthCredentialSync();
+    })();
+
     window.addEventListener("storage", sync);
     window.addEventListener("bim:credential-updated", sync as EventListener);
 
     return () => {
+      active = false;
+      stopAuthSync();
       window.removeEventListener("storage", sync);
       window.removeEventListener("bim:credential-updated", sync as EventListener);
     };
   }, []);
 
   const currentPath = normalizePath(router.asPath || router.pathname || "/");
+  const needsAuthentication = useMemo(
+    () =>
+      currentPath === "/admin" ||
+      currentPath.startsWith("/admin/") ||
+      currentPath === "/projects" ||
+      currentPath.startsWith("/projects/") ||
+      currentPath === "/ho/review" ||
+      currentPath.startsWith("/ho/review/") ||
+      currentPath === "/approve" ||
+      currentPath.startsWith("/approve/"),
+    [currentPath]
+  );
   const isAllowed = useMemo(
     () => canRoleAccessPath(credential.role, currentPath),
     [credential.role, currentPath]
@@ -53,6 +81,28 @@ export default function App({ Component, pageProps }: AppProps) {
           <section className="task-panel">
             <h1>Checking Access</h1>
             <p className="task-subtitle">Memuat credential aktif...</p>
+          </section>
+        </main>
+      </>
+    );
+  }
+
+  if (needsAuthentication && !credential.user_id) {
+    return (
+      <>
+        <MainNav />
+        <main className="task-shell">
+          <section className="task-panel">
+            <h1>Sign In Required</h1>
+            <p className="task-subtitle">
+              Halaman ini hanya untuk user terautentikasi. Silakan sign in terlebih dahulu.
+            </p>
+            <div className="wizard-actions">
+              <Link href="/auth/sign-in" className="action-primary">
+                Sign In
+              </Link>
+              <Link href="/auth/sign-up">Buat Akun</Link>
+            </div>
           </section>
         </main>
       </>

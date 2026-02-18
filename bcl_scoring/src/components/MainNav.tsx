@@ -1,15 +1,10 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { canRoleAccessPath, getMainNavItemsForRole, normalizePath } from "@/lib/accessControl";
-import {
-  AppRole,
-  UserCredential,
-  getRoleLabel,
-  getStoredCredential,
-  setStoredCredential,
-} from "@/lib/userCredential";
+import { getMainNavItemsForRole, normalizePath } from "@/lib/accessControl";
+import { isAuthConfigured, signOutAuth } from "@/lib/authClient";
+import { UserCredential, getRoleLabel, getStoredCredential } from "@/lib/userCredential";
 
 function isRouteActive(currentPath: string, href: string): boolean {
   const cleanPath = normalizePath(currentPath);
@@ -20,38 +15,18 @@ function isRouteActive(currentPath: string, href: string): boolean {
 const DEFAULT_CREDENTIAL: UserCredential = {
   role: "viewer",
   user_id: null,
+  full_name: null,
+  employee_number: null,
+  auth_provider: null,
+  pending_role: false,
   updated_at: "",
 };
-
-const ROLE_OPTIONS: Array<{ value: AppRole; label: string }> = [
-  { value: "admin", label: "Admin" },
-  { value: "role1", label: "BIM Coordinator Project" },
-  { value: "role2", label: "BIM Coordinator HO" },
-  { value: "role3", label: "BIM Manager" },
-  { value: "viewer", label: "Viewer / Auditor" },
-];
-
-function defaultPathForRole(role: AppRole): string {
-  switch (role) {
-    case "admin":
-      return "/admin";
-    case "role1":
-      return "/projects";
-    case "role2":
-      return "/ho/review";
-    case "role3":
-      return "/approve";
-    case "viewer":
-    default:
-      return "/audit";
-  }
-}
 
 export default function MainNav() {
   const router = useRouter();
   const [credential, setCredential] = useState<UserCredential>(DEFAULT_CREDENTIAL);
-  const [draftRole, setDraftRole] = useState<AppRole>("viewer");
-  const [draftUserId, setDraftUserId] = useState("");
+  const [busySignOut, setBusySignOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -59,7 +34,6 @@ export default function MainNav() {
     };
 
     sync();
-
     window.addEventListener("storage", sync);
     window.addEventListener("bim:credential-updated", sync as EventListener);
 
@@ -69,25 +43,21 @@ export default function MainNav() {
     };
   }, []);
 
-  useEffect(() => {
-    setDraftRole(credential.role);
-    setDraftUserId(credential.user_id || "");
-  }, [credential.role, credential.user_id, credential.updated_at]);
-
-  const navItems = useMemo(() => {
-    return getMainNavItemsForRole(credential.role);
-  }, [credential.role]);
-
+  const navItems = useMemo(() => getMainNavItemsForRole(credential.role), [credential.role]);
   const currentPath = normalizePath(router.asPath || router.pathname || "/");
 
-  function handleApplySwitch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const saved = setStoredCredential({
-      role: draftRole,
-      user_id: draftUserId.trim() || null,
-    });
-    if (!canRoleAccessPath(saved.role, currentPath)) {
-      void router.push(defaultPathForRole(saved.role));
+  async function handleSignOut() {
+    setBusySignOut(true);
+    setError(null);
+    try {
+      await signOutAuth();
+      if (currentPath !== "/" && currentPath !== "/audit") {
+        await router.push("/auth/sign-in");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign out gagal");
+    } finally {
+      setBusySignOut(false);
     }
   }
 
@@ -96,6 +66,13 @@ export default function MainNav() {
       <div className="main-nav-inner">
         <p className="main-nav-caption">
           Access: <strong>{getRoleLabel(credential.role)}</strong>
+          {credential.pending_role ? " (menunggu role admin)" : ""}
+          {credential.user_id ? (
+            <>
+              {" "}
+              | User: <strong>{credential.full_name || credential.employee_number || credential.user_id}</strong>
+            </>
+          ) : null}
         </p>
 
         <nav className="main-nav-list" aria-label="Main navigation">
@@ -114,28 +91,30 @@ export default function MainNav() {
           })}
         </nav>
 
-        <form className="main-nav-switcher" onSubmit={handleApplySwitch}>
-          <label>
-            Role Uji Coba
-            <select value={draftRole} onChange={(event) => setDraftRole(event.target.value as AppRole)}>
-              {ROLE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            User ID (opsional)
-            <input
-              value={draftUserId}
-              onChange={(event) => setDraftUserId(event.target.value)}
-              placeholder="mis: u-role1-dev"
-            />
-          </label>
-          <button type="submit">Apply</button>
-        </form>
+        <div className="main-nav-auth-actions">
+          {isAuthConfigured() ? (
+            credential.user_id ? (
+              <>
+                <button type="button" onClick={() => void handleSignOut()} disabled={busySignOut}>
+                  {busySignOut ? "Signing out..." : "Sign Out"}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/auth/sign-in" className="main-nav-auth-link">
+                  Sign In
+                </Link>
+                <Link href="/auth/sign-up" className="main-nav-auth-link">
+                  Sign Up
+                </Link>
+              </>
+            )
+          ) : (
+            <span className="main-nav-auth-note">Auth belum dikonfigurasi</span>
+          )}
+        </div>
       </div>
+      {error ? <div className="main-nav-auth-error">{error}</div> : null}
     </div>
   );
 }

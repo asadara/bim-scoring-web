@@ -5,6 +5,10 @@ import { UserCredential, getStoredCredential } from "@/lib/userCredential";
 const DEFAULT_CREDENTIAL: UserCredential = {
   role: "viewer",
   user_id: null,
+  full_name: null,
+  employee_number: null,
+  auth_provider: null,
+  pending_role: false,
   updated_at: "",
 };
 

@@ -13,6 +13,13 @@ Required:
 
 Optional:
 - `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=true|false`
+- `NEXT_PUBLIC_SUPABASE_AUTH_REDIRECT_URL` (opsional override callback OAuth)
+- `NEXT_PUBLIC_AUTH_PASSWORD_EMAIL_DOMAIN` (default: `pegawai.local`)
+- `NEXT_PUBLIC_AUTH_ALLOW_ROLE_SWITCH=false` (manual role switch default disabled)
+
+Auth required:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 Fail-fast behavior:
 - Unknown `NEXT_PUBLIC_APP_ENV` throws startup/runtime config error.
@@ -24,6 +31,15 @@ Fail-fast behavior:
 - `production` default: `false`
 - `staging` default: `false` (enable only by explicit override)
 - `development`: configurable via env override; default remains `false` unless explicitly enabled.
+
+## Authentication Flow (Current)
+
+- Sign up credential: `nama + nomor pegawai + password` (`/auth/sign-up`)
+- Sign in credential: `nomor pegawai + password` (`/auth/sign-in`)
+- Google OAuth tersedia di halaman auth.
+- Akun baru dikirim ke endpoint API `/auth/account-request` untuk antrean assignment role admin.
+- Resolusi role user dibaca dari endpoint `/auth/resolve-role/:userId`.
+- Jika role belum di-assign admin, user tetap `viewer` (read-only / audit path).
 
 ## Deployment Steps (High-Level)
 
@@ -78,6 +94,14 @@ Run after DNS + TLS cutover:
 
 ```bash
 CUSTOM_DOMAIN=<domain-custom-anda> API_BASE_URL=https://bim-scoring-api.onrender.com npm run smoke:custom-domain
+```
+
+### Render Smoke Timeout Control
+
+`smoke:render` mendukung timeout per request agar fail-fast saat endpoint bermasalah:
+
+```bash
+REQUEST_TIMEOUT_MS=15000 npm run smoke:render
 ```
 
 ### Render Custom Domain Control

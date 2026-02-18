@@ -2,7 +2,7 @@
 title: Phase Status Log
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-16
+last_updated: 2026-02-18
 owner: DevOps / Release
 ---
 
@@ -22,9 +22,13 @@ Log status phase proyek sampai checkpoint saat ini.
 - Landing utama sudah diselaraskan ke dashboard BCL (legacy) pada route root (`/`) dengan kompatibilitas route lama (`/bcl/index.html`).
 - Stage 8 custom domain cutover pack siap (checklist + smoke script), aktivasi domain masih menunggu eksekusi DNS provider.
 - Dry-run smoke cutover script pada domain default Render lulus (`npm run smoke:custom-domain` dengan `CUSTOM_DOMAIN=bim-scoring-web.onrender.com`).
+- Checkpoint R20 terbaru (2026-02-18): Step 3 Wave 0 `COMPLETE`, Wave 3 `IN PROGRESS`, Wave 4 `READY (WAITING EXECUTION)`, Wave 1/2/5 belum mulai.
+- Checkpoint 2026-02-18 11:29:18 +07:00: migrasi OCI di-`HOLD` sementara (akun OCI belum aktif), operasi dikembalikan ke mode `Render + Supabase`.
+- Checkpoint continuity menunjukkan route web kritikal `200`, namun API Render (`/health`, `/ready`) timeout dari jalur pengecekan saat ini; investigasi dashboard/log Render diperlukan.
 - Render API custom domain control aktif (`render:domain:list/add/status/wait`); daftar domain custom saat ini masih kosong.
 - Keputusan terbaru: finalisasi custom domain di-skip sementara; fokus Stage 8 dialihkan ke backup plan migrasi hosting.
 - Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
+- Checkpoint 2026-02-18: policy Admin untuk mutasi evidence di endpoint legacy dikunci `read-only` (semua role termasuk Admin menerima `403 FORBIDDEN_ROLE`), regression API lulus (`tests=99, pass=98, fail=0, skipped=1`).
 
 ## Phase Timeline
 
@@ -54,6 +58,8 @@ Log status phase proyek sampai checkpoint saat ini.
 
 - Landing implementation log: `doc/landing-page-change-log.md`
 - Hosting migration backup plan: `doc/hosting-migration-backup-plan.md`
+- R20 runbook progress checkpoint terbaru: `doc/render-to-oci-step3-progress-2026-02-18.md`
+- Render continuity checkpoint (saat OCI hold): `doc/render-render-supabase-continuity-checkpoint-2026-02-18.md`
 - Landing deploy checklist: `doc/landing-page-render-deploy-checklist.md`
 - Render smoke script (web+api): `bcl_scoring/scripts/render-smoke-check.mjs`
 - Custom domain cutover smoke script: `bcl_scoring/scripts/custom-domain-cutover-check.mjs`

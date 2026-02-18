@@ -1,5 +1,6 @@
 const webBase = (process.env.WEB_BASE_URL || "https://bim-scoring-web.onrender.com").replace(/\/+$/, "");
 const apiBase = (process.env.API_BASE_URL || "https://bim-scoring-api.onrender.com").replace(/\/+$/, "");
+const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 20_000);
 
 function ok(msg) {
   console.log(`[OK] ${msg}`);
@@ -9,8 +10,23 @@ function fail(msg) {
   console.error(`[FAIL] ${msg}`);
 }
 
+async function fetchWithTimeout(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Request timeout (${requestTimeoutMs}ms) at ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchText(url) {
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   const text = await res.text();
   return { res, text };
 }
@@ -43,7 +59,7 @@ async function checkPage({ name, path, mustContainAny = [], mustContainAll = [] 
 
 async function checkApiHealth(path, expectedFlag = "ok") {
   const url = `${apiBase}${path}`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (res.status !== 200) {
     return { ok: false, message: `API ${path}: status ${res.status} at ${url}` };
   }

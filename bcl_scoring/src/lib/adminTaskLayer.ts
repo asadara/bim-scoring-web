@@ -38,6 +38,26 @@ export type AdminIndicator = {
   updated_at?: string | null;
 };
 
+export type AdminUser = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  employee_number: string | null;
+  is_active: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type AdminRoleMapping = {
+  id: string;
+  user_id: string;
+  role: string;
+  project_id: string | null;
+  is_active: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type AdminConfigLock = {
   scope: string;
   is_locked: boolean;
@@ -206,6 +226,35 @@ export async function deleteAdminProject(session: AdminSession, projectId: strin
 
 export async function listAdminPerspectives(session: AdminSession): Promise<AdminPerspective[]> {
   return await requestAdmin<AdminPerspective[]>(session, "/admin/perspectives");
+}
+
+export async function listAdminUsers(session: AdminSession): Promise<AdminUser[]> {
+  return await requestAdmin<AdminUser[]>(session, "/admin/users");
+}
+
+export async function listAdminRoleMappings(session: AdminSession): Promise<AdminRoleMapping[]> {
+  return await requestAdmin<AdminRoleMapping[]>(session, "/admin/role-mappings");
+}
+
+export async function createAdminRoleMapping(
+  session: AdminSession,
+  input: { user_id: string; role: string; project_id?: string | null; is_active?: boolean }
+): Promise<AdminRoleMapping> {
+  return await requestAdmin<AdminRoleMapping>(session, "/admin/role-mappings", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminRoleMapping(
+  session: AdminSession,
+  mappingId: string,
+  patch: { user_id?: string; role?: string; project_id?: string | null; is_active?: boolean | null }
+): Promise<AdminRoleMapping> {
+  return await requestAdmin<AdminRoleMapping>(session, `/admin/role-mappings/${encodeURIComponent(mappingId)}`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
 }
 
 export async function createAdminPerspective(

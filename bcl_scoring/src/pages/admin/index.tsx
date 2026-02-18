@@ -5,8 +5,11 @@ import {
   AdminIndicator,
   AdminPerspective,
   AdminProject,
+  AdminRoleMapping,
   AdminScoringPeriod,
   AdminSession,
+  AdminUser,
+  createAdminRoleMapping,
   createAdminIndicator,
   createAdminProject,
   deleteAdminIndicator,
@@ -15,7 +18,10 @@ import {
   listAdminProjectPeriods,
   listAdminPerspectives,
   listAdminProjects,
+  listAdminRoleMappings,
+  listAdminUsers,
   setAdminConfigLock,
+  updateAdminRoleMapping,
   updateAdminProject,
 } from "@/lib/adminTaskLayer";
 import { AppRole, getRoleLabel, getStoredCredential, setStoredCredential } from "@/lib/userCredential";
@@ -41,6 +47,8 @@ const WEEK_ANCHOR_OPTIONS: Array<{ value: WeekAnchor; label: string }> = [
   { value: "SATURDAY", label: "Sabtu" },
   { value: "SUNDAY", label: "Minggu" },
 ];
+
+const ROLE_PRIORITY: AppRole[] = ["admin", "role3", "role2", "role1", "viewer"];
 
 function toNonEmptyString(value: string): string | null {
   const out = value.trim();
@@ -123,6 +131,23 @@ function upsertWeekAnchorConfigKey(configKey: string | null | undefined, anchor:
   return `${raw}; week_anchor=${anchor}`;
 }
 
+function resolveUserGlobalRole(userId: string, mappings: AdminRoleMapping[]): AppRole {
+  const globalRoles = mappings
+    .filter((item) => item.user_id === userId && item.is_active !== false && !toNonEmptyString(item.project_id || ""))
+    .map((item) => {
+      const role = String(item.role || "").trim().toLowerCase();
+      if (role === "admin") return "admin";
+      if (role === "role3") return "role3";
+      if (role === "role2") return "role2";
+      if (role === "role1") return "role1";
+      return "viewer";
+    });
+  for (const role of ROLE_PRIORITY) {
+    if (globalRoles.includes(role)) return role;
+  }
+  return "viewer";
+}
+
 export default function AdminControlPanelPage() {
   const [session, setSession] = useState<AdminSession>({ actorId: "admin-web", role: "Admin" });
   const [loading, setLoading] = useState(true);
@@ -139,6 +164,9 @@ export default function AdminControlPanelPage() {
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [perspectives, setPerspectives] = useState<AdminPerspective[]>([]);
   const [indicators, setIndicators] = useState<AdminIndicator[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [roleMappings, setRoleMappings] = useState<AdminRoleMapping[]>([]);
+  const [userRoleDraftById, setUserRoleDraftById] = useState<Record<string, AppRole>>({});
   const [periods, setPeriods] = useState<AdminScoringPeriod[]>([]);
   const [configLock, setConfigLock] = useState<AdminConfigLock | null>(null);
   const [indicatorPerspectiveFilter, setIndicatorPerspectiveFilter] = useState<string>("");
@@ -198,6 +226,22 @@ export default function AdminControlPanelPage() {
     );
   }, [perspectives]);
 
+  const userCurrentRoleById = useMemo(() => {
+    const out = new Map<string, AppRole>();
+    for (const user of users) {
+      out.set(user.id, resolveUserGlobalRole(user.id, roleMappings));
+    }
+    return out;
+  }, [users, roleMappings]);
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) =>
+      String(a.name || a.email || a.employee_number || a.id).localeCompare(
+        String(b.name || b.email || b.employee_number || b.id)
+      )
+    );
+  }, [users]);
+
   const selectedPeriodProject = useMemo(() => {
     if (!periodProjectFilter) return null;
     return projects.find((item) => item.id === periodProjectFilter) || null;
@@ -211,14 +255,24 @@ export default function AdminControlPanelPage() {
   }, [selectedPeriodProject?.id, selectedPeriodProject?.config_key]);
 
   async function reloadBase(currentSession: AdminSession): Promise<string | null> {
-    const [projectRows, perspectiveRows, lockRow] = await Promise.all([
+    const [projectRows, perspectiveRows, userRows, roleMappingRows, lockRow] = await Promise.all([
       listAdminProjects(currentSession),
       listAdminPerspectives(currentSession),
+      listAdminUsers(currentSession),
+      listAdminRoleMappings(currentSession),
       getAdminConfigLock(currentSession),
     ]);
 
     setProjects(projectRows);
     setPerspectives(perspectiveRows);
+    setUsers(userRows);
+    setRoleMappings(roleMappingRows);
+    setUserRoleDraftById(
+      userRows.reduce<Record<string, AppRole>>((acc, item) => {
+        acc[item.id] = resolveUserGlobalRole(item.id, roleMappingRows);
+        return acc;
+      }, {})
+    );
     setConfigLock(lockRow);
 
     if (projectRows.length === 0) {
@@ -479,6 +533,48 @@ export default function AdminControlPanelPage() {
     }, nextLock ? "Config lock diaktifkan." : "Config lock dibuka.");
   }
 
+  async function handleAssignUserRole(userId: string) {
+    const nextRole = userRoleDraftById[userId] || "viewer";
+    await runAction(async () => {
+      const globalMappings = roleMappings.filter(
+        (item) => item.user_id === userId && !toNonEmptyString(item.project_id || "")
+      );
+      const activeGlobal = globalMappings.filter((item) => item.is_active !== false);
+
+      if (nextRole === "viewer") {
+        for (const mapping of activeGlobal) {
+          await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+        }
+        await reloadBase(session);
+        return;
+      }
+
+      for (const mapping of activeGlobal) {
+        const mappingRole = String(mapping.role || "").trim().toLowerCase();
+        if (mappingRole === nextRole) continue;
+        await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+      }
+
+      const sameRoleMapping = globalMappings.find(
+        (item) => String(item.role || "").trim().toLowerCase() === nextRole
+      );
+      if (sameRoleMapping) {
+        if (sameRoleMapping.is_active === false) {
+          await updateAdminRoleMapping(session, sameRoleMapping.id, { is_active: true });
+        }
+      } else {
+        await createAdminRoleMapping(session, {
+          user_id: userId,
+          role: nextRole,
+          project_id: null,
+          is_active: true,
+        });
+      }
+
+      await reloadBase(session);
+    }, `Role user diperbarui ke ${getRoleLabel(nextRole)}.`);
+  }
+
   async function handleSetProjectActive(projectId: string, nextActive: boolean) {
     await runAction(async () => {
       await updateAdminProject(session, projectId, { is_active: nextActive });
@@ -563,6 +659,73 @@ export default function AdminControlPanelPage() {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="task-panel">
+        <h2>User Role Management</h2>
+        <p className="task-subtitle">
+          Assign role global user dari admin panel. Perubahan berlaku setelah user sign out dan sign in ulang.
+        </p>
+        <div className="admin-table-wrap">
+          <table className="audit-table">
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Nomor Pegawai</th>
+                <th>Email</th>
+                <th>Role Aktif</th>
+                <th>Set Role</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedUsers.length === 0 && (
+                <tr>
+                  <td colSpan={6}>Belum ada user terdaftar.</td>
+                </tr>
+              )}
+              {sortedUsers.map((item) => {
+                const currentRole = userCurrentRoleById.get(item.id) || "viewer";
+                const draftRole = userRoleDraftById[item.id] || currentRole;
+                return (
+                  <tr key={item.id}>
+                    <td>{item.name || "N/A"}</td>
+                    <td>{item.employee_number || "N/A"}</td>
+                    <td>{item.email || "N/A"}</td>
+                    <td>{getRoleLabel(currentRole)}</td>
+                    <td>
+                      <select
+                        value={draftRole}
+                        onChange={(event) =>
+                          setUserRoleDraftById((prev) => ({
+                            ...prev,
+                            [item.id]: event.target.value as AppRole,
+                          }))
+                        }
+                      >
+                        {ROLE_OPTIONS.map((option) => (
+                          <option key={`${item.id}-${option.value}`} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="action-primary"
+                        disabled={working}
+                        onClick={() => void handleAssignUserRole(item.id)}
+                      >
+                        Simpan Role
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="task-panel">

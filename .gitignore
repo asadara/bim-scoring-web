@@ -1,0 +1,6 @@
+client_secret_*.json
+*.apps.googleusercontent.com.json
+.env
+.env.*
+*.local
+*.log

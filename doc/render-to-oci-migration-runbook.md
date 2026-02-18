@@ -2,13 +2,35 @@
 title: Render to OCI Migration Runbook
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-16
+last_updated: 2026-02-18
 owner: DevOps / Release
 ---
 
 # Render to OCI Migration Runbook
 
 Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pada Render Free dengan memindahkan API dan Next.js ke OCI Always Free VM.
+
+## 0) Progress Snapshot (R20)
+
+Status checkpoint per 2026-02-18:
+
+Keputusan operasional terbaru (checkpoint 2026-02-18 11:29:18 +07:00):
+- Migrasi OCI di-`HOLD` sementara karena akun OCI belum berhasil dibuat.
+- Operasi aktif kembali difokuskan ke `Render + Supabase` sampai blocker OCI selesai.
+
+| Wave | Status | Catatan |
+|---|---|---|
+| Wave 0 (Freeze/Baseline) | COMPLETE | Baseline dan smoke web kritikal sudah tervalidasi. |
+| Wave 1 (Provision OCI VM) | ON HOLD (BLOCKED) | Menunggu akun OCI aktif. |
+| Wave 2 (Deploy Service di OCI) | ON HOLD (BLOCKED) | Bergantung pada Wave 1. |
+| Wave 3 (Nginx/TLS/Cloudflare) | ON HOLD (BLOCKED) | Bergantung pada Wave 1-2 + domain final. |
+| Wave 4 (Controlled Cutover) | DEFERRED | Ditunda sampai jalur OCI dibuka kembali. |
+| Wave 5 (Stabilization) | DEFERRED | Menunggu eksekusi Wave 4. |
+
+Evidence terbaru:
+- `doc/render-to-oci-wave0-evidence-2026-02-16.md`
+- `doc/render-to-oci-step3-progress-2026-02-18.md`
+- `doc/render-render-supabase-continuity-checkpoint-2026-02-18.md`
 
 ## 1) Objective
 
@@ -40,6 +62,10 @@ Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pa
    - error rate naik signifikan
    - flow role kritikal gagal (projects/review/approve/audit)
 
+Progress 2026-02-18:
+- `COMPLETE` untuk gate baseline availability dan smoke route kritikal.
+- Hasil `npm run smoke:render`: seluruh check lulus.
+
 ## 3.2 Wave 1 - Provision OCI VM (H-0)
 
 1. Buat VM OCI Always Free (Ubuntu), siapkan static public IP.
@@ -54,6 +80,10 @@ Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pa
    - `/opt/bim-scoring/api`
    - `/opt/bim-scoring/web`
 5. Clone repo dari GitHub ke direktori deploy.
+
+Progress 2026-02-18:
+- `NOT STARTED` (butuh provisioning aktual di OCI Console).
+- Checkpoint 2026-02-18 11:29:18 +07:00: `ON HOLD (BLOCKED)` menunggu akun OCI siap.
 
 ## 3.3 Wave 2 - Deploy Service di OCI (Belum Cutover DNS)
 
@@ -72,6 +102,15 @@ Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pa
    - `curl http://127.0.0.1:4000/ready`
    - `curl -I http://127.0.0.1:3000`
 
+Progress 2026-02-18:
+- `NOT STARTED` di host OCI (belum ada VM target).
+- Readiness codebase lokal sudah tervalidasi:
+  - API `npm test`: pass (`tests=99, pass=98, fail=0, skipped=1`)
+  - API `npm run build`: pass
+  - Guardrail policy tambahan: endpoint evidence legacy untuk Admin diset read-only (`/projects/:projectId/evidence/request-upload`, `/projects/:projectId/evidence/signed-upload`, `/indicator-inputs/:inputId/evidence`) dan tervalidasi kontrak `403 FORBIDDEN_ROLE`.
+  - Web `npm run e2e`: pass (`3 passed`)
+- Checkpoint 2026-02-18 11:29:18 +07:00: `ON HOLD (BLOCKED)` menunggu Wave 1.
+
 ## 3.4 Wave 3 - Nginx + TLS + Cloudflare Prep
 
 1. Konfigurasi Nginx reverse proxy:
@@ -87,6 +126,16 @@ Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pa
    - `https://api.<domain>/ready` => `200`
    - `https://app.<domain>/` => `200`
 
+Progress 2026-02-18:
+- `IN PROGRESS`.
+- Tooling cutover check siap dan lulus dry-run di domain Render:
+  - `CUSTOM_DOMAIN=bim-scoring-web.onrender.com npm run smoke:custom-domain` -> pass.
+- Gap operasional:
+  - domain final `api.<domain>`/`app.<domain>` belum ditetapkan.
+  - kredensial operasional untuk Render API (`RENDER_API_KEY`, `RENDER_WEB_SERVICE_ID`) belum tersedia di environment eksekusi saat ini.
+  - akses OCI/Cloudflare untuk konfigurasi DNS + SSL strict belum tersedia di workspace ini.
+- Checkpoint 2026-02-18 11:29:18 +07:00: `ON HOLD (BLOCKED)` menunggu Wave 1-2.
+
 ## 3.5 Wave 4 - Controlled Cutover (H-Day)
 
 1. Pastikan Render masih aktif (fallback).
@@ -101,12 +150,24 @@ Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pa
    - timeout
    - latency route kritikal
 
+Progress 2026-02-18:
+- `READY, WAITING EXECUTION` (belum dieksekusi karena Wave 1-3 belum final).
+- Gate pra-cutover yang sudah lulus:
+  - `npm run smoke:render`
+  - `CUSTOM_DOMAIN=bim-scoring-web.onrender.com npm run smoke:custom-domain`
+  - `npm run e2e`
+- Checkpoint 2026-02-18 11:29:18 +07:00: `DEFERRED` sampai jalur OCI dibuka kembali.
+
 ## 3.6 Wave 5 - Stabilization (24-48 jam)
 
 1. Pantau health/readiness berkala.
 2. Pantau log aplikasi (web+api) dan Nginx.
 3. Jika stabil, baru turunkan dependensi ke Render (disable/decommission).
 4. Setelah final, rotasi secret yang pernah diekspor untuk migrasi.
+
+Progress 2026-02-18:
+- `NOT STARTED` (mulai setelah Wave 4 cutover selesai).
+- Checkpoint 2026-02-18 11:29:18 +07:00: `DEFERRED`.
 
 ## 4) Rollback Plan (Cepat)
 
@@ -116,6 +177,9 @@ Dokumen ini adalah urutan migrasi praktis untuk menghilangkan idle cold-start pa
    - `npm run smoke:render`
    - `GET /health` dan `GET /ready` API lama
 4. Catat root cause, jadwalkan cutover ulang setelah corrective action.
+
+Status 2026-02-18:
+- `READY` (prosedur rollback terdokumentasi, baseline smoke lama terverifikasi ulang).
 
 ## 5) Production Checklist
 
@@ -158,3 +222,13 @@ curl -I https://app.<domain>/
 - Health/readiness API konsisten `200`.
 - Flow role kritikal lulus smoke + E2E.
 - Tidak ada regression kontrak API/UI dibanding baseline pra-migrasi.
+
+## 8) Immediate Next Actions (R20)
+
+1. Stabilkan operasi `Render + Supabase` sebagai mode sementara.
+2. Jalankan monitoring rutin endpoint kritikal (`/`, `/projects`, `/ho/review`, `/approve`, `/audit`, `/health`, `/ready`) dengan timeout eksplisit.
+3. Investigasi timeout API Render yang terdeteksi pada checkpoint 2026-02-18 dan konfirmasi status service dari dashboard Render.
+4. Pertahankan gate kualitas sebelum perubahan produksi:
+   - `npm run smoke:render`
+   - `npm run e2e`
+5. Setelah akun OCI siap, buka kembali Wave 1 dan lanjutkan sequence migrasi dari titik hold saat ini.

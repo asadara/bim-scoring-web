@@ -3,12 +3,19 @@ export type AppRole = "admin" | "role1" | "role2" | "role3" | "viewer";
 export type UserCredential = {
   role: AppRole;
   user_id: string | null;
+  full_name?: string | null;
+  employee_number?: string | null;
+  auth_provider?: string | null;
+  pending_role?: boolean;
   updated_at: string;
 };
 
 export const USER_CREDENTIAL_STORAGE_KEY = "bim_user_credential_v1";
 
 const ADMIN_SESSION_STORAGE_KEY = "bim_admin_session_v1";
+const MANUAL_ROLE_SWITCH_ENABLED = String(process.env.NEXT_PUBLIC_AUTH_ALLOW_ROLE_SWITCH || "false")
+  .trim()
+  .toLowerCase() === "true";
 
 const ROLE_ALIAS_MAP: Record<string, AppRole> = {
   admin: "admin",
@@ -61,10 +68,20 @@ function parseCredential(raw: string | null): UserCredential | null {
     const parsed = JSON.parse(raw) as Partial<UserCredential>;
     const role = normalizeRole(parsed.role);
     const user_id = typeof parsed.user_id === "string" && parsed.user_id.trim() ? parsed.user_id.trim() : null;
+    const full_name = typeof parsed.full_name === "string" && parsed.full_name.trim()
+      ? parsed.full_name.trim()
+      : null;
+    const employee_number = typeof parsed.employee_number === "string" && parsed.employee_number.trim()
+      ? parsed.employee_number.trim()
+      : null;
+    const auth_provider = typeof parsed.auth_provider === "string" && parsed.auth_provider.trim()
+      ? parsed.auth_provider.trim().toLowerCase()
+      : null;
+    const pending_role = parsed.pending_role === true;
     const updated_at = typeof parsed.updated_at === "string" && parsed.updated_at.trim()
       ? parsed.updated_at.trim()
       : new Date().toISOString();
-    return { role, user_id, updated_at };
+    return { role, user_id, full_name, employee_number, auth_provider, pending_role, updated_at };
   } catch {
     return null;
   }
@@ -85,17 +102,29 @@ function readAdminSessionRole(): AppRole | null {
 
 export function getStoredCredential(): UserCredential {
   if (typeof window === "undefined") {
-    return { role: "viewer", user_id: null, updated_at: new Date().toISOString() };
+    return {
+      role: "viewer",
+      user_id: null,
+      full_name: null,
+      employee_number: null,
+      auth_provider: null,
+      pending_role: false,
+      updated_at: new Date().toISOString(),
+    };
   }
 
   const direct = parseCredential(window.localStorage.getItem(USER_CREDENTIAL_STORAGE_KEY));
   if (direct) return direct;
 
   const adminRole = readAdminSessionRole();
-  if (adminRole === "admin") {
+  if (MANUAL_ROLE_SWITCH_ENABLED && adminRole === "admin") {
     const fallback: UserCredential = {
       role: "admin",
       user_id: "admin-web",
+      full_name: "Admin Web",
+      employee_number: null,
+      auth_provider: "manual",
+      pending_role: false,
       updated_at: new Date().toISOString(),
     };
     window.localStorage.setItem(USER_CREDENTIAL_STORAGE_KEY, JSON.stringify(fallback));
@@ -105,16 +134,45 @@ export function getStoredCredential(): UserCredential {
   const fallback: UserCredential = {
     role: "viewer",
     user_id: null,
+    full_name: null,
+    employee_number: null,
+    auth_provider: null,
+    pending_role: false,
     updated_at: new Date().toISOString(),
   };
   window.localStorage.setItem(USER_CREDENTIAL_STORAGE_KEY, JSON.stringify(fallback));
   return fallback;
 }
 
-export function setStoredCredential(input: { role: AppRole; user_id?: string | null }): UserCredential {
+export function setStoredCredential(
+  input: {
+    role: AppRole;
+    user_id?: string | null;
+    full_name?: string | null;
+    employee_number?: string | null;
+    auth_provider?: string | null;
+    pending_role?: boolean;
+  },
+  options?: { source?: "manual" | "auth" }
+): UserCredential {
+  const source = options?.source || "manual";
+  if (source === "manual" && !MANUAL_ROLE_SWITCH_ENABLED) {
+    return getStoredCredential();
+  }
+
   const payload: UserCredential = {
     role: normalizeRole(input.role),
     user_id: typeof input.user_id === "string" && input.user_id.trim() ? input.user_id.trim() : null,
+    full_name: typeof input.full_name === "string" && input.full_name.trim() ? input.full_name.trim() : null,
+    employee_number:
+      typeof input.employee_number === "string" && input.employee_number.trim()
+        ? input.employee_number.trim()
+        : null,
+    auth_provider:
+      typeof input.auth_provider === "string" && input.auth_provider.trim()
+        ? input.auth_provider.trim().toLowerCase()
+        : null,
+    pending_role: input.pending_role === true,
     updated_at: new Date().toISOString(),
   };
   if (typeof window !== "undefined") {
