@@ -78,8 +78,20 @@ async function main() {
         mustContainAll: ["apiFetch(", "apiUrl("],
       }),
     () => checkPage({ name: "Projects route", path: "/projects", mustContainAny: ["Project", "Role 1"] }),
-    () => checkPage({ name: "HO review route", path: "/ho/review", mustContainAny: ["Review", "Role 2"] }),
-    () => checkPage({ name: "Approve route", path: "/approve", mustContainAny: ["Approve", "Approval"] }),
+    () =>
+      checkPage({
+        name: "HO review route",
+        path: "/ho/review",
+        mustContainAll: ['"page":"/ho/review"'],
+        mustContainAny: ["Evidence Review - HO", "Review Evidence", "Checking Access"],
+      }),
+    () =>
+      checkPage({
+        name: "Approve route",
+        path: "/approve",
+        mustContainAll: ['"page":"/approve"'],
+        mustContainAny: ["Period Approval", "Approval", "Checking Access"],
+      }),
     () => checkPage({ name: "Audit route", path: "/audit", mustContainAny: ["Audit", "Snapshot"] }),
     () => checkApiHealth("/health", "ok"),
     () => checkApiHealth("/ready", "ready"),
