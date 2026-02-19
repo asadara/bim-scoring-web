@@ -45,6 +45,7 @@ export default function SignUpPage() {
   const router = useRouter();
   const credential = useCredential();
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -110,6 +111,7 @@ export default function SignUpPage() {
     try {
       await signUpWithEmployeePassword({
         name,
+        email,
         employee_number: employeeNumber,
         password,
         requested_role: requestedRole,
@@ -152,7 +154,7 @@ export default function SignUpPage() {
         <section className="task-panel">
           <h1>Sign Up</h1>
           <p className="task-subtitle">
-            Buat akun pribadi dengan nama, nomor pegawai, dan password. Setelah itu akun masuk antrean assignment role
+            Buat akun pribadi dengan nama, email, nomor pegawai, dan password. Setelah itu akun masuk antrean assignment role
             oleh admin.
           </p>
 
@@ -186,6 +188,16 @@ export default function SignUpPage() {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Nama pegawai"
+                    required
+                  />
+                </label>
+                <label className="auth-field">
+                  Email
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="nama@domain.com"
                     required
                   />
                 </label>

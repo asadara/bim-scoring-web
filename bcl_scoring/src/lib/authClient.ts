@@ -45,6 +45,12 @@ function normalizeText(value: unknown): string | null {
   return out ? out : null;
 }
 
+function normalizeEmail(value: unknown): string | null {
+  const raw = normalizeText(value);
+  if (!raw) return null;
+  return raw.toLowerCase();
+}
+
 function normalizeEmployeeNumber(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }
@@ -179,6 +185,18 @@ async function resolveRole(user_id: string): Promise<{ role: AppRole; assigned: 
   return { role, assigned, scoped_project_ids };
 }
 
+async function resolvePasswordEmailByEmployee(employee_number: string): Promise<string | null> {
+  const normalized = normalizeEmployeeNumber(employee_number);
+  if (!normalized) return null;
+  const result = await safeFetchJson<unknown>(
+    buildApiUrl(`/auth/password-email/${encodeURIComponent(normalized)}`)
+  );
+  if (!result.ok) return null;
+  const root = isObject(result.data) ? result.data : {};
+  const data = isObject(root.data) ? root.data : {};
+  return normalizeEmail(data.email);
+}
+
 export function isAuthConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
@@ -284,7 +302,8 @@ export async function signInWithEmployeePassword(input: {
   password: string;
 }): Promise<void> {
   const supabase = getSupabaseBrowserClient();
-  const email = toPasswordEmail(input.employee_number);
+  const resolvedEmail = await resolvePasswordEmailByEmployee(input.employee_number);
+  const email = resolvedEmail || toPasswordEmail(input.employee_number);
   const { error } = await supabase.auth.signInWithPassword({
     email,
     password: input.password,
@@ -295,6 +314,7 @@ export async function signInWithEmployeePassword(input: {
 
 export async function signUpWithEmployeePassword(input: {
   name: string;
+  email: string;
   employee_number: string;
   password: string;
   requested_role: RequestedRole;
@@ -302,7 +322,10 @@ export async function signUpWithEmployeePassword(input: {
 }): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   const normalizedEmployeeNumber = normalizeEmployeeNumber(input.employee_number);
-  const email = toPasswordEmail(normalizedEmployeeNumber);
+  const email = normalizeEmail(input.email);
+  if (!email) {
+    throw new Error("Email wajib diisi dengan format yang valid.");
+  }
   const requestedRole = normalizeRequestedRole(input.requested_role) || "viewer";
   const requestedProjectIds = normalizeRequestedProjectIds(input.requested_project_ids);
   setPendingRequestedRole(requestedRole);
