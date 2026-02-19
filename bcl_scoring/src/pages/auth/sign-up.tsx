@@ -109,7 +109,7 @@ export default function SignUpPage() {
     setError(null);
     setInfo(null);
     try {
-      await signUpWithEmployeePassword({
+      const result = await signUpWithEmployeePassword({
         name,
         email,
         employee_number: employeeNumber,
@@ -117,6 +117,19 @@ export default function SignUpPage() {
         requested_role: requestedRole,
         requested_project_ids: selectedProjectIds,
       });
+      if (result.requires_email_verification) {
+        if (result.likely_new_registration) {
+          setInfo(
+            "Pendaftaran berhasil. Cek email Anda untuk verifikasi akun, lalu lanjut Sign In."
+          );
+        } else {
+          setInfo(
+            "Permintaan pendaftaran diterima. Jika email sudah terdaftar, gunakan Sign In atau cek email verifikasi terakhir."
+          );
+        }
+        return;
+      }
+
       setInfo("Akun berhasil dibuat. Menunggu assignment role dari admin.");
       await router.push("/auth/sign-in");
     } catch (err) {

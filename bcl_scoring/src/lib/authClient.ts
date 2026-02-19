@@ -14,6 +14,11 @@ const PENDING_REQUESTED_PROJECTS_STORAGE_KEY = "bim_pending_requested_project_id
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
 export type RequestedRole = "role1" | "role2" | "role3" | "viewer";
+export type PasswordSignUpResult = {
+  requires_email_verification: boolean;
+  user_id: string | null;
+  likely_new_registration: boolean;
+};
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
@@ -319,7 +324,7 @@ export async function signUpWithEmployeePassword(input: {
   password: string;
   requested_role: RequestedRole;
   requested_project_ids?: string[];
-}): Promise<void> {
+}): Promise<PasswordSignUpResult> {
   const supabase = getSupabaseBrowserClient();
   const normalizedEmployeeNumber = normalizeEmployeeNumber(input.employee_number);
   const email = normalizeEmail(input.email);
@@ -330,7 +335,7 @@ export async function signUpWithEmployeePassword(input: {
   const requestedProjectIds = normalizeRequestedProjectIds(input.requested_project_ids);
   setPendingRequestedRole(requestedRole);
   setPendingRequestedProjectIds(requestedProjectIds);
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password: input.password,
     options: {
@@ -343,7 +348,39 @@ export async function signUpWithEmployeePassword(input: {
     },
   });
   if (error) throw new Error(error.message || "Sign up gagal");
-  await syncCredentialFromAuth();
+  const signedUser = data?.user || null;
+  const signedSession = data?.session || null;
+  const user_id = normalizeText(signedUser?.id);
+  const identities = Array.isArray(signedUser?.identities) ? signedUser.identities : [];
+  const likely_new_registration = identities.length > 0;
+
+  if (user_id && likely_new_registration) {
+    try {
+      await callAccountRequest({
+        user_id,
+        email,
+        name: normalizeText(input.name),
+        employee_number: normalizedEmployeeNumber,
+        provider: "password",
+        requested_role: requestedRole,
+        requested_project_ids: requestedProjectIds.length > 0 ? requestedProjectIds : undefined,
+      });
+    } catch {
+      // Best effort only. Will retry after first successful sign-in/session sync.
+    }
+  }
+
+  if (signedSession) {
+    await syncCredentialFromAuth();
+  } else {
+    setStoredCredential({ role: "viewer", user_id: null, pending_role: false }, { source: "auth" });
+  }
+
+  return {
+    requires_email_verification: !signedSession,
+    user_id: user_id || null,
+    likely_new_registration,
+  };
 }
 
 export async function signInWithGoogleOAuth(input?: {
