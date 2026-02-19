@@ -220,7 +220,7 @@ export default function Role2ProposalPage() {
               />
             </label>
 
-            <fieldset className="auth-field auth-fieldset">
+            <fieldset className="auth-fieldset">
               <legend>Indicator (Read-only reference)</legend>
               <p className="auth-hint">
                 Pilih indikator untuk usulan mapping. Daftar indikator ini tidak bisa diubah oleh Role 2.
@@ -307,4 +307,3 @@ export default function Role2ProposalPage() {
     </Role2Layout>
   );
 }
-

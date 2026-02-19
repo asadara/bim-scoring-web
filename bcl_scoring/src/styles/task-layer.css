@@ -345,9 +345,11 @@ a {
 }
 
 .auth-fieldset {
+  display: grid;
+  gap: 8px;
   border: 1px solid var(--task-line);
   border-radius: 8px;
-  padding: 10px;
+  padding: 12px;
 }
 
 .auth-fieldset legend {
@@ -363,23 +365,46 @@ a {
 
 .auth-checkbox-grid {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   max-height: 160px;
   overflow-y: auto;
   border: 1px solid #d8e3de;
   border-radius: 8px;
-  padding: 8px;
+  padding: 10px;
   background: #fbfdfc;
+  margin-top: 8px;
 }
 
 .auth-checkbox-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  justify-items: start;
+  column-gap: 10px;
   font-size: 13px;
+  width: 100%;
+  min-width: 0;
 }
 
-.auth-field input,
+.auth-checkbox-item input {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.auth-checkbox-label {
+  display: block;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-field input:not([type="checkbox"]):not([type="radio"]),
 .auth-field select,
 .auth-field textarea {
   width: 100%;

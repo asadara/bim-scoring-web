@@ -26,6 +26,21 @@ type ProjectOption = {
   is_active?: boolean | null;
 };
 
+function toSingleLine(text: string | null | undefined): string {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function projectLabel(project: ProjectOption): string {
+  const code = toSingleLine(project.code);
+  const name = toSingleLine(project.name);
+  if (code && name && !name.toLowerCase().startsWith(code.toLowerCase())) {
+    return `${code} - ${name}`;
+  }
+  return name || code || project.id;
+}
+
 export default function SignUpPage() {
   const router = useRouter();
   const credential = useCredential();
@@ -193,7 +208,7 @@ export default function SignUpPage() {
                     ))}
                   </select>
                 </label>
-                <fieldset className="auth-field auth-fieldset">
+                <fieldset className="auth-fieldset">
                   <legend>Default Scope Project (Pengajuan)</legend>
                   <p className="auth-hint">
                     {requiresScope
@@ -212,7 +227,9 @@ export default function SignUpPage() {
                             checked={selectedProjectIds.includes(project.id)}
                             onChange={() => toggleProjectScope(project.id)}
                           />
-                          <span>{project.name || project.code || project.id}</span>
+                          <span className="auth-checkbox-label" title={projectLabel(project)}>
+                            {projectLabel(project)}
+                          </span>
                         </label>
                       ))}
                     </div>
