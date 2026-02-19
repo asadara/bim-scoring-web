@@ -3,8 +3,20 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useState } from "react";
 
-import { isAuthConfigured, signInWithGoogleOAuth, signUpWithEmployeePassword } from "@/lib/authClient";
+import {
+  isAuthConfigured,
+  signInWithGoogleOAuth,
+  signUpWithEmployeePassword,
+} from "@/lib/authClient";
+import type { RequestedRole } from "@/lib/authClient";
 import { useCredential } from "@/lib/useCredential";
+
+const REQUEST_ROLE_OPTIONS: Array<{ value: RequestedRole; label: string }> = [
+  { value: "role1", label: "BIM Coord Pro" },
+  { value: "role2", label: "HO" },
+  { value: "role3", label: "BIM Manager" },
+  { value: "viewer", label: "Auditor" },
+];
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -13,6 +25,7 @@ export default function SignUpPage() {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [requestedRole, setRequestedRole] = useState<RequestedRole>("role1");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -35,6 +48,7 @@ export default function SignUpPage() {
         name,
         employee_number: employeeNumber,
         password,
+        requested_role: requestedRole,
       });
       setInfo("Akun berhasil dibuat. Menunggu assignment role dari admin.");
       await router.push("/auth/sign-in");
@@ -50,7 +64,7 @@ export default function SignUpPage() {
     setError(null);
     setInfo(null);
     try {
-      await signInWithGoogleOAuth();
+      await signInWithGoogleOAuth({ requested_role: requestedRole });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google OAuth gagal");
       setBusy(false);
@@ -94,7 +108,7 @@ export default function SignUpPage() {
           ) : (
             <div className="auth-stack">
               <form className="auth-stack" onSubmit={onSignUp}>
-                <label>
+                <label className="auth-field">
                   Nama Lengkap
                   <input
                     value={name}
@@ -103,7 +117,7 @@ export default function SignUpPage() {
                     required
                   />
                 </label>
-                <label>
+                <label className="auth-field">
                   Nomor Pegawai
                   <input
                     value={employeeNumber}
@@ -112,7 +126,17 @@ export default function SignUpPage() {
                     required
                   />
                 </label>
-                <label>
+                <label className="auth-field">
+                  Pengajuan Role
+                  <select value={requestedRole} onChange={(event) => setRequestedRole(event.target.value as RequestedRole)}>
+                    {REQUEST_ROLE_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="auth-field">
                   Password
                   <input
                     type="password"
@@ -121,7 +145,7 @@ export default function SignUpPage() {
                     required
                   />
                 </label>
-                <label>
+                <label className="auth-field">
                   Konfirmasi Password
                   <input
                     type="password"

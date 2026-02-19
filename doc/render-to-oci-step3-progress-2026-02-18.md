@@ -120,3 +120,16 @@ Result:
 ## 6) Step 4 Readiness
 
 Rollback procedure di runbook siap dipakai; baseline host lama sudah tervalidasi ulang (`smoke:render` pass).
+
+## 7) Post-Rotation Validation Checkpoint (2026-02-18)
+
+- Auth hardening and credential rotation: `COMPLETE`.
+  - Google OAuth client lama dihapus, client baru aktif.
+  - Supabase secret key lama sudah revoke, key baru sudah aktif.
+  - Login flow `employee_number + password` dan `Google OAuth` tervalidasi berhasil di web service aktif.
+- Web service produksi aktif: `https://bimscoringnke.onrender.com`.
+- API produksi health/readiness: `PASS` (`/health=200`, `/ready=200`).
+- Guard policy evidence legacy admin read-only: `PASS` (`403 FORBIDDEN_ROLE`).
+- Catatan konfigurasi lanjutan:
+  - Root API redirect (`GET /` dengan `Accept: text/html`) masih mengarah ke domain lama `https://bim-scoring-web.onrender.com`.
+  - Action required: update env `WEB_APP_URL` di Render API ke domain web aktif `https://bimscoringnke.onrender.com`.

@@ -106,7 +106,7 @@ export default function SignInPage() {
               </p>
               {missingEmployeeNumber ? (
                 <form className="auth-stack" onSubmit={onSaveEmployeeNumber}>
-                  <label>
+                  <label className="auth-field">
                     Lengkapi Nomor Pegawai
                     <input
                       value={profileEmployeeNumber}
@@ -131,7 +131,7 @@ export default function SignInPage() {
           ) : (
             <div className="auth-stack">
               <form className="auth-stack" onSubmit={onCredentialSignIn}>
-                <label>
+                <label className="auth-field">
                   Nomor Pegawai
                   <input
                     value={employeeNumber}
@@ -140,7 +140,7 @@ export default function SignInPage() {
                     required
                   />
                 </label>
-                <label>
+                <label className="auth-field">
                   Password
                   <input
                     type="password"
@@ -158,7 +158,7 @@ export default function SignInPage() {
               <div className="auth-divider">atau</div>
 
               <button type="button" className="primary-cta" onClick={() => void onGoogleSignIn()} disabled={busy || !isConfigured}>
-                Lanjut dengan Google
+                Sign In dengan Akun Google (Gmail)
               </button>
 
               <p className="auth-helper">

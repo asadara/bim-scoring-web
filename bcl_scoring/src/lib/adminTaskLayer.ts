@@ -43,6 +43,8 @@ export type AdminUser = {
   email: string | null;
   name: string | null;
   employee_number: string | null;
+  requested_role?: string | null;
+  requested_role_submitted_at?: string | null;
   is_active: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;

@@ -9,8 +9,10 @@ const DEFAULT_PASSWORD_EMAIL_DOMAIN = (
   process.env.NEXT_PUBLIC_AUTH_PASSWORD_EMAIL_DOMAIN || "pegawai.local"
 ).trim().toLowerCase();
 const OAUTH_REDIRECT_URL = (process.env.NEXT_PUBLIC_SUPABASE_AUTH_REDIRECT_URL || "").trim();
+const PENDING_REQUESTED_ROLE_STORAGE_KEY = "bim_pending_requested_role_v1";
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
+export type RequestedRole = "role1" | "role2" | "role3" | "viewer";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
@@ -24,6 +26,16 @@ function normalizeRole(raw: unknown): AppRole {
   if (value === "role2") return "role2";
   if (value === "role3") return "role3";
   return "viewer";
+}
+
+function normalizeRequestedRole(raw: unknown): RequestedRole | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().toLowerCase();
+  if (value === "role1") return "role1";
+  if (value === "role2") return "role2";
+  if (value === "role3") return "role3";
+  if (value === "viewer" || value === "auditor") return "viewer";
+  return null;
 }
 
 function normalizeText(value: unknown): string | null {
@@ -66,6 +78,11 @@ function readProvider(user: User): string | null {
   return null;
 }
 
+function readRequestedRole(user: User): RequestedRole | null {
+  if (!isObject(user.user_metadata)) return null;
+  return normalizeRequestedRole(user.user_metadata.requested_role);
+}
+
 function getWindowLocationOrigin(): string {
   if (typeof window === "undefined") return "";
   return window.location.origin;
@@ -77,12 +94,27 @@ function getAuthRedirectUrl(): string {
   return origin ? `${origin}/auth/sign-in` : "";
 }
 
+function setPendingRequestedRole(role: RequestedRole | null): void {
+  if (typeof window === "undefined") return;
+  if (!role) {
+    window.localStorage.removeItem(PENDING_REQUESTED_ROLE_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(PENDING_REQUESTED_ROLE_STORAGE_KEY, role);
+}
+
+function getPendingRequestedRole(): RequestedRole | null {
+  if (typeof window === "undefined") return null;
+  return normalizeRequestedRole(window.localStorage.getItem(PENDING_REQUESTED_ROLE_STORAGE_KEY));
+}
+
 async function callAccountRequest(payload: {
   user_id: string;
   email: string | null;
   name: string | null;
   employee_number: string | null;
   provider: string | null;
+  requested_role: RequestedRole | null;
 }): Promise<void> {
   const result = await safeFetchJson<unknown>(buildApiUrl("/auth/account-request"), {
     method: "POST",
@@ -148,6 +180,7 @@ export async function syncCredentialFromAuth(): Promise<void> {
   const provider = readProvider(user);
   const full_name = readUserName(user);
   const employee_number = readEmployeeNumber(user);
+  const requested_role = readRequestedRole(user) || getPendingRequestedRole();
   const roleResult = await resolveRole(user.id);
 
   setStoredCredential(
@@ -169,7 +202,11 @@ export async function syncCredentialFromAuth(): Promise<void> {
       name: full_name,
       employee_number,
       provider,
+      requested_role,
     });
+    if (requested_role) {
+      setPendingRequestedRole(null);
+    }
   } catch {
     // Best effort only. Auth session stays valid even if account request API is unavailable.
   }
@@ -208,10 +245,13 @@ export async function signUpWithEmployeePassword(input: {
   name: string;
   employee_number: string;
   password: string;
+  requested_role: RequestedRole;
 }): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   const normalizedEmployeeNumber = normalizeEmployeeNumber(input.employee_number);
   const email = toPasswordEmail(normalizedEmployeeNumber);
+  const requestedRole = normalizeRequestedRole(input.requested_role) || "viewer";
+  setPendingRequestedRole(requestedRole);
   const { error } = await supabase.auth.signUp({
     email,
     password: input.password,
@@ -219,6 +259,7 @@ export async function signUpWithEmployeePassword(input: {
       data: {
         full_name: input.name.trim(),
         employee_number: normalizedEmployeeNumber,
+        requested_role: requestedRole,
       },
     },
   });
@@ -226,9 +267,13 @@ export async function signUpWithEmployeePassword(input: {
   await syncCredentialFromAuth();
 }
 
-export async function signInWithGoogleOAuth(): Promise<void> {
+export async function signInWithGoogleOAuth(input?: { requested_role?: RequestedRole | null }): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   const redirectTo = getAuthRedirectUrl();
+  const requestedRole = normalizeRequestedRole(input?.requested_role);
+  if (requestedRole) {
+    setPendingRequestedRole(requestedRole);
+  }
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

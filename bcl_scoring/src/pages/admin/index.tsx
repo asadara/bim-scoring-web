@@ -35,6 +35,7 @@ const ROLE_OPTIONS: Array<{ value: AppRole; label: string }> = [
   { value: "role3", label: "BIM Manager" },
   { value: "viewer", label: "Viewer / Auditor" },
 ];
+type RequestedRole = "role1" | "role2" | "role3" | "viewer";
 
 type WeekAnchor = "SUNDAY" | "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY";
 
@@ -66,6 +67,16 @@ function formatDateTime(value?: string | null): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "N/A";
   return parsed.toLocaleString();
+}
+
+function normalizeRequestedRole(raw: unknown): RequestedRole | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().toLowerCase();
+  if (value === "role1") return "role1";
+  if (value === "role2") return "role2";
+  if (value === "role3") return "role3";
+  if (value === "viewer" || value === "auditor") return "viewer";
+  return null;
 }
 
 function isLegacyPerspectiveCode(code: string | null | undefined): boolean {
@@ -533,46 +544,60 @@ export default function AdminControlPanelPage() {
     }, nextLock ? "Config lock diaktifkan." : "Config lock dibuka.");
   }
 
+  async function applyGlobalUserRole(userId: string, nextRole: AppRole) {
+    const globalMappings = roleMappings.filter(
+      (item) => item.user_id === userId && !toNonEmptyString(item.project_id || "")
+    );
+    const activeGlobal = globalMappings.filter((item) => item.is_active !== false);
+
+    if (nextRole === "viewer") {
+      for (const mapping of activeGlobal) {
+        await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+      }
+      return;
+    }
+
+    for (const mapping of activeGlobal) {
+      const mappingRole = String(mapping.role || "").trim().toLowerCase();
+      if (mappingRole === nextRole) continue;
+      await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+    }
+
+    const sameRoleMapping = globalMappings.find(
+      (item) => String(item.role || "").trim().toLowerCase() === nextRole
+    );
+    if (sameRoleMapping) {
+      if (sameRoleMapping.is_active === false) {
+        await updateAdminRoleMapping(session, sameRoleMapping.id, { is_active: true });
+      }
+    } else {
+      await createAdminRoleMapping(session, {
+        user_id: userId,
+        role: nextRole,
+        project_id: null,
+        is_active: true,
+      });
+    }
+  }
+
   async function handleAssignUserRole(userId: string) {
     const nextRole = userRoleDraftById[userId] || "viewer";
     await runAction(async () => {
-      const globalMappings = roleMappings.filter(
-        (item) => item.user_id === userId && !toNonEmptyString(item.project_id || "")
-      );
-      const activeGlobal = globalMappings.filter((item) => item.is_active !== false);
-
-      if (nextRole === "viewer") {
-        for (const mapping of activeGlobal) {
-          await updateAdminRoleMapping(session, mapping.id, { is_active: false });
-        }
-        await reloadBase(session);
-        return;
-      }
-
-      for (const mapping of activeGlobal) {
-        const mappingRole = String(mapping.role || "").trim().toLowerCase();
-        if (mappingRole === nextRole) continue;
-        await updateAdminRoleMapping(session, mapping.id, { is_active: false });
-      }
-
-      const sameRoleMapping = globalMappings.find(
-        (item) => String(item.role || "").trim().toLowerCase() === nextRole
-      );
-      if (sameRoleMapping) {
-        if (sameRoleMapping.is_active === false) {
-          await updateAdminRoleMapping(session, sameRoleMapping.id, { is_active: true });
-        }
-      } else {
-        await createAdminRoleMapping(session, {
-          user_id: userId,
-          role: nextRole,
-          project_id: null,
-          is_active: true,
-        });
-      }
-
+      await applyGlobalUserRole(userId, nextRole);
       await reloadBase(session);
     }, `Role user diperbarui ke ${getRoleLabel(nextRole)}.`);
+  }
+
+  async function handleApproveRequestedRole(user: AdminUser) {
+    const requestedRole = normalizeRequestedRole(user.requested_role);
+    if (!requestedRole) {
+      setError("Pengajuan role tidak valid atau belum tersedia.");
+      return;
+    }
+    await runAction(async () => {
+      await applyGlobalUserRole(user.id, requestedRole);
+      await reloadBase(session);
+    }, `Pengajuan role disetujui: ${user.name || user.email || user.id} -> ${getRoleLabel(requestedRole)}.`);
   }
 
   async function handleSetProjectActive(projectId: string, nextActive: boolean) {
@@ -664,7 +689,8 @@ export default function AdminControlPanelPage() {
       <section className="task-panel">
         <h2>User Role Management</h2>
         <p className="task-subtitle">
-          Assign role global user dari admin panel. Perubahan berlaku setelah user sign out dan sign in ulang.
+          Assign role global user dari admin panel, termasuk approve pengajuan role saat pendaftaran.
+          Perubahan berlaku setelah user sign out dan sign in ulang.
         </p>
         <div className="admin-table-wrap">
           <table className="audit-table">
@@ -673,25 +699,43 @@ export default function AdminControlPanelPage() {
                 <th>Nama</th>
                 <th>Nomor Pegawai</th>
                 <th>Email</th>
+                <th>Pengajuan Role</th>
                 <th>Role Aktif</th>
                 <th>Set Role</th>
-                <th>Aksi</th>
+                <th>Approve Pengajuan</th>
+                <th>Aksi Manual</th>
               </tr>
             </thead>
             <tbody>
               {sortedUsers.length === 0 && (
                 <tr>
-                  <td colSpan={6}>Belum ada user terdaftar.</td>
+                  <td colSpan={8}>Belum ada user terdaftar.</td>
                 </tr>
               )}
               {sortedUsers.map((item) => {
                 const currentRole = userCurrentRoleById.get(item.id) || "viewer";
                 const draftRole = userRoleDraftById[item.id] || currentRole;
+                const requestedRole = normalizeRequestedRole(item.requested_role);
+                const isRequestAlreadyApplied = Boolean(requestedRole && requestedRole === currentRole);
+                const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
                 return (
                   <tr key={item.id}>
                     <td>{item.name || "N/A"}</td>
                     <td>{item.employee_number || "N/A"}</td>
                     <td>{item.email || "N/A"}</td>
+                    <td>
+                      {requestedRole ? (
+                        <>
+                          <strong>{getRoleLabel(requestedRole)}</strong>
+                          <br />
+                          <small>
+                            Diajukan: {requestSubmittedAt} | Status: {isRequestAlreadyApplied ? "Approved" : "Pending"}
+                          </small>
+                        </>
+                      ) : (
+                        "N/A"
+                      )}
+                    </td>
                     <td>{getRoleLabel(currentRole)}</td>
                     <td>
                       <select
@@ -709,6 +753,15 @@ export default function AdminControlPanelPage() {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        disabled={working || !requestedRole || isRequestAlreadyApplied}
+                        onClick={() => void handleApproveRequestedRole(item)}
+                      >
+                        {isRequestAlreadyApplied ? "Sudah Approved" : "Approve Sesuai Pengajuan"}
+                      </button>
                     </td>
                     <td>
                       <button

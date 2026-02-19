@@ -29,6 +29,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Keputusan terbaru: finalisasi custom domain di-skip sementara; fokus Stage 8 dialihkan ke backup plan migrasi hosting.
 - Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
 - Checkpoint 2026-02-18: policy Admin untuk mutasi evidence di endpoint legacy dikunci `read-only` (semua role termasuk Admin menerima `403 FORBIDDEN_ROLE`), regression API lulus (`tests=99, pass=98, fail=0, skipped=1`).
+- Checkpoint 2026-02-18 (post-rotation): login `employee_number + password` dan Google OAuth tervalidasi di web service aktif `https://bimscoringnke.onrender.com`; terdapat gap redirect root API (`/`) yang masih menunjuk domain web lama dan perlu update `WEB_APP_URL`.
 
 ## Phase Timeline
 
