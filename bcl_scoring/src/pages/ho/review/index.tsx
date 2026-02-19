@@ -17,6 +17,7 @@ import {
   listPrototypeProjectRecords,
 } from "@/lib/role2TaskLayer";
 import { getPrototypePeriodMetaFromStore, listPrototypePeriodIdsByProjectFromStore } from "@/lib/prototypeStore";
+import { useCredential } from "@/lib/useCredential";
 
 type ProjectReviewRow = {
   project: ProjectRecord;
@@ -48,6 +49,7 @@ function resolveRecommendedAction(params: {
 }
 
 export default function HoReviewHomePage() {
+  const credential = useCredential();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ProjectReviewRow[]>([]);
@@ -64,6 +66,10 @@ export default function HoReviewHomePage() {
         let projects = projectsResult.data;
         if (projects.length === 0) {
           projects = listPrototypeProjectRecords();
+        }
+        if (credential.role === "role2" && Array.isArray(credential.scoped_project_ids) && credential.scoped_project_ids.length > 0) {
+          const allowed = new Set(credential.scoped_project_ids);
+          projects = projects.filter((project) => allowed.has(project.id));
         }
 
         const periodResults = await Promise.all(
@@ -138,7 +144,7 @@ export default function HoReviewHomePage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [credential.role, credential.scoped_project_ids]);
 
   const totalSubmitted = useMemo(
     () => rows.reduce((sum, row) => sum + row.submitted_count, 0),
@@ -249,6 +255,11 @@ export default function HoReviewHomePage() {
             <strong>{lockedProjects}</strong>
           </article>
         )}
+        <Link className="summary-card summary-card-action" href="/ho/review/proposals">
+          <span>BIM Use & Indicator</span>
+          <strong>Proposal Queue</strong>
+          <small>Ajukan perubahan ke Admin (proposal-only)</small>
+        </Link>
       </section>
 
       <section className="task-panel">

@@ -35,6 +35,7 @@ import {
   classifyBackendIssue,
 } from "@/lib/backendWriteClient";
 import { UNKNOWN_ACTIVE_PERIOD_KEY } from "@/lib/statusModel";
+import { getStoredCredential } from "@/lib/userCredential";
 
 function fallbackProject(projectId: string): ProjectRecord {
   const meta = getPrototypeProjectMetaFromStore(projectId);
@@ -92,6 +93,14 @@ export async function fetchRole2ProjectContext(
   data_mode: DataMode;
   backend_message: string | null;
 }> {
+  const credential = getStoredCredential();
+  if (credential.role === "role2" && Array.isArray(credential.scoped_project_ids) && credential.scoped_project_ids.length > 0) {
+    const allowed = new Set(credential.scoped_project_ids);
+    if (!allowed.has(projectId)) {
+      throw new Error("Project berada di luar scope role2 yang ditetapkan admin.");
+    }
+  }
+
   const [projectResult, periodsResult] = await Promise.all([
     fetchProjectReadMode(projectId),
     fetchProjectPeriodsReadMode(projectId),

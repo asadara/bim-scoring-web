@@ -1,7 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
   isAuthConfigured,
@@ -9,6 +9,7 @@ import {
   signUpWithEmployeePassword,
 } from "@/lib/authClient";
 import type { RequestedRole } from "@/lib/authClient";
+import { buildApiUrl, safeFetchJson } from "@/lib/http";
 import { useCredential } from "@/lib/useCredential";
 
 const REQUEST_ROLE_OPTIONS: Array<{ value: RequestedRole; label: string }> = [
@@ -18,6 +19,13 @@ const REQUEST_ROLE_OPTIONS: Array<{ value: RequestedRole; label: string }> = [
   { value: "viewer", label: "Auditor" },
 ];
 
+type ProjectOption = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  is_active?: boolean | null;
+};
+
 export default function SignUpPage() {
   const router = useRouter();
   const credential = useCredential();
@@ -26,17 +34,58 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [requestedRole, setRequestedRole] = useState<RequestedRole>("role1");
+  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [projectLoadError, setProjectLoadError] = useState<string | null>(null);
 
   const isConfigured = isAuthConfigured();
   const isSignedIn = Boolean(credential.user_id);
+  const requiresScope = requestedRole === "role2";
+
+  const activeProjectOptions = useMemo(() => {
+    return projectOptions
+      .filter((item) => item.is_active !== false)
+      .sort((a, b) => String(a.name || a.code || a.id).localeCompare(String(b.name || b.code || b.id)));
+  }, [projectOptions]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const result = await safeFetchJson<unknown>(buildApiUrl("/projects"));
+      if (!mounted) return;
+      if (!result.ok) {
+        setProjectOptions([]);
+        setProjectLoadError(result.error || "Gagal memuat daftar project");
+        return;
+      }
+      const root = result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};
+      const rows = Array.isArray(root.data) ? (root.data as ProjectOption[]) : [];
+      setProjectOptions(rows);
+      setProjectLoadError(null);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function toggleProjectScope(projectId: string) {
+    setSelectedProjectIds((prev) => {
+      if (prev.includes(projectId)) return prev.filter((item) => item !== projectId);
+      return [...prev, projectId];
+    });
+  }
 
   async function onSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (password !== confirmPassword) {
       setError("Password dan konfirmasi password harus sama.");
+      return;
+    }
+    if (requiresScope && selectedProjectIds.length === 0) {
+      setError("Untuk pengajuan role HO, pilih minimal 1 project scope.");
       return;
     }
 
@@ -49,6 +98,7 @@ export default function SignUpPage() {
         employee_number: employeeNumber,
         password,
         requested_role: requestedRole,
+        requested_project_ids: selectedProjectIds,
       });
       setInfo("Akun berhasil dibuat. Menunggu assignment role dari admin.");
       await router.push("/auth/sign-in");
@@ -60,11 +110,18 @@ export default function SignUpPage() {
   }
 
   async function onGoogleSignUp() {
+    if (requiresScope && selectedProjectIds.length === 0) {
+      setError("Untuk pengajuan role HO, pilih minimal 1 project scope.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setInfo(null);
     try {
-      await signInWithGoogleOAuth({ requested_role: requestedRole });
+      await signInWithGoogleOAuth({
+        requested_role: requestedRole,
+        requested_project_ids: selectedProjectIds,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google OAuth gagal");
       setBusy(false);
@@ -136,6 +193,31 @@ export default function SignUpPage() {
                     ))}
                   </select>
                 </label>
+                <fieldset className="auth-field auth-fieldset">
+                  <legend>Default Scope Project (Pengajuan)</legend>
+                  <p className="auth-hint">
+                    {requiresScope
+                      ? "Role HO wajib memilih minimal 1 project. Scope akhir tetap diputuskan Admin."
+                      : "Opsional. Bisa dipakai sebagai preferensi saat admin assign role."}
+                  </p>
+                  {projectLoadError ? <p className="error-box">{projectLoadError}</p> : null}
+                  {activeProjectOptions.length === 0 ? (
+                    <p className="auth-hint">Belum ada project aktif.</p>
+                  ) : (
+                    <div className="auth-checkbox-grid">
+                      {activeProjectOptions.map((project) => (
+                        <label key={project.id} className="auth-checkbox-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedProjectIds.includes(project.id)}
+                            onChange={() => toggleProjectScope(project.id)}
+                          />
+                          <span>{project.name || project.code || project.id}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
                 <label className="auth-field">
                   Password
                   <input

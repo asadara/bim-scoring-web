@@ -7,6 +7,7 @@ export type UserCredential = {
   employee_number?: string | null;
   auth_provider?: string | null;
   pending_role?: boolean;
+  scoped_project_ids?: string[];
   updated_at: string;
 };
 
@@ -78,10 +79,13 @@ function parseCredential(raw: string | null): UserCredential | null {
       ? parsed.auth_provider.trim().toLowerCase()
       : null;
     const pending_role = parsed.pending_role === true;
+    const scoped_project_ids = Array.isArray(parsed.scoped_project_ids)
+      ? [...new Set(parsed.scoped_project_ids.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))]
+      : [];
     const updated_at = typeof parsed.updated_at === "string" && parsed.updated_at.trim()
       ? parsed.updated_at.trim()
       : new Date().toISOString();
-    return { role, user_id, full_name, employee_number, auth_provider, pending_role, updated_at };
+    return { role, user_id, full_name, employee_number, auth_provider, pending_role, scoped_project_ids, updated_at };
   } catch {
     return null;
   }
@@ -109,6 +113,7 @@ export function getStoredCredential(): UserCredential {
       employee_number: null,
       auth_provider: null,
       pending_role: false,
+      scoped_project_ids: [],
       updated_at: new Date().toISOString(),
     };
   }
@@ -125,6 +130,7 @@ export function getStoredCredential(): UserCredential {
       employee_number: null,
       auth_provider: "manual",
       pending_role: false,
+      scoped_project_ids: [],
       updated_at: new Date().toISOString(),
     };
     window.localStorage.setItem(USER_CREDENTIAL_STORAGE_KEY, JSON.stringify(fallback));
@@ -152,6 +158,7 @@ export function setStoredCredential(
     employee_number?: string | null;
     auth_provider?: string | null;
     pending_role?: boolean;
+    scoped_project_ids?: string[] | null;
   },
   options?: { source?: "manual" | "auth" }
 ): UserCredential {
@@ -173,6 +180,9 @@ export function setStoredCredential(
         ? input.auth_provider.trim().toLowerCase()
         : null,
     pending_role: input.pending_role === true,
+    scoped_project_ids: Array.isArray(input.scoped_project_ids)
+      ? [...new Set(input.scoped_project_ids.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))]
+      : [],
     updated_at: new Date().toISOString(),
   };
   if (typeof window !== "undefined") {

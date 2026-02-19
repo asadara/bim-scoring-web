@@ -9,15 +9,18 @@ import {
   AdminScoringPeriod,
   AdminSession,
   AdminUser,
+  Role2BimUseProposal,
   createAdminRoleMapping,
   createAdminIndicator,
   createAdminProject,
+  decideRole2BimUseProposal,
   deleteAdminIndicator,
   getAdminConfigLock,
   listAdminIndicators,
   listAdminProjectPeriods,
   listAdminPerspectives,
   listAdminProjects,
+  listRole2BimUseProposals,
   listAdminRoleMappings,
   listAdminUsers,
   setAdminConfigLock,
@@ -77,6 +80,30 @@ function normalizeRequestedRole(raw: unknown): RequestedRole | null {
   if (value === "role3") return "role3";
   if (value === "viewer" || value === "auditor") return "viewer";
   return null;
+}
+
+function normalizeRequestedProjectIds(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return [...new Set(raw.map((item) => toNonEmptyString(String(item || ""))).filter(Boolean) as string[])];
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return [
+          ...new Set(
+            parsed.map((item) => toNonEmptyString(String(item || ""))).filter(Boolean) as string[]
+          ),
+        ];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 function isLegacyPerspectiveCode(code: string | null | undefined): boolean {
@@ -177,6 +204,7 @@ export default function AdminControlPanelPage() {
   const [indicators, setIndicators] = useState<AdminIndicator[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roleMappings, setRoleMappings] = useState<AdminRoleMapping[]>([]);
+  const [role2Proposals, setRole2Proposals] = useState<Role2BimUseProposal[]>([]);
   const [userRoleDraftById, setUserRoleDraftById] = useState<Record<string, AppRole>>({});
   const [periods, setPeriods] = useState<AdminScoringPeriod[]>([]);
   const [configLock, setConfigLock] = useState<AdminConfigLock | null>(null);
@@ -236,6 +264,12 @@ export default function AdminControlPanelPage() {
       perspectives.map((item) => [item.id, item.title || item.code || "Perspective tanpa judul"])
     );
   }, [perspectives]);
+
+  const projectNameById = useMemo(() => {
+    return new Map(
+      projects.map((item) => [item.id, item.name || item.code || item.id])
+    );
+  }, [projects]);
 
   const userCurrentRoleById = useMemo(() => {
     const out = new Map<string, AppRole>();
@@ -324,8 +358,12 @@ export default function AdminControlPanelPage() {
 
   async function reloadAll(currentSession: AdminSession): Promise<void> {
     const nextProjectId = await reloadBase(currentSession);
-    await reloadIndicatorsForPerspective(currentSession, indicatorPerspectiveFilter);
-    await reloadPeriodsForProject(currentSession, nextProjectId || periodProjectFilter);
+    const [proposalRows] = await Promise.all([
+      listRole2BimUseProposals(currentSession).catch(() => []),
+      reloadIndicatorsForPerspective(currentSession, indicatorPerspectiveFilter),
+      reloadPeriodsForProject(currentSession, nextProjectId || periodProjectFilter),
+    ]);
+    setRole2Proposals(proposalRows);
   }
 
   useEffect(() => {
@@ -348,7 +386,7 @@ export default function AdminControlPanelPage() {
       setLoading(true);
       setError(null);
       try {
-        await reloadBase(session);
+        await reloadAll(session);
         if (!mounted) return;
       } catch (e) {
         if (!mounted) return;
@@ -580,6 +618,43 @@ export default function AdminControlPanelPage() {
     }
   }
 
+  async function applyRole2ScopedUserRole(userId: string, requestedProjectIds: string[]) {
+    const scopedProjectIds = [...new Set(requestedProjectIds.map((item) => item.trim()).filter(Boolean))];
+    if (scopedProjectIds.length === 0) {
+      await applyGlobalUserRole(userId, "role2");
+      return;
+    }
+
+    const allRole2Mappings = roleMappings.filter(
+      (item) =>
+        item.user_id === userId &&
+        String(item.role || "").trim().toLowerCase() === "role2"
+    );
+    const activeRole2Mappings = allRole2Mappings.filter((item) => item.is_active !== false);
+
+    for (const mapping of activeRole2Mappings) {
+      const mappingProjectId = toNonEmptyString(mapping.project_id || "");
+      if (mappingProjectId && scopedProjectIds.includes(mappingProjectId)) continue;
+      await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+    }
+
+    for (const projectId of scopedProjectIds) {
+      const sameProject = allRole2Mappings.find((item) => toNonEmptyString(item.project_id || "") === projectId);
+      if (sameProject) {
+        if (sameProject.is_active === false) {
+          await updateAdminRoleMapping(session, sameProject.id, { is_active: true });
+        }
+      } else {
+        await createAdminRoleMapping(session, {
+          user_id: userId,
+          role: "role2",
+          project_id: projectId,
+          is_active: true,
+        });
+      }
+    }
+  }
+
   async function handleAssignUserRole(userId: string) {
     const nextRole = userRoleDraftById[userId] || "viewer";
     await runAction(async () => {
@@ -594,9 +669,14 @@ export default function AdminControlPanelPage() {
       setError("Pengajuan role tidak valid atau belum tersedia.");
       return;
     }
+    const requestedProjectIds = normalizeRequestedProjectIds(user.requested_project_ids);
     await runAction(async () => {
-      await applyGlobalUserRole(user.id, requestedRole);
-      await reloadBase(session);
+      if (requestedRole === "role2") {
+        await applyRole2ScopedUserRole(user.id, requestedProjectIds);
+      } else {
+        await applyGlobalUserRole(user.id, requestedRole);
+      }
+      await reloadAll(session);
     }, `Pengajuan role disetujui: ${user.name || user.email || user.id} -> ${getRoleLabel(requestedRole)}.`);
   }
 
@@ -615,6 +695,19 @@ export default function AdminControlPanelPage() {
       await deleteAdminIndicator(session, id);
       await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
     }, "Indicator berhasil dihapus.");
+  }
+
+  async function handleDecideRole2Proposal(proposalId: string, status: "APPROVED" | "REJECTED") {
+    await runAction(async () => {
+      await decideRole2BimUseProposal(session, proposalId, {
+        status,
+        decision_note: status === "APPROVED"
+          ? "Approved by Admin (proposal-only)."
+          : "Rejected by Admin.",
+      });
+      const rows = await listRole2BimUseProposals(session);
+      setRole2Proposals(rows);
+    }, status === "APPROVED" ? "Proposal Role 2 disetujui." : "Proposal Role 2 ditolak.");
   }
 
   function handleChangeIndicatorPerspective(nextPerspectiveId: string) {
@@ -700,6 +793,7 @@ export default function AdminControlPanelPage() {
                 <th>Nomor Pegawai</th>
                 <th>Email</th>
                 <th>Pengajuan Role</th>
+                <th>Pengajuan Scope Project</th>
                 <th>Role Aktif</th>
                 <th>Set Role</th>
                 <th>Approve Pengajuan</th>
@@ -709,14 +803,35 @@ export default function AdminControlPanelPage() {
             <tbody>
               {sortedUsers.length === 0 && (
                 <tr>
-                  <td colSpan={8}>Belum ada user terdaftar.</td>
+                  <td colSpan={9}>Belum ada user terdaftar.</td>
                 </tr>
               )}
               {sortedUsers.map((item) => {
                 const currentRole = userCurrentRoleById.get(item.id) || "viewer";
                 const draftRole = userRoleDraftById[item.id] || currentRole;
                 const requestedRole = normalizeRequestedRole(item.requested_role);
-                const isRequestAlreadyApplied = Boolean(requestedRole && requestedRole === currentRole);
+                const requestedProjectIds = normalizeRequestedProjectIds(item.requested_project_ids);
+                const requestedScopeLabel =
+                  requestedProjectIds.length > 0
+                    ? requestedProjectIds.map((id) => projectNameById.get(id) || id).join(", ")
+                    : "N/A";
+                const activeRole2Scopes = roleMappings
+                  .filter(
+                    (mapping) =>
+                      mapping.user_id === item.id &&
+                      mapping.is_active !== false &&
+                      String(mapping.role || "").trim().toLowerCase() === "role2"
+                  )
+                  .map((mapping) => toNonEmptyString(mapping.project_id || ""))
+                  .filter(Boolean) as string[];
+                const isRequestAlreadyApplied = (() => {
+                  if (!requestedRole) return false;
+                  if (requestedRole !== "role2") return requestedRole === currentRole;
+                  if (requestedProjectIds.length === 0) {
+                    return currentRole === "role2" && activeRole2Scopes.length === 0;
+                  }
+                  return requestedProjectIds.every((projectId) => activeRole2Scopes.includes(projectId));
+                })();
                 const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
                 return (
                   <tr key={item.id}>
@@ -736,6 +851,7 @@ export default function AdminControlPanelPage() {
                         "N/A"
                       )}
                     </td>
+                    <td>{requestedScopeLabel}</td>
                     <td>{getRoleLabel(currentRole)}</td>
                     <td>
                       <select
@@ -776,6 +892,77 @@ export default function AdminControlPanelPage() {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="task-panel">
+        <h2>Role 2 BIM Use Proposal Queue</h2>
+        <p className="task-subtitle">
+          Proposal-only workflow. Role 2 mengajukan perubahan BIM Use / mapping indicator, keputusan akhir tetap di Admin.
+        </p>
+        <p className="inline-note">
+          Approve/Reject di sini tidak otomatis mengubah master perspektif/indikator. Perubahan master tetap admin-controlled.
+        </p>
+        <div className="admin-table-wrap">
+          <table className="audit-table">
+            <thead>
+              <tr>
+                <th>Requester</th>
+                <th>Project</th>
+                <th>Tipe</th>
+                <th>Proposed BIM Use</th>
+                <th>Indicator IDs</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {role2Proposals.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>Belum ada proposal Role 2.</td>
+                </tr>
+              ) : (
+                role2Proposals.map((item) => {
+                  const requester = users.find((user) => user.id === item.requester_user_id);
+                  const indicatorList = Array.isArray(item.indicator_ids) ? item.indicator_ids : [];
+                  return (
+                    <tr key={item.id}>
+                      <td>{requester?.name || requester?.email || item.requester_user_id}</td>
+                      <td>{(item.project_id && projectNameById.get(item.project_id)) || item.project_id || "N/A"}</td>
+                      <td>{item.proposal_type || "N/A"}</td>
+                      <td>{item.proposed_bim_use || "N/A"}</td>
+                      <td>{indicatorList.length ? indicatorList.join(", ") : "N/A"}</td>
+                      <td>{item.reason || "N/A"}</td>
+                      <td>
+                        <strong>{item.status || "N/A"}</strong>
+                        <br />
+                        <small>Dibuat: {formatDateTime(item.created_at)}</small>
+                      </td>
+                      <td>
+                        <div className="item-actions">
+                          <button
+                            type="button"
+                            disabled={working || item.status !== "PENDING"}
+                            onClick={() => void handleDecideRole2Proposal(item.id, "APPROVED")}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={working || item.status !== "PENDING"}
+                            onClick={() => void handleDecideRole2Proposal(item.id, "REJECTED")}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

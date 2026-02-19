@@ -20,6 +20,7 @@ const DEFAULT_CREDENTIAL: UserCredential = {
   employee_number: null,
   auth_provider: null,
   pending_role: false,
+  scoped_project_ids: [],
   updated_at: "",
 };
 

@@ -10,6 +10,7 @@ const DEFAULT_PASSWORD_EMAIL_DOMAIN = (
 ).trim().toLowerCase();
 const OAUTH_REDIRECT_URL = (process.env.NEXT_PUBLIC_SUPABASE_AUTH_REDIRECT_URL || "").trim();
 const PENDING_REQUESTED_ROLE_STORAGE_KEY = "bim_pending_requested_role_v1";
+const PENDING_REQUESTED_PROJECTS_STORAGE_KEY = "bim_pending_requested_project_ids_v1";
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
 export type RequestedRole = "role1" | "role2" | "role3" | "viewer";
@@ -48,6 +49,11 @@ function normalizeEmployeeNumber(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }
 
+function normalizeRequestedProjectIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => normalizeText(item)).filter(Boolean) as string[])];
+}
+
 function toPasswordEmail(employeeNumber: string): string {
   const normalized = normalizeEmployeeNumber(employeeNumber).replace(/[^A-Z0-9._-]/g, "");
   return `${normalized}@${DEFAULT_PASSWORD_EMAIL_DOMAIN}`;
@@ -83,6 +89,11 @@ function readRequestedRole(user: User): RequestedRole | null {
   return normalizeRequestedRole(user.user_metadata.requested_role);
 }
 
+function readRequestedProjectIds(user: User): string[] {
+  if (!isObject(user.user_metadata)) return [];
+  return normalizeRequestedProjectIds(user.user_metadata.requested_project_ids);
+}
+
 function getWindowLocationOrigin(): string {
   if (typeof window === "undefined") return "";
   return window.location.origin;
@@ -108,6 +119,27 @@ function getPendingRequestedRole(): RequestedRole | null {
   return normalizeRequestedRole(window.localStorage.getItem(PENDING_REQUESTED_ROLE_STORAGE_KEY));
 }
 
+function setPendingRequestedProjectIds(projectIds: string[]): void {
+  if (typeof window === "undefined") return;
+  const normalized = normalizeRequestedProjectIds(projectIds);
+  if (normalized.length === 0) {
+    window.localStorage.removeItem(PENDING_REQUESTED_PROJECTS_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(PENDING_REQUESTED_PROJECTS_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+function getPendingRequestedProjectIds(): string[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(PENDING_REQUESTED_PROJECTS_STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    return normalizeRequestedProjectIds(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
+}
+
 async function callAccountRequest(payload: {
   user_id: string;
   email: string | null;
@@ -115,6 +147,7 @@ async function callAccountRequest(payload: {
   employee_number: string | null;
   provider: string | null;
   requested_role: RequestedRole | null;
+  requested_project_ids?: string[];
 }): Promise<void> {
   const result = await safeFetchJson<unknown>(buildApiUrl("/auth/account-request"), {
     method: "POST",
@@ -126,15 +159,24 @@ async function callAccountRequest(payload: {
   }
 }
 
-async function resolveRole(user_id: string): Promise<{ role: AppRole; assigned: boolean }> {
+async function resolveRole(user_id: string): Promise<{ role: AppRole; assigned: boolean; scoped_project_ids: string[] }> {
   const result = await safeFetchJson<unknown>(buildApiUrl(`/auth/resolve-role/${encodeURIComponent(user_id)}`));
-  if (!result.ok) return { role: "viewer", assigned: false };
+  if (!result.ok) return { role: "viewer", assigned: false, scoped_project_ids: [] };
 
   const root = isObject(result.data) ? result.data : {};
   const data = isObject(root.data) ? root.data : {};
   const role = normalizeRole(data.role);
   const assigned = data.assigned === true;
-  return { role, assigned };
+  const scoped_project_ids = Array.isArray(data.mappings)
+    ? [
+        ...new Set(
+          data.mappings
+            .map((row) => (isObject(row) ? normalizeText(row.project_id) : null))
+            .filter(Boolean) as string[]
+        ),
+      ]
+    : [];
+  return { role, assigned, scoped_project_ids };
 }
 
 export function isAuthConfigured(): boolean {
@@ -181,6 +223,11 @@ export async function syncCredentialFromAuth(): Promise<void> {
   const full_name = readUserName(user);
   const employee_number = readEmployeeNumber(user);
   const requested_role = readRequestedRole(user) || getPendingRequestedRole();
+  const requested_project_ids = (() => {
+    const fromMetadata = readRequestedProjectIds(user);
+    if (fromMetadata.length > 0) return fromMetadata;
+    return getPendingRequestedProjectIds();
+  })();
   const roleResult = await resolveRole(user.id);
 
   setStoredCredential(
@@ -191,6 +238,7 @@ export async function syncCredentialFromAuth(): Promise<void> {
       employee_number,
       auth_provider: provider,
       pending_role: !roleResult.assigned,
+      scoped_project_ids: roleResult.scoped_project_ids,
     },
     { source: "auth" }
   );
@@ -203,9 +251,13 @@ export async function syncCredentialFromAuth(): Promise<void> {
       employee_number,
       provider,
       requested_role,
+      requested_project_ids: requested_project_ids.length > 0 ? requested_project_ids : undefined,
     });
     if (requested_role) {
       setPendingRequestedRole(null);
+    }
+    if (requested_project_ids.length > 0) {
+      setPendingRequestedProjectIds([]);
     }
   } catch {
     // Best effort only. Auth session stays valid even if account request API is unavailable.
@@ -246,12 +298,15 @@ export async function signUpWithEmployeePassword(input: {
   employee_number: string;
   password: string;
   requested_role: RequestedRole;
+  requested_project_ids?: string[];
 }): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   const normalizedEmployeeNumber = normalizeEmployeeNumber(input.employee_number);
   const email = toPasswordEmail(normalizedEmployeeNumber);
   const requestedRole = normalizeRequestedRole(input.requested_role) || "viewer";
+  const requestedProjectIds = normalizeRequestedProjectIds(input.requested_project_ids);
   setPendingRequestedRole(requestedRole);
+  setPendingRequestedProjectIds(requestedProjectIds);
   const { error } = await supabase.auth.signUp({
     email,
     password: input.password,
@@ -260,6 +315,7 @@ export async function signUpWithEmployeePassword(input: {
         full_name: input.name.trim(),
         employee_number: normalizedEmployeeNumber,
         requested_role: requestedRole,
+        requested_project_ids: requestedProjectIds,
       },
     },
   });
@@ -267,12 +323,19 @@ export async function signUpWithEmployeePassword(input: {
   await syncCredentialFromAuth();
 }
 
-export async function signInWithGoogleOAuth(input?: { requested_role?: RequestedRole | null }): Promise<void> {
+export async function signInWithGoogleOAuth(input?: {
+  requested_role?: RequestedRole | null;
+  requested_project_ids?: string[];
+}): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   const redirectTo = getAuthRedirectUrl();
   const requestedRole = normalizeRequestedRole(input?.requested_role);
+  const requestedProjectIds = normalizeRequestedProjectIds(input?.requested_project_ids);
   if (requestedRole) {
     setPendingRequestedRole(requestedRole);
+  }
+  if (requestedProjectIds.length > 0) {
+    setPendingRequestedProjectIds(requestedProjectIds);
   }
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",

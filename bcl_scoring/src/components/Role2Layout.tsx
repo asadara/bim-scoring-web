@@ -79,6 +79,7 @@ export default function Role2Layout(props: Role2LayoutProps) {
         items={[
           { label: "Review Home", href: "/ho/review" },
           { label: "Project Review", href: projectId ? `/ho/review/projects/${projectId}` : null },
+          { label: "Proposal BIM Use", href: "/ho/review/proposals" },
         ]}
       />
 

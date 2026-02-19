@@ -44,6 +44,7 @@ export type AdminUser = {
   name: string | null;
   employee_number: string | null;
   requested_role?: string | null;
+  requested_project_ids?: string[] | null;
   requested_role_submitted_at?: string | null;
   is_active: boolean | null;
   created_at?: string | null;
@@ -101,6 +102,23 @@ export type AdminBulkPeriodGenerationResult = {
     end_date: string | null;
     reason: string;
   }>;
+};
+
+export type Role2BimUseProposal = {
+  id: string;
+  requester_user_id: string;
+  requester_role: string | null;
+  project_id: string | null;
+  proposal_type: "BIM_USE_CREATE" | "BIM_USE_MAPPING_UPDATE" | string;
+  proposed_bim_use: string | null;
+  indicator_ids: string[];
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | string;
+  decision_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type AdminErrorPayload =
@@ -394,6 +412,34 @@ export async function bulkGenerateAdminProjectPeriods(
     `/admin/projects/${encodeURIComponent(projectId)}/periods/bulk-generate`,
     {
       method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export async function listRole2BimUseProposals(
+  session: AdminSession,
+  filter?: { status?: string | null; project_id?: string | null }
+): Promise<Role2BimUseProposal[]> {
+  const status = toNonEmptyString(filter?.status);
+  const project_id = toNonEmptyString(filter?.project_id);
+  const query = new URLSearchParams();
+  if (status) query.set("status", status);
+  if (project_id) query.set("project_id", project_id);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return await requestAdmin<Role2BimUseProposal[]>(session, `/role2/bim-use-proposals${suffix}`);
+}
+
+export async function decideRole2BimUseProposal(
+  session: AdminSession,
+  proposalId: string,
+  input: { status: "APPROVED" | "REJECTED"; decision_note?: string | null }
+): Promise<Role2BimUseProposal> {
+  return await requestAdmin<Role2BimUseProposal>(
+    session,
+    `/admin/role2/bim-use-proposals/${encodeURIComponent(proposalId)}/status`,
+    {
+      method: "PUT",
       body: JSON.stringify(input),
     }
   );

@@ -344,8 +344,44 @@ a {
   font-size: 14px;
 }
 
+.auth-fieldset {
+  border: 1px solid var(--task-line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.auth-fieldset legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.auth-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--task-muted);
+}
+
+.auth-checkbox-grid {
+  display: grid;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid #d8e3de;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fbfdfc;
+}
+
+.auth-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
 .auth-field input,
-.auth-field select {
+.auth-field select,
+.auth-field textarea {
   width: 100%;
   border: 1px solid #bfcfc6;
   border-radius: 8px;
