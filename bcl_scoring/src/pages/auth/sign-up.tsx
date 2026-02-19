@@ -1,7 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   isAuthConfigured,
@@ -18,6 +18,7 @@ const REQUEST_ROLE_OPTIONS: Array<{ value: RequestedRole; label: string }> = [
   { value: "role3", label: "BIM Manager" },
   { value: "viewer", label: "Auditor" },
 ];
+const AUTH_RATE_LIMIT_COOLDOWN_SECONDS = 75;
 
 type ProjectOption = {
   id: string;
@@ -44,6 +45,7 @@ function projectLabel(project: ProjectOption): string {
 export default function SignUpPage() {
   const router = useRouter();
   const credential = useCredential();
+  const submitGuardRef = useRef(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
@@ -56,6 +58,7 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [projectLoadError, setProjectLoadError] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   const isConfigured = isAuthConfigured();
   const isSignedIn = Boolean(credential.user_id);
@@ -87,6 +90,14 @@ export default function SignUpPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldownSeconds]);
+
   function toggleProjectScope(projectId: string) {
     setSelectedProjectIds((prev) => {
       if (prev.includes(projectId)) return prev.filter((item) => item !== projectId);
@@ -96,6 +107,11 @@ export default function SignUpPage() {
 
   async function onSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitGuardRef.current || busy) return;
+    if (cooldownSeconds > 0) {
+      setError(`Terlalu banyak percobaan. Coba lagi dalam ${cooldownSeconds} detik.`);
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Password dan konfirmasi password harus sama.");
       return;
@@ -105,6 +121,7 @@ export default function SignUpPage() {
       return;
     }
 
+    submitGuardRef.current = true;
     setBusy(true);
     setError(null);
     setInfo(null);
@@ -133,17 +150,32 @@ export default function SignUpPage() {
       setInfo("Akun berhasil dibuat. Menunggu assignment role dari admin.");
       await router.push("/auth/sign-in");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up gagal");
+      const message = err instanceof Error ? err.message : "Sign up gagal";
+      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(message)) {
+        setCooldownSeconds(AUTH_RATE_LIMIT_COOLDOWN_SECONDS);
+        setError(
+          `Email rate limit exceeded. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi sekali.`
+        );
+      } else {
+        setError(message);
+      }
     } finally {
+      submitGuardRef.current = false;
       setBusy(false);
     }
   }
 
   async function onGoogleSignUp() {
+    if (submitGuardRef.current || busy) return;
+    if (cooldownSeconds > 0) {
+      setError(`Terlalu banyak percobaan. Coba lagi dalam ${cooldownSeconds} detik.`);
+      return;
+    }
     if (requiresScope && selectedProjectIds.length === 0) {
       setError("Untuk pengajuan role HO, pilih minimal 1 project scope.");
       return;
     }
+    submitGuardRef.current = true;
     setBusy(true);
     setError(null);
     setInfo(null);
@@ -153,7 +185,16 @@ export default function SignUpPage() {
         requested_project_ids: selectedProjectIds,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google OAuth gagal");
+      const message = err instanceof Error ? err.message : "Google OAuth gagal";
+      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(message)) {
+        setCooldownSeconds(AUTH_RATE_LIMIT_COOLDOWN_SECONDS);
+        setError(
+          `Email rate limit exceeded. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi.`
+        );
+      } else {
+        setError(message);
+      }
+      submitGuardRef.current = false;
       setBusy(false);
     }
   }
@@ -278,14 +319,27 @@ export default function SignUpPage() {
                     required
                   />
                 </label>
-                <button type="submit" className="primary-cta" disabled={busy || !isConfigured}>
-                  {busy ? "Membuat akun..." : "Sign Up"}
+                <button
+                  type="submit"
+                  className="primary-cta"
+                  disabled={busy || !isConfigured || cooldownSeconds > 0}
+                >
+                  {busy
+                    ? "Membuat akun..."
+                    : cooldownSeconds > 0
+                      ? `Tunggu ${cooldownSeconds}s`
+                      : "Sign Up"}
                 </button>
               </form>
 
               <div className="auth-divider">atau</div>
 
-              <button type="button" className="primary-cta" onClick={() => void onGoogleSignUp()} disabled={busy || !isConfigured}>
+              <button
+                type="button"
+                className="primary-cta"
+                onClick={() => void onGoogleSignUp()}
+                disabled={busy || !isConfigured || cooldownSeconds > 0}
+              >
                 Daftar dengan Google
               </button>
 
