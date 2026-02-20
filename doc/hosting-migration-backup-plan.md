@@ -2,7 +2,7 @@
 title: Hosting Migration Backup Plan
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-16
+last_updated: 2026-02-20
 owner: DevOps / Release
 ---
 
@@ -96,7 +96,7 @@ Jika verifikasi gagal pada wave mana pun:
 3. Jalankan smoke check baseline host lama.
 4. Catat root cause dan blok cutover ulang sampai corrective action selesai.
 
-## 7) Progress Saat Ini (2026-02-16)
+## 7) Progress Saat Ini (2026-02-20)
 
 - Status custom domain finalization: `DEFERRED` (sesuai keputusan terbaru).
 - Cutover tooling tersedia:
@@ -108,10 +108,14 @@ Jika verifikasi gagal pada wave mana pun:
 - Gap utama:
   - Domain produksi final untuk cutover belum ditetapkan.
   - Standby environment di provider target belum diprovision.
+- Keputusan operasional 2026-02-20:
+  - Jalur deploy aktif tetap `Render + Supabase`.
+  - Provider backup ditetapkan: OCI (standby plan, belum diaktifkan).
+  - Gap continuity timeout/redirect ditutup (lihat `doc/render-operational-gap-closure-2026-02-20.md`).
 
 ## 8) Immediate Next Actions
 
-1. Pilih provider target backup untuk API dan Web.
-2. Provision standby host (non-public) untuk API dan Web.
-3. Jalankan wave 1 smoke check dan dokumentasikan evidence.
-4. Setelah wave 1 lulus, tetapkan jadwal wave 2 cutover terkontrol.
+1. Pertahankan Render sebagai jalur produksi aktif dan jalankan monitoring rutin endpoint kritikal.
+2. Jaga dokumentasi OCI backup tetap up-to-date (env parity, checklist, rollback).
+3. Jalankan readiness review berkala untuk OCI standby tanpa membuka cutover.
+4. Aktifkan Wave 1 hanya jika trigger backup migration terpenuhi.

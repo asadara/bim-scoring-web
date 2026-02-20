@@ -93,7 +93,13 @@ async function main() {
         path: "/bcl/js/dashboard.js",
         mustContainAll: ["apiFetch(", "apiUrl("],
       }),
-    () => checkPage({ name: "Projects route", path: "/projects", mustContainAny: ["Project", "Role 1"] }),
+    () =>
+      checkPage({
+        name: "Projects route",
+        path: "/projects",
+        mustContainAll: ['"page":"/projects"'],
+        mustContainAny: ["Project", "Role 1", "Checking Access"],
+      }),
     () =>
       checkPage({
         name: "HO review route",

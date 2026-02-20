@@ -2,7 +2,7 @@
 title: Phase Status Log
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-18
+last_updated: 2026-02-20
 owner: DevOps / Release
 ---
 
@@ -13,7 +13,7 @@ Log status phase proyek sampai checkpoint saat ini.
 ## Current Summary
 
 - Backend API production: LIVE di Render.
-- Frontend web landing: LIVE di Render (`https://bim-scoring-web.onrender.com`).
+- Frontend web landing: LIVE di Render (`https://bimscoringnke.onrender.com`).
 - Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
 - Paket contract/regression blueprint-critical terbaru: lulus (`tests=20, pass=20, fail=0`).
 - E2E browser lintas role + hardening scenario (reject flow, post-approval lock, snapshot export): lulus (`npm run e2e`, `3 passed`).
@@ -22,14 +22,15 @@ Log status phase proyek sampai checkpoint saat ini.
 - Landing utama sudah diselaraskan ke dashboard BCL (legacy) pada route root (`/`) dengan kompatibilitas route lama (`/bcl/index.html`).
 - Stage 8 custom domain cutover pack siap (checklist + smoke script), aktivasi domain masih menunggu eksekusi DNS provider.
 - Dry-run smoke cutover script pada domain default Render lulus (`npm run smoke:custom-domain` dengan `CUSTOM_DOMAIN=bim-scoring-web.onrender.com`).
-- Checkpoint R20 terbaru (2026-02-18): Step 3 Wave 0 `COMPLETE`, Wave 3 `IN PROGRESS`, Wave 4 `READY (WAITING EXECUTION)`, Wave 1/2/5 belum mulai.
+- Checkpoint R20 terbaru: Wave 0 `COMPLETE`; Wave 1-3 `ON HOLD (BLOCKED)`; Wave 4-5 `DEFERRED` selama Render tetap jalur aktif.
 - Checkpoint 2026-02-18 11:29:18 +07:00: migrasi OCI di-`HOLD` sementara (akun OCI belum aktif), operasi dikembalikan ke mode `Render + Supabase`.
-- Checkpoint continuity menunjukkan route web kritikal `200`, namun API Render (`/health`, `/ready`) timeout dari jalur pengecekan saat ini; investigasi dashboard/log Render diperlukan.
+- Gap continuity API Render ditutup pada checkpoint 2026-02-20: `/health` dan `/ready` tervalidasi `200`, smoke lintas route + API lulus.
 - Render API custom domain control aktif (`render:domain:list/add/status/wait`); daftar domain custom saat ini masih kosong.
 - Keputusan terbaru: finalisasi custom domain di-skip sementara; fokus Stage 8 dialihkan ke backup plan migrasi hosting.
 - Mode operasional frontend saat ini tetap: **read-only / prototype write disabled** untuk uji UI/UX client-side.
 - Checkpoint 2026-02-18: policy Admin untuk mutasi evidence di endpoint legacy dikunci `read-only` (semua role termasuk Admin menerima `403 FORBIDDEN_ROLE`), regression API lulus (`tests=99, pass=98, fail=0, skipped=1`).
-- Checkpoint 2026-02-18 (post-rotation): login `employee_number + password` dan Google OAuth tervalidasi di web service aktif `https://bimscoringnke.onrender.com`; terdapat gap redirect root API (`/`) yang masih menunjuk domain web lama dan perlu update `WEB_APP_URL`.
+- Checkpoint 2026-02-20: root redirect API (`GET /` dengan `Accept: text/html`) tervalidasi `302` ke `https://bimscoringnke.onrender.com` (gap `WEB_APP_URL` ditutup).
+- Keputusan operasional aktif: Render tetap jalur deploy primary; OCI tetap dicatat sebagai jalur backup.
 
 ## Phase Timeline
 
@@ -44,21 +45,22 @@ Log status phase proyek sampai checkpoint saat ini.
 | Blueprint Alignment Remediation (R1) | COMPLETE (CODEBASE) | Step 1-6 remediation blueprint selesai di workspace dev + evidence dokumentasi tersedia. |
 | Remediation Rollout Gate | COMPLETE | Push ke `main` API/Web selesai; smoke checks dan verifikasi pasca-deploy endpoint produksi lulus. |
 | Custom Domain Activation | DEFERRED (BY DECISION) | Finalisasi custom domain ditunda sementara untuk memberi prioritas pada rencana backup migrasi hosting. |
-| Hosting Migration Backup Plan | IN PROGRESS | Rencana cadangan migrasi hosting disiapkan sebagai jalur continuity jika perlu pindah provider. |
+| Hosting Migration Backup Plan | IN PROGRESS | OCI dipertahankan sebagai jalur backup terdokumentasi; aktivasi hanya bila trigger migration backup terpenuhi. |
 | UX Trial Window | IN PROGRESS | Aplikasi dijalankan read-only untuk ujicoba client-side. |
 
 ## Active Decisions
 
-1. Tetap menggunakan domain default Render sementara: `https://bim-scoring-web.onrender.com`.
+1. Jalur deploy aktif tetap Render; domain operasional web: `https://bimscoringnke.onrender.com`.
 2. Menjaga `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false` selama fase ujicoba UX read-only masih berjalan.
 3. Remediation scoring/evidence linkage sudah aktif di produksi; perubahan berikutnya wajib melalui release gate operasional.
 4. Guardrail governance tetap: review != approval, approval mengunci period, snapshot immutable, audit append-only.
-5. Custom domain cutover ditunda; prioritas deploy dialihkan ke kesiapan backup migrasi hosting.
+5. OCI tetap standby backup terdokumentasi; custom domain/cutover OCI tetap ditunda sampai ada trigger resmi.
 
 ## Evidence References
 
 - Landing implementation log: `doc/landing-page-change-log.md`
 - Hosting migration backup plan: `doc/hosting-migration-backup-plan.md`
+- Render operational gap closure (2026-02-20): `doc/render-operational-gap-closure-2026-02-20.md`
 - R20 runbook progress checkpoint terbaru: `doc/render-to-oci-step3-progress-2026-02-18.md`
 - Render continuity checkpoint (saat OCI hold): `doc/render-render-supabase-continuity-checkpoint-2026-02-18.md`
 - Landing deploy checklist: `doc/landing-page-render-deploy-checklist.md`

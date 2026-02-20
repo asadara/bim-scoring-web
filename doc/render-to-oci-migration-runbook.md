@@ -2,7 +2,7 @@
 title: Render to OCI Migration Runbook
 project: BIM Scoring Platform
 status: ACTIVE
-last_updated: 2026-02-18
+last_updated: 2026-02-20
 owner: DevOps / Release
 ---
 
@@ -17,6 +17,7 @@ Status checkpoint per 2026-02-18:
 Keputusan operasional terbaru (checkpoint 2026-02-18 11:29:18 +07:00):
 - Migrasi OCI di-`HOLD` sementara karena akun OCI belum berhasil dibuat.
 - Operasi aktif kembali difokuskan ke `Render + Supabase` sampai blocker OCI selesai.
+- Checkpoint 2026-02-20: jalur deploy aktif dikunci tetap di Render; OCI dipertahankan sebagai jalur cadangan terdokumentasi.
 
 | Wave | Status | Catatan |
 |---|---|---|
@@ -31,6 +32,7 @@ Evidence terbaru:
 - `doc/render-to-oci-wave0-evidence-2026-02-16.md`
 - `doc/render-to-oci-step3-progress-2026-02-18.md`
 - `doc/render-render-supabase-continuity-checkpoint-2026-02-18.md`
+- `doc/render-operational-gap-closure-2026-02-20.md`
 
 ## 1) Objective
 
@@ -227,7 +229,7 @@ curl -I https://app.<domain>/
 
 1. Stabilkan operasi `Render + Supabase` sebagai mode sementara.
 2. Jalankan monitoring rutin endpoint kritikal (`/`, `/projects`, `/ho/review`, `/approve`, `/audit`, `/health`, `/ready`) dengan timeout eksplisit.
-3. Investigasi timeout API Render yang terdeteksi pada checkpoint 2026-02-18 dan konfirmasi status service dari dashboard Render.
+3. Lanjutkan monitoring periodik API Render (`/health`, `/ready`) dengan timeout eksplisit; gap timeout checkpoint 2026-02-18 sudah ditutup pada verifikasi 2026-02-20.
 4. Pertahankan gate kualitas sebelum perubahan produksi:
    - `npm run smoke:render`
    - `npm run e2e`

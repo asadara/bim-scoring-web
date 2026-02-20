@@ -1,8 +1,9 @@
 ---
 title: Render Supabase Continuity Checkpoint
 project: BIM Scoring Platform
-status: ACTIVE_WITH_INCIDENT_CHECK
+status: ACTIVE_INCIDENT_CLOSED
 executed_at: 2026-02-18 11:29:18 +07:00
+updated_at: 2026-02-20
 owner: DevOps / Release
 ---
 
@@ -70,3 +71,13 @@ Wave 1-5 migrasi OCI dibuka kembali jika seluruh syarat berikut terpenuhi:
 1. Akun OCI aktif dan dapat dipakai provisioning VM.
 2. Domain target final (`api.<domain>`, `app.<domain>`) sudah disetujui.
 3. Akses Cloudflare DNS/SSL tersedia.
+
+## 5) Addendum Closure (2026-02-20)
+
+Verifikasi ulang continuity menunjukkan incident timeout API tidak tereproduksi:
+1. `GET https://bim-scoring-api.onrender.com/health` -> `200`
+2. `GET https://bim-scoring-api.onrender.com/ready` -> `200`
+3. `GET https://bim-scoring-api.onrender.com/` + `Accept: text/html` -> `302` ke `https://bimscoringnke.onrender.com`
+4. `npm run smoke:render` (WEB=`https://bimscoringnke.onrender.com`, API=`https://bim-scoring-api.onrender.com`) -> `PASS` seluruh checks.
+
+Status incident continuity 2026-02-18: `CLOSED` untuk baseline operasional saat ini.

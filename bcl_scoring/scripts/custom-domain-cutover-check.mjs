@@ -221,7 +221,13 @@ async function main() {
     () => checkHttpRedirect(customDomain),
     () => checkPage({ name: "Web root", path: "/", mustContainAny: ["Desktop", "BCL Dashboard"] }),
     () => checkPage({ name: "Legacy route alias", path: "/bcl/index.html", mustContainAny: ["Desktop", "BCL Dashboard"] }),
-    () => checkPage({ name: "Projects route", path: "/projects", mustContainAny: ["Project", "Role 1"] }),
+    () =>
+      checkPage({
+        name: "Projects route",
+        path: "/projects",
+        mustContainAll: ['"page":"/projects"'],
+        mustContainAny: ["Project", "Role 1", "Checking Access"],
+      }),
     () => checkPage({ name: "HO review route", path: "/ho/review" }),
     () => checkPage({ name: "Approve route", path: "/approve" }),
     () => checkPage({ name: "Audit route", path: "/audit", mustContainAny: ["Audit", "Snapshot"] }),
