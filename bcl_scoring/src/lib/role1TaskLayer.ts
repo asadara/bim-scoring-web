@@ -707,13 +707,37 @@ export async function fetchProjectPeriods(projectId: string): Promise<ScoringPer
   return result.data;
 }
 
-export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadResult<IndicatorRecord[]>> {
-  const candidates = [
-    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicators`),
-    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator_definitions`),
-    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator-definitions`),
-  ];
+function mapIndicatorRows(rows: unknown[]): IndicatorRecord[] {
+  return rows
+    .map((row) => {
+      const item = row as Record<string, unknown>;
+      const id = asString(item.id || item.indicator_id || item.project_indicator_id);
+      const code = asString(item.code);
+      const title = asString(item.title || item.name || item.indicator_title);
+      const bimUseId = asNullableString(item.bim_use_id);
+      const bimUseTags = resolveIndicatorBimUseTags({
+        code,
+        bim_use_id: bimUseId,
+        bim_use_tags: item.bim_use_tags,
+      });
+      return {
+        id,
+        code,
+        title,
+        description: asNullableString(item.description),
+        perspective_id: asNullableString(item.perspective_id || item.perspective),
+        bim_use_id: bimUseTags[0] || bimUseId,
+        bim_use_tags: bimUseTags,
+      } satisfies IndicatorRecord;
+    })
+    .filter((row) => row.id && row.code && row.title);
+}
 
+async function fetchIndicatorsFromCandidates(
+  candidates: string[],
+  options?: { tryNextOnEmpty?: boolean }
+): Promise<ReadResult<IndicatorRecord[]>> {
+  const tryNextOnEmpty = options?.tryNextOnEmpty === true;
   let lastFailure: SafeFetchFail | null = null;
 
   for (let index = 0; index < candidates.length; index += 1) {
@@ -734,33 +758,9 @@ export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadRe
     }
 
     const rows = Array.isArray(unwrapped.data) ? unwrapped.data : [];
-    const mapped = rows
-      .map((row) => {
-        const item = row as Record<string, unknown>;
-        const id = asString(item.id || item.indicator_id || item.project_indicator_id);
-        const code = asString(item.code);
-        const title = asString(item.title || item.name || item.indicator_title);
-        const bimUseId = asNullableString(item.bim_use_id);
-        const bimUseTags = resolveIndicatorBimUseTags({
-          code,
-          bim_use_id: bimUseId,
-          bim_use_tags: item.bim_use_tags,
-        });
-        return {
-          id,
-          code,
-          title,
-          description: asNullableString(item.description),
-          perspective_id: asNullableString(item.perspective_id || item.perspective),
-          bim_use_id: bimUseTags[0] || bimUseId,
-          bim_use_tags: bimUseTags,
-        } satisfies IndicatorRecord;
-      })
-      .filter((row) => row.id && row.code && row.title);
+    const mapped = mapIndicatorRows(rows);
 
-    // Endpoint prioritas pertama bisa valid tetapi kosong pada project baru.
-    // Dalam kasus itu, lanjut coba endpoint fallback agar BIM Use tetap tersedia.
-    if (mapped.length === 0 && index < candidates.length - 1) {
+    if (mapped.length === 0 && tryNextOnEmpty && index < candidates.length - 1) {
       continue;
     }
 
@@ -776,6 +776,30 @@ export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadRe
     mode: "prototype",
     backend_message: lastFailure ? toSafeErrorMessage(lastFailure) : "Backend not available",
   };
+}
+
+export async function fetchProjectActiveIndicatorsReadMode(projectId: string): Promise<ReadResult<IndicatorRecord[]>> {
+  return await fetchIndicatorsFromCandidates(
+    [buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicators`)]
+  );
+}
+
+export async function fetchIndicatorDefinitionsReadMode(projectId: string): Promise<ReadResult<IndicatorRecord[]>> {
+  return await fetchIndicatorsFromCandidates([
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator_definitions`),
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator-definitions`),
+  ]);
+}
+
+export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadResult<IndicatorRecord[]>> {
+  return await fetchIndicatorsFromCandidates(
+    [
+      buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicators`),
+      buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator_definitions`),
+      buildApiUrl(`/projects/${encodeURIComponent(projectId)}/indicator-definitions`),
+    ],
+    { tryNextOnEmpty: true }
+  );
 }
 
 export async function fetchIndicators(projectId: string): Promise<IndicatorRecord[]> {
