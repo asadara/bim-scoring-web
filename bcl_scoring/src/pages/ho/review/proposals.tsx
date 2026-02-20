@@ -41,6 +41,14 @@ const PERSPECTIVE_TITLE_BY_ID: Record<string, string> = {
   P5: "Value, Impact & Risk Reduction",
 };
 
+const PERSPECTIVE_TRANSLATION_BY_ID: Record<string, string> = {
+  P1: "Tata Kelola & Strategi",
+  P2: "Proses & Alur Kerja",
+  P3: "Kualitas Informasi & Model",
+  P4: "SDM & Kapabilitas",
+  P5: "Nilai, Dampak & Reduksi Risiko",
+};
+
 const PERSPECTIVE_DESCRIPTION_BY_ID: Record<string, string> = {
   P1: "Kejelasan arahan, kebijakan, peran, dan tata kelola penerapan BIM di proyek.",
   P2: "Kematangan alur kerja BIM harian, koordinasi lintas disiplin, dan proses review/approval.",
@@ -66,10 +74,26 @@ const INDICATOR_SCORE_SCALE = [
   { score: "5", meaning: "Dipakai optimal dan berdampak" },
 ] as const;
 
+function normalizeTextKey(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function normalizePerspectiveId(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const out = value.trim().toUpperCase();
-  return out || null;
+  if (!out) return null;
+  const directCodeMatch = out.match(/^(P[1-5])$/);
+  if (directCodeMatch) return directCodeMatch[1];
+  const embeddedCodeMatch = out.match(/\bP([1-5])\b/);
+  if (embeddedCodeMatch) return `P${embeddedCodeMatch[1]}`;
+  const normalized = normalizeTextKey(out);
+  for (const [perspectiveId, title] of Object.entries(PERSPECTIVE_TITLE_BY_ID)) {
+    if (normalizeTextKey(title) === normalized) return perspectiveId;
+  }
+  for (const [perspectiveId, title] of Object.entries(PERSPECTIVE_TRANSLATION_BY_ID)) {
+    if (normalizeTextKey(title) === normalized) return perspectiveId;
+  }
+  return null;
 }
 
 function inferPerspectiveIdFromIndicatorCode(code: string | null | undefined): string | null {
@@ -85,9 +109,13 @@ function perspectiveOrderKey(value: string): number {
 }
 
 function formatPerspectiveLabel(perspectiveId: string): string {
-  if (perspectiveId === "UNASSIGNED") return "Perspective Not Assigned";
+  if (perspectiveId === "UNASSIGNED") return "Perspektif belum terpetakan";
   const title = PERSPECTIVE_TITLE_BY_ID[perspectiveId];
-  return title ? `${perspectiveId} - ${title}` : perspectiveId;
+  return title ? `${perspectiveId} - ${title}` : `Perspektif ${perspectiveId}`;
+}
+
+function getPerspectiveTranslation(perspectiveId: string): string | null {
+  return PERSPECTIVE_TRANSLATION_BY_ID[perspectiveId] || null;
 }
 
 function getPerspectiveShortDescription(perspectiveId: string): string | null {
@@ -146,8 +174,8 @@ export default function Role2ProposalPage() {
     const grouped = new Map<string, IndicatorRecord[]>();
     for (const indicator of defaultIndicators) {
       const key =
-        normalizePerspectiveId(indicator.perspective_id) ||
         inferPerspectiveIdFromIndicatorCode(indicator.code) ||
+        normalizePerspectiveId(indicator.perspective_id) ||
         "UNASSIGNED";
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)?.push(indicator);
@@ -155,6 +183,7 @@ export default function Role2ProposalPage() {
     const sections = [...grouped.entries()].map(([perspectiveId, rows]) => ({
       perspectiveId,
       perspectiveLabel: formatPerspectiveLabel(perspectiveId),
+      perspectiveTranslation: getPerspectiveTranslation(perspectiveId),
       perspectiveDescription: getPerspectiveShortDescription(perspectiveId),
       indicators: [...rows].sort((a, b) => a.code.localeCompare(b.code)),
     }));
@@ -407,6 +436,9 @@ export default function Role2ProposalPage() {
                 <div key={section.perspectiveId} className="task-panel desktop-drawer-panel">
                   <p className="task-kicker">Perspective</p>
                   <h3>{section.perspectiveLabel}</h3>
+                  {section.perspectiveTranslation ? (
+                    <p className="auth-hint">Terjemah: {section.perspectiveTranslation}</p>
+                  ) : null}
                   {section.perspectiveDescription ? (
                     <p className="auth-hint">
                       Pengertian singkat: {section.perspectiveDescription}
