@@ -52,7 +52,7 @@ export function getRoleLabel(role: AppRole): string {
       return "BIM Manager";
     case "viewer":
     default:
-      return "Viewer";
+      return "Viewer / Auditor";
   }
 }
 

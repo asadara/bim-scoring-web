@@ -19,6 +19,18 @@ export type PasswordSignUpResult = {
   user_id: string | null;
   likely_new_registration: boolean;
 };
+export type CurrentAuthAccount = {
+  user_id: string | null;
+  email: string | null;
+  full_name: string | null;
+  employee_number: string | null;
+  auth_provider: string | null;
+  requested_role: RequestedRole | null;
+  requested_project_ids: string[];
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  updated_at: string | null;
+};
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
@@ -410,6 +422,52 @@ export async function signInWithGoogleOAuth(input?: {
   if (error) throw new Error(error.message || "Google sign in gagal");
 }
 
+function emptyCurrentAuthAccount(): CurrentAuthAccount {
+  return {
+    user_id: null,
+    email: null,
+    full_name: null,
+    employee_number: null,
+    auth_provider: null,
+    requested_role: null,
+    requested_project_ids: [],
+    created_at: null,
+    last_sign_in_at: null,
+    updated_at: null,
+  };
+}
+
+export async function getCurrentAuthAccount(): Promise<CurrentAuthAccount> {
+  if (!isAuthConfigured()) {
+    return emptyCurrentAuthAccount();
+  }
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw new Error(error.message || "Gagal memuat profil akun.");
+  const user = data.user;
+  if (!user) return emptyCurrentAuthAccount();
+
+  const requested_role = readRequestedRole(user) || getPendingRequestedRole();
+  const requested_project_ids = (() => {
+    const fromMetadata = readRequestedProjectIds(user);
+    if (fromMetadata.length > 0) return fromMetadata;
+    return getPendingRequestedProjectIds();
+  })();
+
+  return {
+    user_id: normalizeText(user.id),
+    email: normalizeEmail(user.email),
+    full_name: readUserName(user),
+    employee_number: readEmployeeNumber(user),
+    auth_provider: readProvider(user),
+    requested_role,
+    requested_project_ids,
+    created_at: normalizeText(user.created_at),
+    last_sign_in_at: normalizeText(user.last_sign_in_at),
+    updated_at: normalizeText(user.updated_at),
+  };
+}
+
 export async function signOutAuth(): Promise<void> {
   if (!isAuthConfigured()) {
     setStoredCredential({ role: "viewer", user_id: null, pending_role: false }, { source: "auth" });
@@ -418,6 +476,17 @@ export async function signOutAuth(): Promise<void> {
   const supabase = getSupabaseBrowserClient();
   const { error } = await supabase.auth.signOut();
   if (error) throw new Error(error.message || "Sign out gagal");
+  await syncCredentialFromAuth();
+}
+
+export async function signOutAllAuthSessions(): Promise<void> {
+  if (!isAuthConfigured()) {
+    setStoredCredential({ role: "viewer", user_id: null, pending_role: false }, { source: "auth" });
+    return;
+  }
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  if (error) throw new Error(error.message || "Sign out semua sesi gagal");
   await syncCredentialFromAuth();
 }
 
@@ -435,5 +504,16 @@ export async function updateAuthProfile(input: {
 
   const { error } = await supabase.auth.updateUser({ data: payload });
   if (error) throw new Error(error.message || "Update profil gagal");
+  await syncCredentialFromAuth();
+}
+
+export async function updateAuthPassword(input: { new_password: string }): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const nextPassword = typeof input.new_password === "string" ? input.new_password.trim() : "";
+  if (nextPassword.length < 8) {
+    throw new Error("Password baru minimal 8 karakter.");
+  }
+  const { error } = await supabase.auth.updateUser({ password: nextPassword });
+  if (error) throw new Error(error.message || "Ubah password gagal");
   await syncCredentialFromAuth();
 }

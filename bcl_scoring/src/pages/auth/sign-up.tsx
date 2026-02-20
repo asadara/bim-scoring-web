@@ -5,7 +5,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   isAuthConfigured,
-  signInWithGoogleOAuth,
   signUpWithEmployeePassword,
 } from "@/lib/authClient";
 import type { RequestedRole } from "@/lib/authClient";
@@ -13,10 +12,10 @@ import { buildApiUrl, safeFetchJson, toUserFacingErrorMessage, toUserFacingSafeF
 import { useCredential } from "@/lib/useCredential";
 
 const REQUEST_ROLE_OPTIONS: Array<{ value: RequestedRole; label: string }> = [
-  { value: "role1", label: "BIM Coord Pro" },
-  { value: "role2", label: "HO" },
+  { value: "role1", label: "BIM Coordinator Project" },
+  { value: "role2", label: "BIM Coordinator HO" },
   { value: "role3", label: "BIM Manager" },
-  { value: "viewer", label: "Auditor" },
+  { value: "viewer", label: "Viewer / Auditor" },
 ];
 const AUTH_RATE_LIMIT_COOLDOWN_SECONDS = 75;
 
@@ -93,6 +92,7 @@ export default function SignUpPage() {
   const isConfigured = isAuthConfigured();
   const isSignedIn = Boolean(credential.user_id);
   const requiresScope = requestedRole === "role2";
+  const isViewerRequest = requestedRole === "viewer";
 
   const activeProjectOptions = useMemo(() => {
     return projectOptions
@@ -147,7 +147,7 @@ export default function SignUpPage() {
       return;
     }
     if (requiresScope && selectedProjectIds.length === 0) {
-      setError("Untuk pengajuan role HO, pilih minimal 1 scope project.");
+      setError("Untuk pengajuan role BIM Coordinator HO, pilih minimal 1 scope project.");
       return;
     }
 
@@ -191,41 +191,6 @@ export default function SignUpPage() {
         setError(message);
       }
     } finally {
-      submitGuardRef.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function onGoogleSignUp() {
-    if (submitGuardRef.current || busy) return;
-    if (cooldownSeconds > 0) {
-      setError(`Terlalu banyak percobaan. Coba lagi dalam ${cooldownSeconds} detik.`);
-      return;
-    }
-    if (requiresScope && selectedProjectIds.length === 0) {
-      setError("Untuk pengajuan role HO, pilih minimal 1 scope project.");
-      return;
-    }
-    submitGuardRef.current = true;
-    setBusy(true);
-    setError(null);
-    setInfo(null);
-    try {
-      await signInWithGoogleOAuth({
-        requested_role: requestedRole,
-        requested_project_ids: selectedProjectIds,
-      });
-    } catch (err) {
-      const rawMessage = err instanceof Error ? err.message : "";
-      const message = toUserFacingErrorMessage(err, "Masuk dengan Google gagal.");
-      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(rawMessage)) {
-        setCooldownSeconds(AUTH_RATE_LIMIT_COOLDOWN_SECONDS);
-        setError(
-          `Batas kirim email tercapai. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi.`
-        );
-      } else {
-        setError(message);
-      }
       submitGuardRef.current = false;
       setBusy(false);
     }
@@ -310,8 +275,10 @@ export default function SignUpPage() {
                   <legend>Scope Project Default (Pengajuan)</legend>
                   <p className="auth-hint">
                     {requiresScope
-                      ? "Role HO wajib memilih minimal 1 project. Scope akhir tetap diputuskan admin."
-                      : "Opsional. Bisa dipakai sebagai preferensi saat admin menetapkan role."}
+                      ? "Role BIM Coordinator HO wajib memilih minimal 1 project. Scope akhir tetap diputuskan admin."
+                      : isViewerRequest
+                        ? "Viewer / Auditor memiliki akses read-only ke halaman Audit."
+                        : "Opsional. Bisa dipakai sebagai preferensi saat admin menetapkan role."}
                   </p>
                   {projectLoadError ? <p className="error-box">{projectLoadError}</p> : null}
                   {activeProjectOptions.length === 0 ? (
@@ -385,17 +352,6 @@ export default function SignUpPage() {
                       : "Daftar"}
                 </button>
               </form>
-
-              <div className="auth-divider">atau</div>
-
-              <button
-                type="button"
-                className="secondary-cta"
-                onClick={() => void onGoogleSignUp()}
-                disabled={busy || !isConfigured || cooldownSeconds > 0}
-              >
-                Daftar dengan Google
-              </button>
 
               <p className="auth-helper">
                 Sudah punya akun? <Link href="/auth/sign-in">Masuk di sini</Link>.

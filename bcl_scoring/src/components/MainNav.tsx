@@ -44,7 +44,13 @@ export default function MainNav() {
     };
   }, []);
 
-  const navItems = useMemo(() => getMainNavItemsForRole(credential.role), [credential.role]);
+  const navItems = useMemo(
+    () =>
+      getMainNavItemsForRole(credential.role).filter(
+        (item) => item.href !== "/me" || Boolean(credential.user_id)
+      ),
+    [credential.role, credential.user_id]
+  );
   const currentPath = normalizePath(router.asPath || router.pathname || "/");
 
   async function handleSignOut() {

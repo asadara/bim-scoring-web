@@ -7,6 +7,7 @@ export type MainNavItem = {
 
 const ROUTE_ACCESS_RULES: Array<{ prefix: string; roles: AppRole[] }> = [
   { prefix: "/admin", roles: ["admin"] },
+  { prefix: "/me", roles: ["admin", "role1", "role2", "role3", "viewer"] },
   { prefix: "/projects", roles: ["admin", "role1"] },
   { prefix: "/ho/review", roles: ["admin", "role2"] },
   { prefix: "/approve", roles: ["admin", "role3"] },
@@ -15,6 +16,7 @@ const ROUTE_ACCESS_RULES: Array<{ prefix: string; roles: AppRole[] }> = [
 
 export const MAIN_NAV_ITEMS: MainNavItem[] = [
   { href: "/", label: "Desktop" },
+  { href: "/me", label: "Akun Saya" },
   { href: "/projects", label: "BIM Coordinator Project" },
   { href: "/ho/review", label: "BIM Coordinator HO" },
   { href: "/approve", label: "BIM Manager" },
