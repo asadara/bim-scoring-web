@@ -677,6 +677,186 @@ a {
   margin-right: 8px;
 }
 
+.collapsible-section {
+  border: 1px solid var(--task-line);
+  border-radius: 10px;
+  background: #fbfdfc;
+  overflow: hidden;
+}
+
+.collapsible-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 700;
+  background: #f4faf7;
+  border-bottom: 1px solid var(--task-line);
+}
+
+.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary::before {
+  content: ">";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+
+.collapsible-section[open] .collapsible-summary::before {
+  transform: rotate(90deg);
+}
+
+.collapsible-content {
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.formula-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.math-panel {
+  border: 1px solid #d9e6df;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.math-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--task-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.math-equation {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.math-paren {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.math-frac {
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  text-align: center;
+  align-items: center;
+  min-width: 150px;
+}
+
+.math-frac-top {
+  display: block;
+  padding: 0 4px 2px;
+  border-bottom: 1px solid #30453b;
+}
+
+.math-frac-bottom {
+  display: block;
+  padding-top: 2px;
+}
+
+.math-panel-reference {
+  background: #ededed;
+  border-color: #d5d5d5;
+  padding: 14px 16px;
+  gap: 10px;
+}
+
+.math-panel-reference .math-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 28px;
+  color: #252525;
+}
+
+.math-equation-display {
+  justify-content: center;
+  font-family: "Times New Roman", Georgia, serif;
+  font-style: italic;
+  font-size: 36px;
+  line-height: 1.2;
+  color: #222222;
+}
+
+.math-equation-total {
+  margin-top: 2px;
+}
+
+.math-var {
+  font-style: italic;
+}
+
+.math-operator {
+  font-style: normal;
+}
+
+.math-frac-reference {
+  min-width: 270px;
+}
+
+.math-frac-reference .math-frac-top,
+.math-frac-reference .math-frac-bottom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.math-frac-reference .math-frac-top {
+  border-bottom-color: #222222;
+}
+
+.math-sigma {
+  font-style: normal;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.math-sigma-large {
+  font-size: 1.45em;
+}
+
+.math-panel-footnote {
+  margin: 0;
+  font-size: 30px;
+  color: #222222;
+}
+
+@media (max-width: 720px) {
+  .math-panel-reference .math-title {
+    font-size: 20px;
+  }
+
+  .math-equation-display {
+    font-size: 24px;
+  }
+
+  .math-frac-reference {
+    min-width: 200px;
+  }
+
+  .math-panel-footnote {
+    font-size: 20px;
+  }
+}
+
 .wizard-actions {
   margin-top: 14px;
   display: flex;
