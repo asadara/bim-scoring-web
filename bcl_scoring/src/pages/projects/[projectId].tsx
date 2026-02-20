@@ -86,6 +86,13 @@ export default function ProjectRole1HomePage() {
   }, [context, projectId]);
 
   const counts = useMemo(() => buildEvidenceCounts(evidenceRows), [evidenceRows]);
+  const scopedProjectId = useMemo(() => {
+    if (credential.role !== "role1") return null;
+    const scopedIds = Array.isArray(credential.scoped_project_ids)
+      ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    return scopedIds[0] || null;
+  }, [credential.role, credential.scoped_project_ids]);
 
   if (loading) {
     return (
@@ -115,7 +122,9 @@ export default function ProjectRole1HomePage() {
       : context.period_status_label === "OPEN"
         ? "status-chip status-open"
         : "status-chip status-na";
-  const canWriteEvidence = canWriteRole1Evidence(credential.role);
+  const role1OutOfScopeReadOnly =
+    credential.role === "role1" && Boolean(scopedProjectId) && scopedProjectId !== projectId;
+  const canWriteEvidence = canWriteRole1Evidence(credential.role) && !role1OutOfScopeReadOnly;
   const hasActivePeriod = Boolean(context.active_period?.id);
   const canAddEvidence = canWriteEvidence && !context.period_locked && hasActivePeriod;
 
@@ -133,6 +142,30 @@ export default function ProjectRole1HomePage() {
         mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
         message={context.backend_message || evidenceMessage}
       />
+
+      <section className="task-panel">
+        <h2>Aksi Utama</h2>
+        {role1OutOfScopeReadOnly ? (
+          <p className="read-only-banner">
+            Workspace ini berada di luar scope input Role 1 Anda. Halaman tetap bisa dibaca, tetapi semua aksi input
+            evidence dinonaktifkan.
+          </p>
+        ) : null}
+        <div className="wizard-actions">
+          <button
+            type="button"
+            className="action-primary"
+            onClick={() => router.push(`/projects/${projectId}/evidence/add`)}
+            disabled={!canAddEvidence}
+          >
+            Tambahkan Evidence untuk BIM Use
+          </button>
+          <Link href={`/projects/${projectId}/evidence`} className="secondary-link">
+            Lihat My Evidence List
+          </Link>
+        </div>
+        <p className="inline-note">Fokus kerja Role 1: tambah evidence, submit review, lalu monitor hasil review.</p>
+      </section>
 
       <section className="task-grid-3" aria-label="Evidence status summary">
         <Link className="summary-card summary-card-action" href={`/projects/${projectId}/evidence#draft`}>
@@ -187,20 +220,6 @@ export default function ProjectRole1HomePage() {
             dinonaktifkan.
           </p>
         ) : null}
-
-        <div className="wizard-actions">
-          <button
-            type="button"
-            className="action-primary"
-            onClick={() => router.push(`/projects/${projectId}/evidence/add`)}
-            disabled={!canAddEvidence}
-          >
-            Tambahkan Evidence untuk BIM Use
-          </button>
-          <Link href={`/projects/${projectId}/evidence`} className="secondary-link">
-            Lihat My Evidence List
-          </Link>
-        </div>
 
         <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
       </section>

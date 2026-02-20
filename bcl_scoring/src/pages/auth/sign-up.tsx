@@ -91,6 +91,7 @@ export default function SignUpPage() {
 
   const isConfigured = isAuthConfigured();
   const isSignedIn = Boolean(credential.user_id);
+  const requiresSingleScope = requestedRole === "role1";
   const requiresScope = requestedRole === "role2";
   const isViewerRequest = requestedRole === "viewer";
 
@@ -128,7 +129,19 @@ export default function SignUpPage() {
     return () => window.clearInterval(timer);
   }, [cooldownSeconds]);
 
+  useEffect(() => {
+    if (!requiresSingleScope) return;
+    setSelectedProjectIds((prev) => {
+      if (prev.length <= 1) return prev;
+      return [prev[0]];
+    });
+  }, [requiresSingleScope]);
+
   function toggleProjectScope(projectId: string) {
+    if (requiresSingleScope) {
+      setSelectedProjectIds([projectId]);
+      return;
+    }
     setSelectedProjectIds((prev) => {
       if (prev.includes(projectId)) return prev.filter((item) => item !== projectId);
       return [...prev, projectId];
@@ -144,6 +157,10 @@ export default function SignUpPage() {
     }
     if (password !== confirmPassword) {
       setError("Password dan konfirmasi password harus sama.");
+      return;
+    }
+    if (requiresSingleScope && selectedProjectIds.length !== 1) {
+      setError("Untuk pengajuan role BIM Coordinator Project, pilih tepat 1 workspace project.");
       return;
     }
     if (requiresScope && selectedProjectIds.length === 0) {
@@ -162,7 +179,7 @@ export default function SignUpPage() {
         employee_number: employeeNumber,
         password,
         requested_role: requestedRole,
-        requested_project_ids: selectedProjectIds,
+        requested_project_ids: requiresSingleScope ? selectedProjectIds.slice(0, 1) : selectedProjectIds,
       });
       if (result.requires_email_verification) {
         if (result.likely_new_registration) {
@@ -274,7 +291,9 @@ export default function SignUpPage() {
                 <fieldset className="auth-fieldset">
                   <legend>Scope Project Default (Pengajuan)</legend>
                   <p className="auth-hint">
-                    {requiresScope
+                    {requiresSingleScope
+                      ? "Role BIM Coordinator Project wajib memilih tepat 1 workspace project dan memiliki akses Audit read-only."
+                      : requiresScope
                       ? "Role BIM Coordinator HO wajib memilih minimal 1 project. Scope akhir tetap diputuskan admin."
                       : isViewerRequest
                         ? "Viewer / Auditor memiliki akses read-only ke halaman Audit."
@@ -288,7 +307,8 @@ export default function SignUpPage() {
                       {activeProjectOptions.map((project) => (
                         <label key={project.id} className="auth-checkbox-item">
                           <input
-                            type="checkbox"
+                            type={requiresSingleScope ? "radio" : "checkbox"}
+                            name={requiresSingleScope ? "role1-workspace-project" : undefined}
                             checked={selectedProjectIds.includes(project.id)}
                             onChange={() => toggleProjectScope(project.id)}
                           />

@@ -70,6 +70,14 @@ export default function MyEvidenceListPage() {
   const router = useRouter();
   const { projectId } = router.query;
   const credential = useCredential();
+  const scopedProjectId =
+    credential.role === "role1"
+      ? (
+          Array.isArray(credential.scoped_project_ids)
+            ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+            : []
+        )[0] || null
+      : null;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -197,7 +205,9 @@ export default function MyEvidenceListPage() {
     if (status === "SUBMITTED") return "Awaiting Review";
     return "Draft";
   };
-  const canWrite = canWriteRole1Evidence(credential.role);
+  const role1OutOfScopeReadOnly =
+    credential.role === "role1" && Boolean(scopedProjectId) && scopedProjectId !== projectId;
+  const canWrite = canWriteRole1Evidence(credential.role) && !role1OutOfScopeReadOnly;
 
   return (
     <Role1Layout
@@ -215,6 +225,19 @@ export default function MyEvidenceListPage() {
       <section className="task-panel">
         <h2>Evidence Status Groups</h2>
         <p className="inline-note">Data evidence sinkron dari backend.</p>
+        <div className="wizard-actions">
+          <Link
+            href={`/projects/${projectId}/evidence/add`}
+            className={`action-primary${context.period_locked || !canWrite ? " disabled-link" : ""}`}
+            aria-disabled={context.period_locked || !canWrite}
+            onClick={(event) => {
+              if (context.period_locked || !canWrite) event.preventDefault();
+            }}
+          >
+            Tambah Evidence Baru
+          </Link>
+          <Link href={`/projects/${projectId}`}>Kembali ke Evidence Tasks</Link>
+        </div>
         {credential.role === "admin" ? (
           <p className="inline-note">
             Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence).
@@ -225,6 +248,12 @@ export default function MyEvidenceListPage() {
             >
               Switch ke BIM Coordinator Project
             </button>
+          </p>
+        ) : null}
+        {role1OutOfScopeReadOnly ? (
+          <p className="read-only-banner">
+            Workspace ini berada di luar scope input Role 1 Anda. Halaman tetap bisa dibaca, tetapi aksi tambah/edit/revisi
+            evidence dinonaktifkan.
           </p>
         ) : null}
         {!canWrite && credential.role !== "admin" ? (

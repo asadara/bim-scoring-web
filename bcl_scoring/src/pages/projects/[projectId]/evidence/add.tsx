@@ -6,7 +6,9 @@ import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
+  canRole1WriteProject,
   EvidenceType,
+  getRole1ScopedProjectId,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
   NO_BIM_USE_ID,
@@ -37,10 +39,9 @@ type WizardForm = {
 const LOCAL_FILE_SIZE_LIMIT_BYTES = 2 * 1024 * 1024; // 2 MB (localStorage-safe for prototype)
 
 const STEP_LABELS = [
-  "Step 1 - Select BIM Use",
-  "Step 2 - Select indicator",
-  "Step 3 - Select evidence type",
-  "Step 4 - Fill evidence form",
+  "Step 1 - Select BIM Use & indicator",
+  "Step 2 - Select evidence type",
+  "Step 3 - Fill evidence form",
 ];
 
 const INITIAL_FORM: WizardForm = {
@@ -216,6 +217,7 @@ export default function AddEvidencePage() {
     if (!context) return null;
     return context.bim_uses.find((item) => item.bim_use_id === form.bim_use_id) || null;
   }, [context, form.bim_use_id]);
+  const scopedProjectId = getRole1ScopedProjectId();
 
   const indicators = selectedBimUse?.indicators || [];
 
@@ -229,16 +231,16 @@ export default function AddEvidencePage() {
     if (targetStep >= 1 && !form.bim_use_id) {
       return "Step 1 wajib: pilih BIM Use terlebih dahulu.";
     }
-    if (targetStep >= 2 && form.indicator_ids.length === 0) {
-      return "Step 2 wajib: pilih 1 indikator.";
+    if (targetStep >= 1 && form.indicator_ids.length === 0) {
+      return "Step 1 wajib: pilih 1 indikator.";
     }
-    if (targetStep >= 3 && !form.type) {
-      return "Step 3 wajib: pilih tipe evidence (FILE/URL/TEXT).";
+    if (targetStep >= 2 && !form.type) {
+      return "Step 2 wajib: pilih tipe evidence (FILE/URL/TEXT).";
     }
-    if (targetStep >= 3 && form.type === "FILE" && !form.file_type) {
-      return "Step 3 wajib: pilih jenis file untuk tipe FILE.";
+    if (targetStep >= 2 && form.type === "FILE" && !form.file_type) {
+      return "Step 2 wajib: pilih jenis file untuk tipe FILE.";
     }
-    if (targetStep >= 4) {
+    if (targetStep >= 3) {
       if (!form.title.trim()) return "Title wajib diisi.";
       if (!form.description.trim()) return "Description wajib diisi.";
       if (form.type === "URL" && !form.external_url.trim()) {
@@ -265,7 +267,7 @@ export default function AddEvidencePage() {
       setSubmitError(err);
       return;
     }
-    setStep((prev) => Math.min(4, prev + 1));
+    setStep((prev) => Math.min(3, prev + 1));
     setSubmitError(null);
   }
 
@@ -341,6 +343,10 @@ export default function AddEvidencePage() {
 
   async function saveByStatus(status: "DRAFT" | "SUBMITTED") {
     if (!context || typeof projectId !== "string") return;
+    if (!canRole1WriteProject(projectId)) {
+      setSubmitError("Workspace ini read-only untuk Role 1 Anda. Tambah evidence hanya bisa di workspace scope Anda.");
+      return;
+    }
     if (!canWriteRole1Evidence(credential.role)) {
       setSubmitError("Role aktif hanya memiliki read-only access. Simpan/Submit dinonaktifkan.");
       return;
@@ -351,17 +357,15 @@ export default function AddEvidencePage() {
       return;
     }
 
-    const validationError = validateStep(4);
+    const validationError = validateStep(3);
     if (validationError) {
       setSubmitError(validationError);
       const failingStep =
-        !form.bim_use_id
+        !form.bim_use_id || form.indicator_ids.length === 0
           ? 1
-          : form.indicator_ids.length === 0
+          : !form.type || (form.type === "FILE" && !form.file_type)
             ? 2
-            : !form.type
-              ? 3
-              : 4;
+            : 3;
       setStep(failingStep);
       return;
     }
@@ -432,7 +436,9 @@ export default function AddEvidencePage() {
   }
 
   const isLocked = context.period_locked;
-  const canWrite = canWriteRole1Evidence(credential.role);
+  const canWrite = canWriteRole1Evidence(credential.role) && canRole1WriteProject(projectId);
+  const role1OutOfScopeReadOnly =
+    credential.role === "role1" && Boolean(scopedProjectId) && scopedProjectId !== projectId;
   const fieldDisabled = isLocked || !canWrite;
   const writeDisabled =
     fieldDisabled || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
@@ -446,7 +452,7 @@ export default function AddEvidencePage() {
     <Role1Layout
       projectId={projectId}
       title="Tambahkan Evidence untuk BIM Use"
-      subtitle="Light wizard BIM Coordinator Project: pilih BIM Use, pilih indikator, pilih tipe, lalu isi evidence."
+      subtitle="Light wizard BIM Coordinator Project: pilih BIM Use + indikator, pilih tipe, lalu isi evidence."
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
@@ -488,6 +494,17 @@ export default function AddEvidencePage() {
             dinonaktifkan.
           </p>
         ) : null}
+        {role1OutOfScopeReadOnly ? (
+          <p className="read-only-banner">
+            Workspace ini di luar scope input Role 1 Anda. Buka workspace utama untuk input evidence:{" "}
+            <Link href={`/projects/${scopedProjectId}/evidence/add`}>Tambah Evidence di Workspace Utama</Link>.
+          </p>
+        ) : null}
+        {credential.role === "role1" && !scopedProjectId ? (
+          <p className="warning-box">
+            Workspace input Role 1 Anda belum ditetapkan admin. Halaman ini hanya read-only sampai scope ditetapkan.
+          </p>
+        ) : null}
 
         {isRevisionMode ? (
           <p className="inline-note">
@@ -519,7 +536,7 @@ export default function AddEvidencePage() {
           </div>
         ) : null}
 
-        {step === 2 ? (
+        {step === 1 ? (
           <div className="field-grid">
             <p>Pilih satu indikator yang paling relevan untuk evidence ini.</p>
             {form.bim_use_id ? (
@@ -562,7 +579,7 @@ export default function AddEvidencePage() {
           </div>
         ) : null}
 
-        {step === 3 ? (
+        {step === 2 ? (
           <div className="field-grid">
             <label htmlFor="evidence-type">
               Evidence Type
@@ -572,6 +589,7 @@ export default function AddEvidencePage() {
                 onChange={(event) => onSelectEvidenceType(event.target.value as EvidenceType)}
                 disabled={fieldDisabled}
               >
+                <option value="">Pilih tipe evidence</option>
                 {(["FILE", "URL", "TEXT"] as EvidenceType[]).map((type) => (
                   <option key={type} value={type}>
                     {type}
@@ -602,7 +620,7 @@ export default function AddEvidencePage() {
           </div>
         ) : null}
 
-        {step === 4 ? (
+        {step === 3 ? (
           <div className="field-grid">
             <label htmlFor="title-input">
               Title
@@ -714,7 +732,7 @@ export default function AddEvidencePage() {
             ) : null}
 
             {!form.type ? (
-              <p className="warning-box">Tipe evidence pada Step 3 belum dipilih.</p>
+              <p className="warning-box">Tipe evidence pada Step 2 belum dipilih.</p>
             ) : null}
           </div>
         ) : null}
@@ -723,26 +741,32 @@ export default function AddEvidencePage() {
           <button type="button" onClick={onBackStep} disabled={step === 1}>
             Back
           </button>
-          <button type="button" onClick={onNextStep} disabled={step === 4}>
-            Next
-          </button>
-          <button
-            type="button"
-            onClick={() => void saveByStatus("DRAFT")}
-            disabled={writeDisabled}
-            title="Local draft (prototype, not used in scoring)"
-          >
-            Save Draft
-          </button>
-          <button
-            type="button"
-            className="action-primary"
-            onClick={() => void saveByStatus("SUBMITTED")}
-            disabled={writeDisabled}
-            title="Local draft (prototype, not used in scoring)"
-          >
-            Submit for Review
-          </button>
+          {step < 3 ? (
+            <button type="button" onClick={onNextStep}>
+              Next
+            </button>
+          ) : null}
+          {step === 3 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void saveByStatus("DRAFT")}
+                disabled={writeDisabled}
+                title="Local draft (prototype, not used in scoring)"
+              >
+                Save Draft
+              </button>
+              <button
+                type="button"
+                className="action-primary"
+                onClick={() => void saveByStatus("SUBMITTED")}
+                disabled={writeDisabled}
+                title="Local draft (prototype, not used in scoring)"
+              >
+                Submit for Review
+              </button>
+            </>
+          ) : null}
           <Link href={`/projects/${projectId}/evidence`}>Go to My Evidence List</Link>
         </div>
 

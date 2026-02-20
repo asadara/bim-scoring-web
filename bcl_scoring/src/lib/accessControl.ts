@@ -11,7 +11,7 @@ const ROUTE_ACCESS_RULES: Array<{ prefix: string; roles: AppRole[] }> = [
   { prefix: "/projects", roles: ["admin", "role1"] },
   { prefix: "/ho/review", roles: ["admin", "role2"] },
   { prefix: "/approve", roles: ["admin", "role3"] },
-  { prefix: "/audit", roles: ["admin", "role2", "role3", "viewer"] },
+  { prefix: "/audit", roles: ["admin", "role1", "role2", "role3", "viewer"] },
 ];
 
 export const MAIN_NAV_ITEMS: MainNavItem[] = [

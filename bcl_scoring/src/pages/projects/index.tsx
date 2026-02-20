@@ -15,6 +15,7 @@ import {
   resolvePeriodStatusLabelWithPrototype,
   selectActivePeriod,
 } from "@/lib/role1TaskLayer";
+import { useCredential } from "@/lib/useCredential";
 
 type ProjectQueueRow = {
   project: ProjectRecord;
@@ -55,11 +56,19 @@ function toReadinessLabel(row: {
 }
 
 export default function ProjectsIndexPage() {
+  const credential = useCredential();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ProjectQueueRow[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
+  const scopedProjectId = useMemo(() => {
+    if (credential.role !== "role1") return null;
+    const scopedIds = Array.isArray(credential.scoped_project_ids)
+      ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    return scopedIds[0] || null;
+  }, [credential.role, credential.scoped_project_ids]);
 
   useEffect(() => {
     let mounted = true;
@@ -68,6 +77,7 @@ export default function ProjectsIndexPage() {
         setLoading(true);
         const projectsResult = await fetchProjectsReadMode();
         const projectRows = projectsResult.data;
+
         const queueRows = await Promise.all(
           projectRows.map(async (project) => {
             const periodsResult = await fetchProjectPeriodsReadMode(project.id);
@@ -112,6 +122,11 @@ export default function ProjectsIndexPage() {
 
         if (!mounted) return;
         queueRows.sort((a, b) => {
+          if (credential.role === "role1" && scopedProjectId) {
+            const aOwned = a.project.id === scopedProjectId ? 0 : 1;
+            const bOwned = b.project.id === scopedProjectId ? 0 : 1;
+            if (aOwned !== bOwned) return aOwned - bOwned;
+          }
           if (a.evidenceCounts.NEEDS_REVISION !== b.evidenceCounts.NEEDS_REVISION) {
             return b.evidenceCounts.NEEDS_REVISION - a.evidenceCounts.NEEDS_REVISION;
           }
@@ -149,7 +164,7 @@ export default function ProjectsIndexPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [credential.role, credential.scoped_project_ids, scopedProjectId]);
 
   const totalProjects = rows.length;
   const projectsNeedAction = useMemo(
@@ -179,6 +194,10 @@ export default function ProjectsIndexPage() {
   const firstActionProjectId = useMemo(() => {
     return firstNeedsRevisionProjectId || firstDraftProjectId || null;
   }, [firstDraftProjectId, firstNeedsRevisionProjectId]);
+  const primaryAddProjectId = useMemo(() => {
+    if (credential.role === "role1") return scopedProjectId;
+    return firstActionProjectId || rows[0]?.project.id || null;
+  }, [credential.role, firstActionProjectId, rows, scopedProjectId]);
 
   return (
     <main className="task-shell">
@@ -187,7 +206,13 @@ export default function ProjectsIndexPage() {
           <div className="role-hero-main">
             <p className="task-kicker">BIM Coordinator Project</p>
             <h1>Projects</h1>
-            <p className="task-subtitle">Pilih project untuk membuka task layer BIM Coordinator Project.</p>
+            <p className="task-subtitle">Prioritas utama: tambah evidence pada workspace Anda, lalu monitor queue lintas project.</p>
+            {credential.role === "role1" ? (
+              <p className="inline-note">Role 1 dapat melihat semua workspace (read-only), tetapi hanya 1 workspace yang bisa diinput.</p>
+            ) : null}
+            {credential.role === "role1" && !scopedProjectId ? (
+              <p className="warning-box">Workspace input Role 1 Anda belum ditetapkan admin. Saat ini mode hanya read-only.</p>
+            ) : null}
             <div className="landing-chip-row">
               <span className="status-chip status-na">Total projects: {totalProjects}</span>
               <span className="status-chip status-na">Need action: {projectsNeedAction}</span>
@@ -196,9 +221,16 @@ export default function ProjectsIndexPage() {
               Mulai dari proyek -&gt; pilih BIM Use -&gt; submit evidence untuk indikator terkait.
             </p>
             <div className="wizard-actions">
-              <a href="#project-list" className="primary-cta">
-                Pilih Proyek
-              </a>
+              {primaryAddProjectId ? (
+                <Link href={`/projects/${primaryAddProjectId}/evidence/add`} className="primary-cta">
+                  Tambah Evidence Sekarang
+                </Link>
+              ) : (
+                <a href="#project-list" className="primary-cta">
+                  Lihat Workspace
+                </a>
+              )}
+              <a href="#project-list">Lihat Semua Workspace</a>
               <Link href="/projects">Refresh List</Link>
             </div>
           </div>
@@ -304,6 +336,12 @@ export default function ProjectsIndexPage() {
                       <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
                       <br />
                       <small>Code: {row.project.code || NA_TEXT} | Phase: {row.project.phase || NA_TEXT}</small>
+                      {credential.role === "role1" && scopedProjectId && row.project.id !== scopedProjectId ? (
+                        <>
+                          <br />
+                          <small>Access: read-only workspace</small>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       {formatPeriodLabel(row.activePeriod)}
@@ -322,6 +360,11 @@ export default function ProjectsIndexPage() {
                     </td>
                     <td>
                       <div className="item-actions">
+                        {credential.role === "role1" && scopedProjectId === row.project.id ? (
+                          <Link href={`/projects/${row.project.id}/evidence/add`} className="action-primary">
+                            Tambah Evidence
+                          </Link>
+                        ) : null}
                         <Link href={`/projects/${row.project.id}`} className="revisi">
                           Open Evidence Tasks
                         </Link>

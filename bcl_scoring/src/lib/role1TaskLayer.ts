@@ -21,6 +21,7 @@ import {
   callBackendWrite,
   classifyBackendIssue,
 } from "@/lib/backendWriteClient";
+import { getStoredCredential } from "@/lib/userCredential";
 import {
   CanonicalEvidenceLifecycleStatus,
   CanonicalPeriodStatus,
@@ -214,6 +215,37 @@ type ReadResult<T> = {
   mode: DataMode;
   backend_message: string | null;
 };
+
+function resolveRole1ScopedProjectId(): string | null {
+  const credential = getStoredCredential();
+  if (credential.role !== "role1") return null;
+  const scoped = Array.isArray(credential.scoped_project_ids)
+    ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+    : [];
+  return scoped[0] || null;
+}
+
+export function getRole1ScopedProjectId(): string | null {
+  return resolveRole1ScopedProjectId();
+}
+
+export function canRole1WriteProject(projectId: string): boolean {
+  const credential = getStoredCredential();
+  if (credential.role !== "role1") return true;
+  const scopedProjectId = resolveRole1ScopedProjectId();
+  if (!scopedProjectId) return false;
+  return projectId === scopedProjectId;
+}
+
+function assertRole1WritableProject(projectId: string): void {
+  const credential = getStoredCredential();
+  if (credential.role !== "role1") return;
+  const scopedProjectId = resolveRole1ScopedProjectId();
+  if (!scopedProjectId) throw new Error("Workspace project untuk Role 1 belum ditetapkan admin.");
+  if (projectId !== scopedProjectId) {
+    throw new Error("Role 1 hanya dapat menulis evidence pada workspace project miliknya.");
+  }
+}
 
 function backendReadResult<T>(data: T, backendMessage: string | null): ReadResult<T> {
   return {
@@ -968,6 +1000,7 @@ export function getLocalEvidenceById(evidenceId: string): LocalEvidenceItem | nu
 }
 
 export function saveLocalEvidence(input: EvidenceDraftInput): LocalEvidenceItem {
+  assertRole1WritableProject(input.project_id);
   assertWritable(input.project_id, input.period_id);
 
   const all = readAllEvidenceItems();
@@ -1199,6 +1232,7 @@ async function submitEvidenceToBackend(params: {
 }
 
 export async function saveEvidenceWithBackendWrite(input: EvidenceDraftInput): Promise<LocalEvidenceItem> {
+  assertRole1WritableProject(input.project_id);
   if (!FEATURE_REAL_BACKEND_WRITE) {
     return saveLocalEvidence(input);
   }
@@ -1227,6 +1261,7 @@ export async function saveEvidenceWithBackendWrite(input: EvidenceDraftInput): P
 }
 
 export async function submitEvidenceWithBackendWrite(input: EvidenceDraftInput): Promise<LocalEvidenceItem> {
+  assertRole1WritableProject(input.project_id);
   if (!FEATURE_REAL_BACKEND_WRITE) {
     return saveLocalEvidence({
       ...input,
@@ -1328,6 +1363,7 @@ export function markEvidenceAsDraft(evidenceId: string): LocalEvidenceItem | nul
   const all = readAllEvidenceItems();
   const hit = all.find((row) => row.id === evidenceId);
   if (!hit) return null;
+  assertRole1WritableProject(hit.project_id);
   assertWritable(hit.project_id, hit.period_id);
 
   hit.status = "DRAFT";
