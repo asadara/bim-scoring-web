@@ -9,7 +9,7 @@ import {
   signUpWithEmployeePassword,
 } from "@/lib/authClient";
 import type { RequestedRole } from "@/lib/authClient";
-import { buildApiUrl, safeFetchJson } from "@/lib/http";
+import { buildApiUrl, safeFetchJson, toUserFacingErrorMessage, toUserFacingSafeFetchError } from "@/lib/http";
 import { useCredential } from "@/lib/useCredential";
 
 const REQUEST_ROLE_OPTIONS: Array<{ value: RequestedRole; label: string }> = [
@@ -107,7 +107,7 @@ export default function SignUpPage() {
       if (!mounted) return;
       if (!result.ok) {
         setProjectOptions([]);
-        setProjectLoadError(result.error || "Gagal memuat daftar project");
+        setProjectLoadError(toUserFacingSafeFetchError(result, "Gagal memuat daftar project."));
         return;
       }
       const root = result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};
@@ -147,7 +147,7 @@ export default function SignUpPage() {
       return;
     }
     if (requiresScope && selectedProjectIds.length === 0) {
-      setError("Untuk pengajuan role HO, pilih minimal 1 project scope.");
+      setError("Untuk pengajuan role HO, pilih minimal 1 scope project.");
       return;
     }
 
@@ -167,24 +167,25 @@ export default function SignUpPage() {
       if (result.requires_email_verification) {
         if (result.likely_new_registration) {
           setInfo(
-            "Pendaftaran berhasil. Cek email Anda untuk verifikasi akun, lalu lanjut Sign In."
+            "Pendaftaran berhasil. Cek email Anda untuk verifikasi akun, lalu lanjut masuk."
           );
         } else {
           setInfo(
-            "Permintaan pendaftaran diterima. Jika email sudah terdaftar, gunakan Sign In atau cek email verifikasi terakhir."
+            "Permintaan pendaftaran diterima. Jika email sudah terdaftar, gunakan masuk atau cek email verifikasi terakhir."
           );
         }
         return;
       }
 
-      setInfo("Akun berhasil dibuat. Menunggu assignment role dari admin.");
+      setInfo("Akun berhasil dibuat. Menunggu penetapan role dari admin.");
       await router.push("/auth/sign-in");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Sign up gagal";
-      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(message)) {
+      const rawMessage = err instanceof Error ? err.message : "";
+      const message = toUserFacingErrorMessage(err, "Pendaftaran gagal.");
+      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(rawMessage)) {
         setCooldownSeconds(AUTH_RATE_LIMIT_COOLDOWN_SECONDS);
         setError(
-          `Email rate limit exceeded. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi sekali.`
+          `Batas kirim email tercapai. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi.`
         );
       } else {
         setError(message);
@@ -202,7 +203,7 @@ export default function SignUpPage() {
       return;
     }
     if (requiresScope && selectedProjectIds.length === 0) {
-      setError("Untuk pengajuan role HO, pilih minimal 1 project scope.");
+      setError("Untuk pengajuan role HO, pilih minimal 1 scope project.");
       return;
     }
     submitGuardRef.current = true;
@@ -215,11 +216,12 @@ export default function SignUpPage() {
         requested_project_ids: selectedProjectIds,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Google OAuth gagal";
-      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(message)) {
+      const rawMessage = err instanceof Error ? err.message : "";
+      const message = toUserFacingErrorMessage(err, "Masuk dengan Google gagal.");
+      if (/rate limit|too many requests|over_email_send_rate_limit|429/i.test(rawMessage)) {
         setCooldownSeconds(AUTH_RATE_LIMIT_COOLDOWN_SECONDS);
         setError(
-          `Email rate limit exceeded. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi.`
+          `Batas kirim email tercapai. Tunggu ${AUTH_RATE_LIMIT_COOLDOWN_SECONDS} detik, lalu coba lagi.`
         );
       } else {
         setError(message);
@@ -232,13 +234,13 @@ export default function SignUpPage() {
   return (
     <>
       <Head>
-        <title>Sign Up - BIM Scoring</title>
+        <title>Daftar - BIM Scoring</title>
       </Head>
       <main className="task-shell auth-shell">
         <section className="task-panel">
-          <h1>Sign Up</h1>
+          <h1>Daftar</h1>
           <p className="task-subtitle">
-            Buat akun pribadi dengan nama, email, nomor pegawai, dan password. Setelah itu akun masuk antrean assignment role
+            Buat akun pribadi dengan nama, email, nomor pegawai, dan password. Setelah itu akun masuk antrean penetapan role
             oleh admin.
           </p>
 
@@ -255,11 +257,11 @@ export default function SignUpPage() {
             <div className="auth-stack">
               <p className="auth-status">
                 Anda sudah login sebagai <strong>{credential.full_name || credential.user_id}</strong>.
-                {credential.pending_role ? " Role masih menunggu assignment admin." : null}
+                {credential.pending_role ? " Role masih menunggu penetapan admin." : null}
               </p>
               <div className="wizard-actions">
                 <Link href="/auth/sign-in" className="action-primary">
-                  Kembali ke Sign In
+                  Kembali ke Masuk
                 </Link>
               </div>
             </div>
@@ -305,11 +307,11 @@ export default function SignUpPage() {
                   </select>
                 </label>
                 <fieldset className="auth-fieldset">
-                  <legend>Default Scope Project (Pengajuan)</legend>
+                  <legend>Scope Project Default (Pengajuan)</legend>
                   <p className="auth-hint">
                     {requiresScope
-                      ? "Role HO wajib memilih minimal 1 project. Scope akhir tetap diputuskan Admin."
-                      : "Opsional. Bisa dipakai sebagai preferensi saat admin assign role."}
+                      ? "Role HO wajib memilih minimal 1 project. Scope akhir tetap diputuskan admin."
+                      : "Opsional. Bisa dipakai sebagai preferensi saat admin menetapkan role."}
                   </p>
                   {projectLoadError ? <p className="error-box">{projectLoadError}</p> : null}
                   {activeProjectOptions.length === 0 ? (
@@ -379,8 +381,8 @@ export default function SignUpPage() {
                   {busy
                     ? "Membuat akun..."
                     : cooldownSeconds > 0
-                      ? `Tunggu ${cooldownSeconds}s`
-                      : "Sign Up"}
+                      ? `Tunggu ${cooldownSeconds} dtk`
+                      : "Daftar"}
                 </button>
               </form>
 
@@ -388,7 +390,7 @@ export default function SignUpPage() {
 
               <button
                 type="button"
-                className="primary-cta"
+                className="secondary-cta"
                 onClick={() => void onGoogleSignUp()}
                 disabled={busy || !isConfigured || cooldownSeconds > 0}
               >
@@ -396,7 +398,7 @@ export default function SignUpPage() {
               </button>
 
               <p className="auth-helper">
-                Sudah punya akun? <Link href="/auth/sign-in">Sign in di sini</Link>.
+                Sudah punya akun? <Link href="/auth/sign-in">Masuk di sini</Link>.
               </p>
             </div>
           )}

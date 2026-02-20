@@ -10,21 +10,19 @@ type BackendStatusBannerProps = {
 
 export default function BackendStatusBanner(props: BackendStatusBannerProps) {
   const { mode, message } = props;
-  const [handshake, setHandshake] = useState<BackendHandshakeResult | null>(null);
+  const [handshake, setHandshake] = useState<BackendHandshakeResult | null>(() => {
+    if (FEATURE_REAL_BACKEND_WRITE) return null;
+    return {
+      status: "available",
+      service: "prototype",
+      endpoint: null,
+      checked_at: new Date().toISOString(),
+      message: null,
+    };
+  });
 
   useEffect(() => {
-    if (!FEATURE_REAL_BACKEND_WRITE) {
-      setHandshake({
-        status: "available",
-        service: "prototype",
-        endpoint: null,
-        checked_at: new Date().toISOString(),
-        message: null,
-      });
-      return () => {
-        // no-op
-      };
-    }
+    if (!FEATURE_REAL_BACKEND_WRITE) return;
 
     let mounted = true;
     fetchBackendHandshake()

@@ -3,7 +3,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { canRoleAccessPath } from "@/lib/accessControl";
-import { buildApiUrl, fetchBackendHandshake, safeFetchJson, type BackendHandshakeResult } from "@/lib/http";
+import {
+  buildApiUrl,
+  fetchBackendHandshake,
+  safeFetchJson,
+  toUserFacingErrorMessage,
+  toUserFacingSafeFetchError,
+  type BackendHandshakeResult,
+  type SafeFetchFail,
+} from "@/lib/http";
 import { useCredential } from "@/lib/useCredential";
 
 type ProjectRow = {
@@ -201,14 +209,15 @@ function toPercent(part: number, total: number): number {
   return Math.max(0, Math.min(100, (part / total) * 100));
 }
 
-function toApiErrorMessage(path: string, failure: { kind: string; status?: number; error?: string }): string {
-  if (failure.kind === "backend_unavailable") {
-    return `Backend not available for ${path}: ${failure.error || "connection failed"}`;
+function toApiErrorMessage(_path: string, failure: SafeFetchFail): string {
+  if (
+    failure.kind === "backend_unavailable" ||
+    failure.kind === "http_error" ||
+    failure.kind === "parse_error"
+  ) {
+    return toUserFacingSafeFetchError(failure, "Gagal memuat data dashboard.");
   }
-  if (failure.kind === "http_error") {
-    return `HTTP ${failure.status || 500} for ${path}: ${failure.error || "request failed"}`;
-  }
-  return `Invalid payload for ${path}: ${failure.error || "parse error"}`;
+  return toUserFacingErrorMessage(failure.error, "Gagal memuat data dashboard.");
 }
 
 async function fetchEnvelope<T>(path: string): Promise<T> {
@@ -432,9 +441,10 @@ export default function Home() {
     if (!activePerspectiveId) return [];
 
     return indicatorScores
-      .map((item) => {
+      .reduce<PerspectiveIndicatorDetail[]>((acc, item) => {
         const insight = classifyIndicator(item);
-        return {
+        if (insight.perspectiveId !== activePerspectiveId) return acc;
+        acc.push({
           indicatorId: item.indicator_id,
           code: asText(item.code),
           title: asText(item.title, "Indicator without title"),
@@ -442,13 +452,11 @@ export default function Home() {
           statusLabel: insight.statusLabel,
           updatedLabel: insight.updatedLabel,
           priorityRank: insight.priorityRank,
-          perspectiveId: insight.perspectiveId,
-        };
-      })
-      .filter((item) => item.perspectiveId === activePerspectiveId)
+        });
+        return acc;
+      }, [])
       .sort((a, b) => a.priorityRank - b.priorityRank || a.code.localeCompare(b.code))
-      .slice(0, 12)
-      .map(({ perspectiveId: _perspectiveId, ...item }) => item);
+      .slice(0, 12);
   }, [activePerspectiveId, indicatorScores]);
 
   const topPerspective = useMemo(() => perspectiveAnalytics[0] || null, [perspectiveAnalytics]);
@@ -513,7 +521,7 @@ export default function Home() {
         setSelectedProjectId((prev) => prev || safeRows[0].id);
       } catch (e) {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load desktop dashboard.");
+        setError(toUserFacingErrorMessage(e, "Gagal memuat dashboard desktop."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -549,7 +557,7 @@ export default function Home() {
         });
       } catch (e) {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load scoring periods.");
+        setError(toUserFacingErrorMessage(e, "Gagal memuat scoring period."));
       }
     })();
 
@@ -585,7 +593,7 @@ export default function Home() {
         setLastSyncedAt(new Date().toISOString());
       } catch (e) {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load dashboard bundle.");
+        setError(toUserFacingErrorMessage(e, "Gagal memuat ringkasan dashboard."));
       } finally {
         if (!cancelled) setLoading(false);
       }

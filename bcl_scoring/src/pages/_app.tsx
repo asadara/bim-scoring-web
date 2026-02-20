@@ -80,7 +80,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <MainNav />
         <main className="task-shell">
           <section className="task-panel">
-            <h1>Checking Access</h1>
+            <h1>Memeriksa Akses</h1>
             <p className="task-subtitle">Memuat credential aktif...</p>
           </section>
         </main>
@@ -94,13 +94,13 @@ export default function App({ Component, pageProps }: AppProps) {
         <MainNav />
         <main className="task-shell">
           <section className="task-panel">
-            <h1>Sign In Required</h1>
+            <h1>Perlu Masuk</h1>
             <p className="task-subtitle">
-              Halaman ini hanya untuk user terautentikasi. Silakan sign in terlebih dahulu.
+              Halaman ini hanya untuk pengguna terautentikasi. Silakan masuk terlebih dahulu.
             </p>
             <div className="wizard-actions">
               <Link href="/auth/sign-in" className="action-primary">
-                Sign In
+                Masuk
               </Link>
               <Link href="/auth/sign-up">Buat Akun</Link>
             </div>
@@ -116,7 +116,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <MainNav />
         <main className="task-shell">
           <section className="task-panel">
-            <h1>Access Restricted</h1>
+            <h1>Akses Terbatas</h1>
             <p className="task-subtitle">
               Role aktif Anda <strong>{getRoleLabel(credential.role)}</strong> tidak memiliki akses ke halaman ini.
             </p>

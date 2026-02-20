@@ -56,7 +56,7 @@ export default function MainNav() {
         await router.push("/auth/sign-in");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign out gagal");
+      setError(err instanceof Error ? err.message : "Gagal keluar.");
     } finally {
       setBusySignOut(false);
     }
@@ -97,16 +97,16 @@ export default function MainNav() {
             credential.user_id ? (
               <>
                 <button type="button" onClick={() => void handleSignOut()} disabled={busySignOut}>
-                  {busySignOut ? "Signing out..." : "Sign Out"}
+                  {busySignOut ? "Keluar..." : "Keluar"}
                 </button>
               </>
             ) : (
               <>
                 <Link href="/auth/sign-in" className="main-nav-auth-link">
-                  Sign In
+                  Masuk
                 </Link>
                 <Link href="/auth/sign-up" className="main-nav-auth-link">
-                  Sign Up
+                  Daftar
                 </Link>
               </>
             )

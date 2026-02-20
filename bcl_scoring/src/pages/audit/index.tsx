@@ -9,6 +9,7 @@ import {
   fetchAdminAuditLogsReadMode,
   fetchAuditSnapshotsReadMode,
 } from "@/lib/auditTaskLayer";
+import { toUserFacingErrorMessage } from "@/lib/http";
 import { getPrototypeProjectMetaFromStore } from "@/lib/prototypeStore";
 import {
   DataMode,
@@ -168,7 +169,7 @@ export default function AuditHomePage() {
         setProjects([]);
         setPeriodsByProjectId({});
         setEvents([]);
-        setError(e instanceof Error ? e.message : "Unknown error");
+        setError(toUserFacingErrorMessage(e, "Gagal memuat data audit."));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -451,14 +452,15 @@ export default function AuditHomePage() {
       <section className="task-panel">
         <h2>Project Coverage Matrix</h2>
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table audit-coverage-table">
+            <caption className="sr-only">Ringkasan cakupan project, period, dan snapshot</caption>
             <thead>
               <tr>
-                <th>Project</th>
-                <th>Periods</th>
-                <th>Locked</th>
-                <th>Snapshots</th>
-                <th>Latest Snapshot</th>
+                <th scope="col">Project</th>
+                <th scope="col">Periods</th>
+                <th scope="col">Locked</th>
+                <th scope="col">Snapshots</th>
+                <th scope="col">Latest Snapshot</th>
               </tr>
             </thead>
             <tbody>
@@ -493,13 +495,14 @@ export default function AuditHomePage() {
       <section className="task-panel">
         <h2>Recent Governance Events</h2>
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table audit-events-table">
+            <caption className="sr-only">Daftar aktivitas governance terbaru</caption>
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Actor</th>
+                <th scope="col">Time</th>
+                <th scope="col">Action</th>
+                <th scope="col">Entity</th>
+                <th scope="col">Actor</th>
               </tr>
             </thead>
             <tbody>

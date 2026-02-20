@@ -11,7 +11,7 @@ import {
   listPrototypeApprovalDecisions,
   listPrototypeSnapshots,
 } from "@/lib/role1TaskLayer";
-import { buildApiUrl, safeFetchJson } from "@/lib/http";
+import { buildApiUrl, safeFetchJson, toUserFacingSafeFetchError } from "@/lib/http";
 import { getPrototypePeriodStatusFromStore } from "@/lib/prototypeStore";
 
 export type AuditSnapshotView = {
@@ -62,12 +62,7 @@ function unwrapPayload(payload: unknown): { ok: true; data: unknown } | { ok: fa
 
 function toSafeErrorMessage(result: Awaited<ReturnType<typeof safeFetchJson<unknown>>>): string {
   if (result.ok) return "";
-  if (result.kind === "backend_unavailable") return "Backend unavailable";
-  if (result.kind === "http_error") {
-    const status = result.status ? `HTTP ${result.status}` : "HTTP error";
-    return `${status}${result.error ? ` - ${result.error}` : ""}`;
-  }
-  return `Invalid backend payload${result.error ? ` (${result.error})` : ""}`;
+  return toUserFacingSafeFetchError(result, "Backend belum tersedia.");
 }
 
 function toSnapshotRecord(row: Record<string, unknown>): PrototypeSnapshotRecord | null {

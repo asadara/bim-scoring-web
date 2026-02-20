@@ -43,10 +43,10 @@ export default function SignInPage() {
         employee_number: employeeNumber,
         password,
       });
-      setInfo("Sign in berhasil.");
+      setInfo("Berhasil masuk.");
       await router.push(defaultRedirect);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign in gagal");
+      setError(err instanceof Error ? err.message : "Gagal masuk.");
     } finally {
       setBusy(false);
     }
@@ -59,7 +59,7 @@ export default function SignInPage() {
     try {
       await signInWithGoogleOAuth();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign in gagal");
+      setError(err instanceof Error ? err.message : "Gagal masuk dengan Google.");
       setBusy(false);
     }
   }
@@ -82,11 +82,11 @@ export default function SignInPage() {
   return (
     <>
       <Head>
-        <title>Sign In - BIM Scoring</title>
+        <title>Masuk - BIM Scoring</title>
       </Head>
       <main className="task-shell auth-shell">
         <section className="task-panel">
-          <h1>Sign In</h1>
+          <h1>Masuk</h1>
           <p className="task-subtitle">Masuk dengan nomor pegawai + password, atau Google OAuth.</p>
 
           {!isConfigured ? (
@@ -151,14 +151,14 @@ export default function SignInPage() {
                   />
                 </label>
                 <button type="submit" className="primary-cta" disabled={busy || !isConfigured}>
-                  {busy ? "Signing in..." : "Sign In"}
+                  {busy ? "Memproses..." : "Masuk"}
                 </button>
               </form>
 
               <div className="auth-divider">atau</div>
 
-              <button type="button" className="primary-cta" onClick={() => void onGoogleSignIn()} disabled={busy || !isConfigured}>
-                Sign In dengan Akun Google (Gmail)
+              <button type="button" className="secondary-cta" onClick={() => void onGoogleSignIn()} disabled={busy || !isConfigured}>
+                Masuk dengan Google
               </button>
 
               <p className="auth-helper">

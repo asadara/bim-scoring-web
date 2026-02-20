@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AdminConfigLock,
@@ -27,7 +27,7 @@ import {
   updateAdminRoleMapping,
   updateAdminProject,
 } from "@/lib/adminTaskLayer";
-import { AppRole, getRoleLabel, getStoredCredential, setStoredCredential } from "@/lib/userCredential";
+import { AppRole, getRoleLabel } from "@/lib/userCredential";
 
 const ADMIN_SESSION_KEY = "bim_admin_session_v1";
 
@@ -41,6 +41,13 @@ const ROLE_OPTIONS: Array<{ value: AppRole; label: string }> = [
 type RequestedRole = "role1" | "role2" | "role3" | "viewer";
 
 type WeekAnchor = "SUNDAY" | "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY";
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: "default" | "danger";
+  onConfirm: () => void | Promise<void>;
+};
 
 const WEEK_ANCHOR_OPTIONS: Array<{ value: WeekAnchor; label: string }> = [
   { value: "MONDAY", label: "Senin" },
@@ -60,15 +67,15 @@ function toNonEmptyString(value: string): string | null {
 }
 
 function asBooleanLabel(value: boolean | null): string {
-  if (value === true) return "Active";
-  if (value === false) return "Inactive";
-  return "N/A";
+  if (value === true) return "Aktif";
+  if (value === false) return "Nonaktif";
+  return "-";
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) return "N/A";
+  if (!value) return "-";
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "N/A";
+  if (Number.isNaN(parsed.getTime())) return "-";
   return parsed.toLocaleString();
 }
 
@@ -188,6 +195,7 @@ function resolveUserGlobalRole(userId: string, mappings: AdminRoleMapping[]): Ap
 
 export default function AdminControlPanelPage() {
   const [session, setSession] = useState<AdminSession>({ actorId: "admin-web", role: "Admin" });
+  const reloadAllRef = useRef<(currentSession: AdminSession) => Promise<void>>(async () => {});
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [periodLoading, setPeriodLoading] = useState(false);
@@ -225,14 +233,7 @@ export default function AdminControlPanelPage() {
     description: "",
   });
   const [lockReason, setLockReason] = useState("");
-  const [devRole, setDevRole] = useState<AppRole>(() => {
-    if (typeof window === "undefined") return "viewer";
-    return getStoredCredential().role;
-  });
-  const [devUserId, setDevUserId] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return getStoredCredential().user_id || "";
-  });
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const sortedPerspectiveOptions = useMemo(() => {
     return perspectives
@@ -261,7 +262,7 @@ export default function AdminControlPanelPage() {
 
   const perspectiveTitleById = useMemo(() => {
     return new Map(
-      perspectives.map((item) => [item.id, item.title || item.code || "Perspective tanpa judul"])
+      perspectives.map((item) => [item.id, item.title || item.code || "Perspektif tanpa judul"])
     );
   }, [perspectives]);
 
@@ -365,6 +366,7 @@ export default function AdminControlPanelPage() {
     ]);
     setRole2Proposals(proposalRows);
   }
+  reloadAllRef.current = reloadAll;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -386,11 +388,11 @@ export default function AdminControlPanelPage() {
       setLoading(true);
       setError(null);
       try {
-        await reloadAll(session);
+        await reloadAllRef.current(session);
         if (!mounted) return;
       } catch (e) {
         if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load admin data");
+        setError(e instanceof Error ? e.message : "Gagal memuat data admin.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -406,6 +408,19 @@ export default function AdminControlPanelPage() {
   }, [session]);
 
   useEffect(() => {
+    if (!confirmDialog) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !working) {
+        setConfirmDialog(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [confirmDialog, working]);
+
+  useEffect(() => {
     let mounted = true;
     (async () => {
       setIndicatorLoading(true);
@@ -414,7 +429,7 @@ export default function AdminControlPanelPage() {
         if (!mounted) return;
       } catch (e) {
         if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load indicators");
+        setError(e instanceof Error ? e.message : "Gagal memuat indikator.");
       } finally {
         if (mounted) setIndicatorLoading(false);
       }
@@ -454,7 +469,7 @@ export default function AdminControlPanelPage() {
         if (!mounted) return;
       } catch (e) {
         if (!mounted) return;
-        const message = e instanceof Error ? e.message : "Failed to load periods";
+        const message = e instanceof Error ? e.message : "Gagal memuat periode.";
         setPeriodFeedback({ tone: "error", message });
       } finally {
         if (mounted) setPeriodLoading(false);
@@ -473,26 +488,33 @@ export default function AdminControlPanelPage() {
       await action();
       setNotice(successMessage);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Operation failed");
+      setError(e instanceof Error ? e.message : "Operasi gagal.");
     } finally {
       setWorking(false);
     }
   }
 
-  function handleSaveDevCredential(event: FormEvent) {
-    event.preventDefault();
-    const saved = setStoredCredential({
-      role: devRole,
-      user_id: toNonEmptyString(devUserId),
-    });
-    setNotice(`Credential navigasi disimpan: ${getRoleLabel(saved.role)} (${saved.user_id || "no-user-id"})`);
+  function requestConfirm(dialog: ConfirmDialogState) {
+    setConfirmDialog(dialog);
+  }
+
+  function closeConfirm() {
+    if (working) return;
+    setConfirmDialog(null);
+  }
+
+  async function handleConfirm() {
+    if (!confirmDialog) return;
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
   }
 
   async function handleCreateProject(event: FormEvent) {
     event.preventDefault();
     const name = toNonEmptyString(projectForm.name);
     if (!name) {
-      setError("Project name wajib diisi.");
+      setError("Nama project wajib diisi.");
       return;
     }
     await runAction(async () => {
@@ -504,7 +526,7 @@ export default function AdminControlPanelPage() {
       setProjectForm({ name: "", config_key: "" });
       setShowProjectCreateForm(false);
       await reloadBase(session);
-    }, "Project workspace berhasil dibuat.");
+    }, "Workspace project berhasil dibuat.");
   }
 
   async function handleSaveWeeklyAnchor() {
@@ -545,7 +567,7 @@ export default function AdminControlPanelPage() {
       toNonEmptyString(indicatorForm.perspective_id) || toNonEmptyString(indicatorPerspectiveFilter);
     const title = toNonEmptyString(indicatorForm.title);
     if (!perspective_id || !title) {
-      setError("Perspective dan judul indikator wajib diisi.");
+      setError("Perspektif dan judul indikator wajib diisi.");
       return;
     }
     const perspectiveLabel = perspectiveTitleById.get(perspective_id) || "GEN";
@@ -567,7 +589,7 @@ export default function AdminControlPanelPage() {
       }));
       setShowIndicatorCreateForm(false);
       await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
-    }, "Indicator berhasil ditambahkan (kode internal dibuat otomatis).");
+    }, "Indikator berhasil ditambahkan (kode internal dibuat otomatis).");
   }
 
   async function handleToggleLock(nextLock: boolean) {
@@ -579,7 +601,7 @@ export default function AdminControlPanelPage() {
       });
       setLockReason("");
       await reloadBase(session);
-    }, nextLock ? "Config lock diaktifkan." : "Config lock dibuka.");
+    }, nextLock ? "Kunci konfigurasi diaktifkan." : "Kunci konfigurasi dibuka.");
   }
 
   async function applyGlobalUserRole(userId: string, nextRole: AppRole) {
@@ -694,7 +716,7 @@ export default function AdminControlPanelPage() {
     await runAction(async () => {
       await deleteAdminIndicator(session, id);
       await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
-    }, "Indicator berhasil dihapus.");
+    }, "Indikator berhasil dihapus.");
   }
 
   async function handleDecideRole2Proposal(proposalId: string, status: "APPROVED" | "REJECTED") {
@@ -702,8 +724,8 @@ export default function AdminControlPanelPage() {
       await decideRole2BimUseProposal(session, proposalId, {
         status,
         decision_note: status === "APPROVED"
-          ? "Approved by Admin (proposal-only)."
-          : "Rejected by Admin.",
+          ? "Disetujui admin (proposal-only)."
+          : "Ditolak admin.",
       });
       const rows = await listRole2BimUseProposals(session);
       setRole2Proposals(rows);
@@ -720,12 +742,12 @@ export default function AdminControlPanelPage() {
   }
 
   return (
-    <main className="task-shell">
+    <main className="task-shell admin-control-panel">
       <header className="task-header">
         <p className="task-kicker">BIM Scoring Platform</p>
-        <h1>Admin Control Panel</h1>
+        <h1>Panel Kontrol Admin</h1>
         <p className="task-subtitle">
-          Workspace untuk Admin: kelola project, perspectives, indicators, dan lock konfigurasi.
+          Workspace untuk admin: kelola project, perspektif, indikator, dan kunci konfigurasi.
         </p>
       </header>
 
@@ -733,71 +755,33 @@ export default function AdminControlPanelPage() {
       {notice && <p className="task-note">{notice}</p>}
 
       <section className="task-panel">
-        <h2>Admin Session</h2>
-        <form
-          className="field-grid"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const actorId = toNonEmptyString(session.actorId) || "admin-web";
-            const role = toNonEmptyString(session.role) || "Admin";
-            setSession({ actorId, role });
-            setNotice("Session admin diperbarui.");
-          }}
-        >
-          <label>
-            Actor ID
-            <input
-              value={session.actorId}
-              onChange={(event) => setSession((prev) => ({ ...prev, actorId: event.target.value }))}
-              placeholder="admin-web"
-            />
-          </label>
-          <label>
-            Role Header
-            <input
-              value={session.role}
-              onChange={(event) => setSession((prev) => ({ ...prev, role: event.target.value }))}
-              placeholder="Admin"
-            />
-          </label>
-          <div className="wizard-actions">
-            <button type="submit" className="action-primary" disabled={working}>
-              Simpan Session
-            </button>
-            <button
-              type="button"
-              disabled={working || loading}
-              onClick={() => {
-                void runAction(async () => {
-                  await reloadAll(session);
-                }, "Data admin dimuat ulang.");
-              }}
-            >
-              Reload Data
-            </button>
-          </div>
-        </form>
+        <h2>Sesi Admin</h2>
+        <p className="inline-note">
+          Sesi aktif: <strong>{toNonEmptyString(session.actorId) || "admin-web"}</strong> | Header role:{" "}
+          <strong>{toNonEmptyString(session.role) || "Admin"}</strong>
+        </p>
       </section>
 
       <section className="task-panel">
-        <h2>User Role Management</h2>
+        <h2>Manajemen Role Pengguna</h2>
         <p className="task-subtitle">
-          Assign role global user dari admin panel, termasuk approve pengajuan role saat pendaftaran.
-          Perubahan berlaku setelah user sign out dan sign in ulang.
+          Atur role global pengguna dari panel admin, termasuk menyetujui pengajuan role saat pendaftaran.
+          Perubahan berlaku setelah pengguna sign out dan sign in ulang.
         </p>
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table admin-user-table">
+            <caption className="sr-only">Daftar user dan manajemen role</caption>
             <thead>
               <tr>
-                <th>Nama</th>
-                <th>Nomor Pegawai</th>
-                <th>Email</th>
-                <th>Pengajuan Role</th>
-                <th>Pengajuan Scope Project</th>
-                <th>Role Aktif</th>
-                <th>Set Role</th>
-                <th>Approve Pengajuan</th>
-                <th>Aksi Manual</th>
+                <th scope="col">Nama</th>
+                <th scope="col">Nomor Pegawai</th>
+                <th scope="col">Email</th>
+                <th scope="col">Pengajuan Role</th>
+                <th scope="col">Pengajuan Scope Project</th>
+                <th scope="col">Role Aktif</th>
+                <th scope="col">Atur Role</th>
+                <th scope="col">Setujui Pengajuan</th>
+                <th scope="col">Aksi Manual</th>
               </tr>
             </thead>
             <tbody>
@@ -814,7 +798,7 @@ export default function AdminControlPanelPage() {
                 const requestedScopeLabel =
                   requestedProjectIds.length > 0
                     ? requestedProjectIds.map((id) => projectNameById.get(id) || id).join(", ")
-                    : "N/A";
+                    : "-";
                 const activeRole2Scopes = roleMappings
                   .filter(
                     (mapping) =>
@@ -835,26 +819,27 @@ export default function AdminControlPanelPage() {
                 const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
                 return (
                   <tr key={item.id}>
-                    <td>{item.name || "N/A"}</td>
-                    <td>{item.employee_number || "N/A"}</td>
-                    <td>{item.email || "N/A"}</td>
+                    <td>{item.name || "-"}</td>
+                    <td>{item.employee_number || "-"}</td>
+                    <td>{item.email || "-"}</td>
                     <td>
                       {requestedRole ? (
                         <>
                           <strong>{getRoleLabel(requestedRole)}</strong>
                           <br />
                           <small>
-                            Diajukan: {requestSubmittedAt} | Status: {isRequestAlreadyApplied ? "Approved" : "Pending"}
+                            Diajukan: {requestSubmittedAt} | Status: {isRequestAlreadyApplied ? "Disetujui" : "Menunggu"}
                           </small>
                         </>
                       ) : (
-                        "N/A"
+                        "-"
                       )}
                     </td>
                     <td>{requestedScopeLabel}</td>
                     <td>{getRoleLabel(currentRole)}</td>
                     <td>
                       <select
+                        aria-label={`Set role untuk ${item.name || item.email || item.id}`}
                         value={draftRole}
                         onChange={(event) =>
                           setUserRoleDraftById((prev) => ({
@@ -876,7 +861,7 @@ export default function AdminControlPanelPage() {
                         disabled={working || !requestedRole || isRequestAlreadyApplied}
                         onClick={() => void handleApproveRequestedRole(item)}
                       >
-                        {isRequestAlreadyApplied ? "Sudah Approved" : "Approve Sesuai Pengajuan"}
+                        {isRequestAlreadyApplied ? "Sudah Disetujui" : "Setujui Sesuai Pengajuan"}
                       </button>
                     </td>
                     <td>
@@ -898,25 +883,26 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Role 2 BIM Use Proposal Queue</h2>
+        <h2>Antrian Proposal BIM Use Role 2</h2>
         <p className="task-subtitle">
-          Proposal-only workflow. Role 2 mengajukan perubahan BIM Use / mapping indicator, keputusan akhir tetap di Admin.
+          Alur proposal-only. Role 2 mengajukan perubahan BIM Use / pemetaan indikator, keputusan akhir tetap di Admin.
         </p>
         <p className="inline-note">
-          Approve/Reject di sini tidak otomatis mengubah master perspektif/indikator. Perubahan master tetap admin-controlled.
+          Setujui/Tolak di sini tidak otomatis mengubah master perspektif/indikator. Perubahan master tetap dikendalikan admin.
         </p>
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table admin-role2-proposal-table">
+            <caption className="sr-only">Antrian proposal BIM Use Role 2</caption>
             <thead>
               <tr>
-                <th>Requester</th>
-                <th>Project</th>
-                <th>Tipe</th>
-                <th>Proposed BIM Use</th>
-                <th>Indicator IDs</th>
-                <th>Reason</th>
-                <th>Status</th>
-                <th>Aksi</th>
+                <th scope="col">Pemohon</th>
+                <th scope="col">Project</th>
+                <th scope="col">Tipe</th>
+                <th scope="col">Usulan BIM Use</th>
+                <th scope="col">ID Indikator</th>
+                <th scope="col">Alasan</th>
+                <th scope="col">Status</th>
+                <th scope="col">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -931,13 +917,13 @@ export default function AdminControlPanelPage() {
                   return (
                     <tr key={item.id}>
                       <td>{requester?.name || requester?.email || item.requester_user_id}</td>
-                      <td>{(item.project_id && projectNameById.get(item.project_id)) || item.project_id || "N/A"}</td>
-                      <td>{item.proposal_type || "N/A"}</td>
-                      <td>{item.proposed_bim_use || "N/A"}</td>
-                      <td>{indicatorList.length ? indicatorList.join(", ") : "N/A"}</td>
-                      <td>{item.reason || "N/A"}</td>
+                      <td>{(item.project_id && projectNameById.get(item.project_id)) || item.project_id || "-"}</td>
+                      <td>{item.proposal_type || "-"}</td>
+                      <td>{item.proposed_bim_use || "-"}</td>
+                      <td>{indicatorList.length ? indicatorList.join(", ") : "-"}</td>
+                      <td>{item.reason || "-"}</td>
                       <td>
-                        <strong>{item.status || "N/A"}</strong>
+                        <strong>{item.status || "-"}</strong>
                         <br />
                         <small>Dibuat: {formatDateTime(item.created_at)}</small>
                       </td>
@@ -948,14 +934,14 @@ export default function AdminControlPanelPage() {
                             disabled={working || item.status !== "PENDING"}
                             onClick={() => void handleDecideRole2Proposal(item.id, "APPROVED")}
                           >
-                            Approve
+                            Setujui
                           </button>
                           <button
                             type="button"
                             disabled={working || item.status !== "PENDING"}
                             onClick={() => void handleDecideRole2Proposal(item.id, "REJECTED")}
                           >
-                            Reject
+                            Tolak
                           </button>
                         </div>
                       </td>
@@ -969,74 +955,28 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Dev Credential (Menu Navigation)</h2>
-        <p className="task-subtitle">
-          Untuk iterasi lokal sebelum login final, atur role aktif agar visibilitas menu sesuai skenario user.
-        </p>
-        <form className="field-grid" onSubmit={handleSaveDevCredential}>
-          <label>
-            Active role
-            <select value={devRole} onChange={(event) => setDevRole(event.target.value as AppRole)}>
-              {ROLE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            User ID (opsional)
-            <input
-              value={devUserId}
-              onChange={(event) => setDevUserId(event.target.value)}
-              placeholder="contoh: u-bim-001"
-            />
-          </label>
-          <div className="wizard-actions">
-            <button type="submit" className="action-primary" disabled={working}>
-              Simpan Credential Navigasi
-            </button>
-            <button
-              type="button"
-              disabled={working}
-              onClick={() => {
-                setDevRole("viewer");
-                setDevUserId("");
-                const saved = setStoredCredential({ role: "viewer", user_id: null });
-                setNotice(
-                  `Credential navigasi direset: ${getRoleLabel(saved.role)} (${saved.user_id || "no-user-id"})`
-                );
-              }}
-            >
-              Reset ke Viewer
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section className="task-panel">
-        <h2>Config Lock</h2>
+        <h2>Kunci Konfigurasi</h2>
         {loading ? (
-          <p>Loading lock state...</p>
+          <p>Memuat status kunci...</p>
         ) : (
           <div className="admin-lock-bar">
             <p>
               Status:{" "}
               <span className={`status-chip ${configLock?.is_locked ? "status-lock" : "status-open"}`}>
-                {configLock?.is_locked ? "LOCKED" : "OPEN"}
+                {configLock?.is_locked ? "TERKUNCI" : "TERBUKA"}
               </span>
             </p>
-            <p>Reason: {configLock?.reason || "N/A"}</p>
+            <p>Alasan: {configLock?.reason || "-"}</p>
             <p>
-              Updated by: {configLock?.updated_by || "N/A"} | Updated at:{" "}
-              {configLock?.updated_at || "N/A"}
+              Diperbarui oleh: {configLock?.updated_by || "-"} | Diperbarui pada:{" "}
+              {configLock?.updated_at || "-"}
             </p>
             <label>
-              Reason update lock
+              Alasan pembaruan kunci
               <input
                 value={lockReason}
                 onChange={(event) => setLockReason(event.target.value)}
-                placeholder="Freeze reason..."
+                placeholder="Contoh: freeze sebelum audit."
               />
             </label>
             <div className="wizard-actions">
@@ -1046,10 +986,10 @@ export default function AdminControlPanelPage() {
                 disabled={working}
                 onClick={() => void handleToggleLock(true)}
               >
-                Lock Config
+                Kunci Konfigurasi
               </button>
               <button type="button" disabled={working} onClick={() => void handleToggleLock(false)}>
-                Unlock Config
+                Buka Kunci
               </button>
             </div>
           </div>
@@ -1057,10 +997,10 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Project Workspace (Admin CRUD)</h2>
+        <h2>Workspace Project (CRUD Admin)</h2>
         <p className="task-subtitle">Daftar workspace eksisting ditampilkan lebih dulu sebelum aksi CRUD.</p>
         <p className="inline-note">
-          Untuk keamanan, aksi hapus workspace dinonaktifkan. Gunakan Deactivate untuk menonaktifkan workspace tanpa menghapus data.
+          Untuk keamanan, aksi hapus workspace dinonaktifkan. Gunakan Nonaktifkan untuk menonaktifkan workspace tanpa menghapus data.
         </p>
         <div className="wizard-actions">
           <button
@@ -1074,14 +1014,15 @@ export default function AdminControlPanelPage() {
         </div>
 
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table admin-project-table">
+            <caption className="sr-only">Daftar workspace project</caption>
             <thead>
               <tr>
-                <th>Nama Workspace</th>
-                <th>Status</th>
-                <th>Dibuat</th>
-                <th>Diperbarui</th>
-                <th>Aksi</th>
+                <th scope="col">Nama Workspace</th>
+                <th scope="col">Status</th>
+                <th scope="col">Dibuat</th>
+                <th scope="col">Diperbarui</th>
+                <th scope="col">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -1103,15 +1044,18 @@ export default function AdminControlPanelPage() {
                       onClick={() => {
                         const nextActive = item.is_active === false;
                         const label = item.name || "tanpa nama";
-                        const prompt = nextActive
-                          ? `Aktifkan workspace "${label}"?`
-                          : `Nonaktifkan workspace "${label}"?\n\nCatatan: Data tidak dihapus, hanya disembunyikan dari alur aktif.`;
-                        const yes = window.confirm(prompt);
-                        if (!yes) return;
-                        void handleSetProjectActive(item.id, nextActive);
+                        requestConfirm({
+                          title: nextActive ? "Aktifkan workspace?" : "Nonaktifkan workspace?",
+                          message: nextActive
+                            ? `Workspace "${label}" akan kembali tersedia untuk alur aktif.`
+                            : `Workspace "${label}" tidak dihapus, hanya disembunyikan dari alur aktif.`,
+                          confirmLabel: nextActive ? "Aktifkan" : "Nonaktifkan",
+                          tone: nextActive ? "default" : "danger",
+                          onConfirm: () => handleSetProjectActive(item.id, nextActive),
+                        });
                       }}
                     >
-                      {item.is_active === false ? "Activate" : "Deactivate"}
+                      {item.is_active === false ? "Aktifkan" : "Nonaktifkan"}
                     </button>
                   </td>
                 </tr>
@@ -1132,11 +1076,11 @@ export default function AdminControlPanelPage() {
               />
             </label>
             <label>
-              Config Key (opsional)
+              Kunci Konfigurasi (opsional)
               <input
                 value={projectForm.config_key}
                 onChange={(event) => setProjectForm((prev) => ({ ...prev, config_key: event.target.value }))}
-                placeholder="Key konfigurasi internal"
+                placeholder="Kunci konfigurasi internal"
               />
             </label>
             <div className="wizard-actions">
@@ -1149,9 +1093,9 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Scoring Period Management</h2>
+        <h2>Manajemen Periode Skoring</h2>
         <p className="task-subtitle">
-          Skema period mingguan per project diatur di sini. Role input/review/approval menggunakan period aktif yang tersedia.
+          Skema periode mingguan per project diatur di sini. Role input/review/approval menggunakan periode aktif yang tersedia.
         </p>
         <div className="wizard-actions admin-filter-row">
           <label>
@@ -1170,7 +1114,7 @@ export default function AdminControlPanelPage() {
             </select>
           </label>
           <label>
-            Start Hari Periode (Weekly Anchor)
+            Hari Mulai Periode (Anchor Mingguan)
             <select
               value={weekAnchorDraft}
               onChange={(event) => setWeekAnchorDraft(event.target.value as WeekAnchor)}
@@ -1189,31 +1133,31 @@ export default function AdminControlPanelPage() {
             disabled={working || !hasActivePeriodProject || !selectedPeriodProject}
             onClick={() => void handleSaveWeeklyAnchor()}
           >
-            Simpan Anchor Weekly
+            Simpan Anchor Mingguan
           </button>
         </div>
         {selectedPeriodProject && hasActivePeriodProject ? (
           <p className="inline-note">
-            Menampilkan period untuk workspace: <strong>{selectedPeriodProject.name || "Tanpa nama"}</strong>
+            Menampilkan periode untuk workspace: <strong>{selectedPeriodProject.name || "Tanpa nama"}</strong>
           </p>
         ) : null}
-        {!selectedPeriodProject ? <p className="inline-note">Pilih workspace aktif untuk mengatur anchor period.</p> : null}
+        {!selectedPeriodProject ? <p className="inline-note">Pilih workspace aktif untuk mengatur anchor periode.</p> : null}
         {selectedPeriodProject && !hasActivePeriodProject ? (
           <p className="inline-note">
-            Workspace terpilih berstatus <strong>Inactive</strong>. Aktifkan workspace atau pilih workspace lain
-            untuk mengatur anchor period.
+            Workspace terpilih berstatus <strong>Nonaktif</strong>. Aktifkan workspace atau pilih workspace lain
+            untuk mengatur anchor periode.
           </p>
         ) : null}
         {selectedPeriodProject ? (
           <p className="inline-note">
-            Timezone period: <strong>Asia/Jakarta</strong>, start jam <strong>00:00</strong>. Sistem akan membuat dan
-            mengganti period otomatis setiap <strong>7 hari</strong> berdasarkan anchor di atas. Period lama otomatis
-            read-only untuk Role 1 (review/approval tetap mengikuti gate policy).
+            Zona waktu periode: <strong>Asia/Jakarta</strong>, mulai jam <strong>00:00</strong>. Sistem akan membuat dan
+            mengganti periode otomatis setiap <strong>7 hari</strong> berdasarkan anchor di atas. Periode lama otomatis
+            read-only untuk Role 1 (review/approval tetap mengikuti kebijakan gate).
           </p>
         ) : null}
         {selectedPeriodProject ? (
           <p className="inline-note">
-            Total period terdaftar untuk workspace ini: <strong>{periods.length}</strong>
+            Total periode terdaftar untuk workspace ini: <strong>{periods.length}</strong>
           </p>
         ) : null}
         {periodFeedback ? (
@@ -1231,14 +1175,15 @@ export default function AdminControlPanelPage() {
         ) : null}
 
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table admin-period-table">
+            <caption className="sr-only">Daftar periode skoring per workspace</caption>
             <thead>
               <tr>
-                <th>Period</th>
-                <th>Rentang</th>
-                <th>Status</th>
-                <th>Version</th>
-                <th>Diperbarui</th>
+                <th scope="col">Periode</th>
+                <th scope="col">Rentang</th>
+                <th scope="col">Status</th>
+                <th scope="col">Versi</th>
+                <th scope="col">Diperbarui</th>
               </tr>
             </thead>
             <tbody>
@@ -1249,20 +1194,20 @@ export default function AdminControlPanelPage() {
               )}
               {periodProjectFilter && periodLoading && (
                 <tr>
-                  <td colSpan={5}>Memuat scoring period...</td>
+                  <td colSpan={5}>Memuat periode skoring...</td>
                 </tr>
               )}
               {periodProjectFilter && !periodLoading && periods.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Belum ada scoring period untuk project ini.</td>
+                  <td colSpan={5}>Belum ada periode skoring untuk project ini.</td>
                 </tr>
               )}
               {periods.map((item) => (
                 <tr key={item.id}>
                   <td>{item.year && item.week ? `${item.year} W${item.week}` : item.id}</td>
-                  <td>{item.start_date || "N/A"} - {item.end_date || "N/A"}</td>
-                  <td>{item.status || "OPEN"}</td>
-                  <td>{item.version ?? "N/A"}</td>
+                  <td>{item.start_date || "-"} - {item.end_date || "-"}</td>
+                  <td>{item.status || "TERBUKA"}</td>
+                  <td>{item.version ?? "-"}</td>
                   <td>{formatDateTime(item.updated_at || item.created_at)}</td>
                 </tr>
               ))}
@@ -1273,41 +1218,42 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Perspectives (Org Level)</h2>
+        <h2>Perspektif (Level Organisasi)</h2>
         <p className="task-subtitle">
-          Perspective bersifat baseline organisasi (fixed) dan tidak dapat diubah dari admin panel.
+          Perspektif bersifat baseline organisasi (tetap) dan tidak dapat diubah dari panel admin.
         </p>
         <p className="inline-note">
-          Perubahan perspective hanya boleh melalui pembaruan blueprint/migrasi terkontrol.
+          Perubahan perspektif hanya boleh melalui pembaruan blueprint/migrasi terkontrol.
         </p>
         {hiddenLegacyPerspectiveCount > 0 && (
           <p className="inline-note">
-            {hiddenLegacyPerspectiveCount} perspective legacy/nonaktif disembunyikan dari daftar utama.
+            {hiddenLegacyPerspectiveCount} perspektif legacy/nonaktif disembunyikan dari daftar utama.
           </p>
         )}
 
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table admin-perspective-table">
+            <caption className="sr-only">Daftar perspektif organisasi</caption>
             <thead>
               <tr>
-                <th>Perspective</th>
-                <th>Deskripsi</th>
-                <th>Bobot</th>
-                <th>Status</th>
-                <th>Diperbarui</th>
+                <th scope="col">Perspektif</th>
+                <th scope="col">Deskripsi</th>
+                <th scope="col">Bobot</th>
+                <th scope="col">Status</th>
+                <th scope="col">Diperbarui</th>
               </tr>
             </thead>
             <tbody>
               {visiblePerspectiveRows.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Belum ada perspective aktif yang valid.</td>
+                  <td colSpan={5}>Belum ada perspektif aktif yang valid.</td>
                 </tr>
               )}
               {visiblePerspectiveRows.map((item) => (
                 <tr key={item.id}>
                   <td>{item.title || "Tanpa judul"}</td>
-                  <td>{item.description || "N/A"}</td>
-                  <td>{item.weight ?? "N/A"}</td>
+                  <td>{item.description || "-"}</td>
+                  <td>{item.weight ?? "-"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
                   <td>{formatDateTime(item.updated_at)}</td>
                 </tr>
@@ -1318,9 +1264,9 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Indicators</h2>
+        <h2>Indikator</h2>
         <p className="task-subtitle">
-          Indikator dikelompokkan per perspective. Pilih perspective terlebih dahulu untuk melihat daftar dan menambah indikator baru.
+          Indikator dikelompokkan per perspektif. Pilih perspektif terlebih dahulu untuk melihat daftar dan menambah indikator baru.
         </p>
         <div className="wizard-actions">
           <button
@@ -1329,21 +1275,21 @@ export default function AdminControlPanelPage() {
             disabled={working || !indicatorPerspectiveFilter}
             onClick={() => setShowIndicatorCreateForm((prev) => !prev)}
           >
-            {showIndicatorCreateForm ? "Tutup Form Tambah" : "Tambah Indicator"}
+            {showIndicatorCreateForm ? "Tutup Form Tambah" : "Tambah Indikator"}
           </button>
         </div>
 
         <div className="wizard-actions admin-filter-row">
           <label>
-            Perspective
+            Perspektif
             <select
               value={indicatorPerspectiveFilter}
               onChange={(event) => handleChangeIndicatorPerspective(event.target.value)}
             >
-              <option value="">Pilih perspective</option>
+              <option value="">Pilih perspektif</option>
               {sortedPerspectiveOptions.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.title || item.code || "Perspective tanpa judul"}
+                  {item.title || item.code || "Perspektif tanpa judul"}
                 </option>
               ))}
             </select>
@@ -1351,30 +1297,31 @@ export default function AdminControlPanelPage() {
         </div>
         {!indicatorPerspectiveFilter && (
           <p className="inline-note">
-            Pilih perspective untuk menampilkan daftar indikator. Ini mencegah daftar terlalu panjang dan scroll berlebihan.
+            Pilih perspektif untuk menampilkan daftar indikator. Ini mencegah daftar terlalu panjang dan scroll berlebihan.
           </p>
         )}
         {selectedIndicatorPerspective && (
           <p className="inline-note">
-            Menampilkan indikator untuk: <strong>{selectedIndicatorPerspective.title || "Perspective tanpa judul"}</strong>
+            Menampilkan indikator untuk: <strong>{selectedIndicatorPerspective.title || "Perspektif tanpa judul"}</strong>
           </p>
         )}
 
         <div className="admin-table-wrap">
-          <table className="audit-table">
+          <table className="audit-table responsive-stack-table admin-indicator-table">
+            <caption className="sr-only">Daftar indikator per perspektif</caption>
             <thead>
               <tr>
-                <th>Judul Indikator</th>
-                <th>Deskripsi</th>
-                <th>Status</th>
-                <th>Diperbarui</th>
-                <th>Aksi</th>
+                <th scope="col">Judul Indikator</th>
+                <th scope="col">Deskripsi</th>
+                <th scope="col">Status</th>
+                <th scope="col">Diperbarui</th>
+                <th scope="col">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {!indicatorPerspectiveFilter && (
                 <tr>
-                  <td colSpan={5}>Pilih perspective terlebih dahulu.</td>
+                  <td colSpan={5}>Pilih perspektif terlebih dahulu.</td>
                 </tr>
               )}
               {indicatorPerspectiveFilter && indicatorLoading && (
@@ -1384,13 +1331,13 @@ export default function AdminControlPanelPage() {
               )}
               {indicatorPerspectiveFilter && !indicatorLoading && indicators.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Belum ada indikator pada perspective ini.</td>
+                  <td colSpan={5}>Belum ada indikator pada perspektif ini.</td>
                 </tr>
               )}
               {indicators.map((item) => (
                 <tr key={item.id}>
                   <td>{item.title || "Tanpa judul"}</td>
-                  <td>{item.description || "N/A"}</td>
+                  <td>{item.description || "-"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
                   <td>{formatDateTime(item.updated_at)}</td>
                   <td>
@@ -1398,12 +1345,16 @@ export default function AdminControlPanelPage() {
                       type="button"
                       disabled={working}
                       onClick={() => {
-                        const yes = window.confirm(`Hapus indikator "${item.title || "tanpa judul"}"?`);
-                        if (!yes) return;
-                        void handleDeleteIndicator(item.id);
+                        requestConfirm({
+                          title: "Hapus indikator?",
+                          message: `Indikator "${item.title || "tanpa judul"}" akan dihapus permanen.`,
+                          confirmLabel: "Hapus",
+                          tone: "danger",
+                          onConfirm: () => handleDeleteIndicator(item.id),
+                        });
                       }}
                     >
-                      Delete
+                      Hapus
                     </button>
                   </td>
                 </tr>
@@ -1415,16 +1366,16 @@ export default function AdminControlPanelPage() {
         {showIndicatorCreateForm && (
           <form className="field-grid" onSubmit={(event) => void handleCreateIndicator(event)}>
             <label>
-              Perspective Terpilih
+              Perspektif Terpilih
               <select
                 value={indicatorForm.perspective_id || indicatorPerspectiveFilter}
                 onChange={(event) => handleChangeIndicatorPerspective(event.target.value)}
                 required
               >
-                <option value="">Pilih perspective</option>
+                <option value="">Pilih perspektif</option>
                 {sortedPerspectiveOptions.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.title || item.code || "Perspective tanpa judul"}
+                    {item.title || item.code || "Perspektif tanpa judul"}
                   </option>
                 ))}
               </select>
@@ -1434,7 +1385,7 @@ export default function AdminControlPanelPage() {
                 <input
                 value={indicatorForm.title}
                 onChange={(event) => setIndicatorForm((prev) => ({ ...prev, title: event.target.value }))}
-                placeholder="Model coordination issue closure"
+                placeholder="Contoh: Penutupan isu koordinasi model"
                 required
               />
             </label>
@@ -1449,12 +1400,41 @@ export default function AdminControlPanelPage() {
             <p className="inline-note">Kode internal indikator dibuat otomatis saat simpan.</p>
             <div className="wizard-actions">
               <button type="submit" className="action-primary" disabled={working}>
-                Simpan Indicator
+                Simpan Indikator
               </button>
             </div>
           </form>
         )}
       </section>
+
+      {confirmDialog ? (
+        <div className="confirm-modal-overlay" onClick={() => closeConfirm()}>
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-modal-title"
+            aria-describedby="confirm-modal-desc"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="confirm-modal-title">{confirmDialog.title}</h3>
+            <p id="confirm-modal-desc">{confirmDialog.message}</p>
+            <div className="wizard-actions">
+              <button type="button" disabled={working} onClick={() => closeConfirm()}>
+                Batal
+              </button>
+              <button
+                type="button"
+                className={confirmDialog.tone === "danger" ? "action-danger" : "action-primary"}
+                disabled={working}
+                onClick={() => void handleConfirm()}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

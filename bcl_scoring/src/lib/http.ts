@@ -67,6 +67,82 @@ function toErrorMessage(value: unknown): string {
   return String(value || "Unknown error");
 }
 
+function extractHttpStatus(text: string): number | null {
+  const match = text.match(/\bhttp\s+(\d{3})\b/i);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function toUserFacingErrorMessage(
+  error: unknown,
+  fallback = "Terjadi kendala saat memproses permintaan."
+): string {
+  const raw = toErrorMessage(error).trim();
+  if (!raw) return fallback;
+
+  const normalized = raw.toLowerCase();
+  const statusFromText = extractHttpStatus(raw);
+
+  if (
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("cors") ||
+    normalized.includes("backend unavailable") ||
+    normalized.includes("backend not available") ||
+    normalized.includes("request timeout")
+  ) {
+    return "Koneksi ke layanan backend sedang bermasalah. Coba lagi beberapa saat.";
+  }
+
+  if (
+    normalized.includes("unexpected token") ||
+    normalized.includes("not valid json") ||
+    normalized.includes("invalid json") ||
+    normalized.includes("parse error") ||
+    normalized.includes("invalid payload")
+  ) {
+    return "Respons server tidak valid. Coba ulangi dalam beberapa saat.";
+  }
+
+  const status =
+    statusFromText ||
+    (normalized.includes("forbidden") ? 403 : null) ||
+    (normalized.includes("unauthorized") ? 401 : null);
+  if (status) {
+    if (status === 401 || status === 403) {
+      return "Akses ditolak. Pastikan akun dan role Anda sudah sesuai.";
+    }
+    if (status === 404) {
+      return "Data yang diminta tidak ditemukan.";
+    }
+    if (status >= 500) {
+      return "Server sedang bermasalah. Silakan coba lagi nanti.";
+    }
+    return "Permintaan ke server gagal. Silakan coba lagi.";
+  }
+
+  // Preserve concise business errors from API, but avoid leaking overly technical text.
+  if (raw.length <= 140 && !/[<>{}]/.test(raw)) return raw;
+  return fallback;
+}
+
+export function toUserFacingSafeFetchError(
+  result: SafeFetchFail,
+  fallback = "Permintaan ke server gagal."
+): string {
+  if (result.kind === "backend_unavailable") {
+    return toUserFacingErrorMessage(result.error || result.kind, fallback);
+  }
+  if (result.kind === "http_error") {
+    return toUserFacingErrorMessage(
+      `HTTP ${result.status || 500}${result.error ? ` ${result.error}` : ""}`,
+      fallback
+    );
+  }
+  return toUserFacingErrorMessage(result.error || "Invalid payload", fallback);
+}
+
 function snippet(text: string, limit = 220): string {
   if (!text) return "";
   const trimmed = text.replace(/\s+/g, " ").trim();
