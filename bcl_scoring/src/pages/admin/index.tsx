@@ -176,9 +176,9 @@ function upsertWeekAnchorConfigKey(configKey: string | null | undefined, anchor:
   return `${raw}; week_anchor=${anchor}`;
 }
 
-function resolveUserGlobalRole(userId: string, mappings: AdminRoleMapping[]): AppRole {
-  const globalRoles = mappings
-    .filter((item) => item.user_id === userId && item.is_active !== false && !toNonEmptyString(item.project_id || ""))
+function resolveUserAssignedRole(userId: string, mappings: AdminRoleMapping[]): AppRole {
+  const roles = mappings
+    .filter((item) => item.user_id === userId && item.is_active !== false)
     .map((item) => {
       const role = String(item.role || "").trim().toLowerCase();
       if (role === "admin") return "admin";
@@ -188,7 +188,7 @@ function resolveUserGlobalRole(userId: string, mappings: AdminRoleMapping[]): Ap
       return "viewer";
     });
   for (const role of ROLE_PRIORITY) {
-    if (globalRoles.includes(role)) return role;
+    if (roles.includes(role)) return role;
   }
   return "viewer";
 }
@@ -275,7 +275,7 @@ export default function AdminControlPanelPage() {
   const userCurrentRoleById = useMemo(() => {
     const out = new Map<string, AppRole>();
     for (const user of users) {
-      out.set(user.id, resolveUserGlobalRole(user.id, roleMappings));
+      out.set(user.id, resolveUserAssignedRole(user.id, roleMappings));
     }
     return out;
   }, [users, roleMappings]);
@@ -315,7 +315,7 @@ export default function AdminControlPanelPage() {
     setRoleMappings(roleMappingRows);
     setUserRoleDraftById(
       userRows.reduce<Record<string, AppRole>>((acc, item) => {
-        acc[item.id] = resolveUserGlobalRole(item.id, roleMappingRows);
+        acc[item.id] = resolveUserAssignedRole(item.id, roleMappingRows);
         return acc;
       }, {})
     );
@@ -677,6 +677,51 @@ export default function AdminControlPanelPage() {
     }
   }
 
+  async function applyRole1ScopedUserRole(userId: string, requestedProjectIds: string[]) {
+    const scopedProjectIds = [...new Set(requestedProjectIds.map((item) => item.trim()).filter(Boolean))];
+    const scopedProjectId = scopedProjectIds[0] || null;
+
+    await applyGlobalUserRole(userId, "role1");
+
+    const allRole1Mappings = roleMappings.filter(
+      (item) =>
+        item.user_id === userId &&
+        String(item.role || "").trim().toLowerCase() === "role1"
+    );
+
+    if (!scopedProjectId) {
+      for (const mapping of allRole1Mappings) {
+        const mappingProjectId = toNonEmptyString(mapping.project_id || "");
+        if (mappingProjectId && mapping.is_active !== false) {
+          await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+        }
+      }
+      return;
+    }
+
+    for (const mapping of allRole1Mappings) {
+      const mappingProjectId = toNonEmptyString(mapping.project_id || "");
+      if (!mappingProjectId || mappingProjectId === scopedProjectId || mapping.is_active === false) continue;
+      await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+    }
+
+    const sameProject = allRole1Mappings.find(
+      (item) => toNonEmptyString(item.project_id || "") === scopedProjectId
+    );
+    if (sameProject) {
+      if (sameProject.is_active === false) {
+        await updateAdminRoleMapping(session, sameProject.id, { is_active: true });
+      }
+    } else {
+      await createAdminRoleMapping(session, {
+        user_id: userId,
+        role: "role1",
+        project_id: scopedProjectId,
+        is_active: true,
+      });
+    }
+  }
+
   async function handleAssignUserRole(userId: string) {
     const nextRole = userRoleDraftById[userId] || "viewer";
     await runAction(async () => {
@@ -695,6 +740,8 @@ export default function AdminControlPanelPage() {
     await runAction(async () => {
       if (requestedRole === "role2") {
         await applyRole2ScopedUserRole(user.id, requestedProjectIds);
+      } else if (requestedRole === "role1") {
+        await applyRole1ScopedUserRole(user.id, requestedProjectIds);
       } else {
         await applyGlobalUserRole(user.id, requestedRole);
       }
@@ -766,6 +813,7 @@ export default function AdminControlPanelPage() {
         <h2>Manajemen Role Pengguna</h2>
         <p className="task-subtitle">
           Atur role global pengguna dari panel admin, termasuk menyetujui pengajuan role saat pendaftaran.
+          Role 1 dan Role 2 yang mengajukan scope project akan dipetakan ke workspace saat disetujui.
           Perubahan berlaku setelah pengguna sign out dan sign in ulang.
         </p>
         <div className="admin-table-wrap">
@@ -808,13 +856,27 @@ export default function AdminControlPanelPage() {
                   )
                   .map((mapping) => toNonEmptyString(mapping.project_id || ""))
                   .filter(Boolean) as string[];
+                const activeRole1Scopes = roleMappings
+                  .filter(
+                    (mapping) =>
+                      mapping.user_id === item.id &&
+                      mapping.is_active !== false &&
+                      String(mapping.role || "").trim().toLowerCase() === "role1"
+                  )
+                  .map((mapping) => toNonEmptyString(mapping.project_id || ""))
+                  .filter(Boolean) as string[];
                 const isRequestAlreadyApplied = (() => {
                   if (!requestedRole) return false;
+                  if (requestedRole === "role1") {
+                    if (currentRole !== "role1") return false;
+                    if (requestedProjectIds.length === 0) return activeRole1Scopes.length === 0;
+                    return requestedProjectIds.every((projectId) => activeRole1Scopes.includes(projectId));
+                  }
                   if (requestedRole !== "role2") return requestedRole === currentRole;
                   if (requestedProjectIds.length === 0) {
                     return currentRole === "role2" && activeRole2Scopes.length === 0;
                   }
-                  return requestedProjectIds.every((projectId) => activeRole2Scopes.includes(projectId));
+                  return currentRole === "role2" && requestedProjectIds.every((projectId) => activeRole2Scopes.includes(projectId));
                 })();
                 const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
                 return (
