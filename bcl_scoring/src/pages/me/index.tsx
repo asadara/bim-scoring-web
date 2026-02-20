@@ -1,7 +1,8 @@
 import Head from "next/head";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { getMainNavItemsForRole } from "@/lib/accessControl";
 import {
@@ -32,6 +33,8 @@ const REQUESTED_ROLE_LABEL: Record<RequestedRole, string> = {
   role3: "BIM Manager",
   viewer: "Viewer / Auditor",
 };
+const PROFILE_PHOTO_STORAGE_KEY = "bim_user_profile_photo_v1";
+const MAX_PROFILE_PHOTO_SIZE_BYTES = 3 * 1024 * 1024;
 
 const EMPTY_ACCOUNT: CurrentAuthAccount = {
   user_id: null,
@@ -76,6 +79,61 @@ function providerLabel(value?: string | null): string {
   return normalized;
 }
 
+function toInitials(value: string): string {
+  const clean = value
+    .replace(/[^A-Za-z0-9 ]+/g, " ")
+    .trim();
+  if (!clean) return "U";
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("File gambar tidak valid."));
+    };
+    reader.onerror = () => {
+      reject(new Error("Gagal membaca file gambar."));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function EyeIcon({ visible }: { visible: boolean }) {
+  if (visible) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M2 12c2.6-4.2 6.1-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-6.1 6.3-10 6.3S4.6 16.2 2 12z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M2 12c2.6-4.2 6.1-6.3 10-6.3 1.8 0 3.5.5 5.1 1.5m2.1 1.8c1 1 1.9 2.2 2.8 3.7-2.6 4.2-6.1 6.3-10 6.3-1.8 0-3.5-.5-5.1-1.5M4.9 15.4A17.4 17.4 0 0 1 2 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M3 3l18 18" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export default function MePage() {
   const router = useRouter();
   const credential = useCredential();
@@ -91,6 +149,20 @@ export default function MePage() {
   const [profileEmployeeNumber, setProfileEmployeeNumber] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [newPasswordVisible, setNewPasswordVisible] = useState(false);
+  const [confirmNewPasswordVisible, setConfirmNewPasswordVisible] = useState(false);
+  const [profilePhotoDataUrl, setProfilePhotoDataUrl] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const profilePhotoStorageKey = useMemo(
+    () => `${PROFILE_PHOTO_STORAGE_KEY}:${credential.user_id || "anon"}`,
+    [credential.user_id]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedPhoto = normalizeText(window.localStorage.getItem(profilePhotoStorageKey));
+    setProfilePhotoDataUrl(savedPhoto);
+  }, [profilePhotoStorageKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -150,6 +222,22 @@ export default function MePage() {
     [credential.role]
   );
   const roleStatusText = credential.pending_role ? "Menunggu penetapan admin" : "Role aktif";
+  const profileAvatarInitials = useMemo(() => {
+    const base =
+      account.full_name ||
+      credential.full_name ||
+      account.employee_number ||
+      credential.employee_number ||
+      account.email ||
+      "User";
+    return toInitials(base);
+  }, [
+    account.email,
+    account.employee_number,
+    account.full_name,
+    credential.employee_number,
+    credential.full_name,
+  ]);
 
   async function reloadAccountSnapshot(): Promise<void> {
     const snapshot = await getCurrentAuthAccount();
@@ -228,6 +316,32 @@ export default function MePage() {
     }
   }
 
+  async function onProfilePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("File harus berupa gambar.");
+      return;
+    }
+    if (file.size > MAX_PROFILE_PHOTO_SIZE_BYTES) {
+      setError("Ukuran foto maksimal 3 MB.");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setProfilePhotoDataUrl(dataUrl);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(profilePhotoStorageKey, dataUrl);
+      }
+      setError(null);
+      setInfo("Foto profil berhasil diperbarui.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memperbarui foto profil.");
+    }
+  }
+
   return (
     <>
       <Head>
@@ -235,10 +349,56 @@ export default function MePage() {
       </Head>
       <main className="task-shell auth-shell">
         <section className="task-panel">
-          <h1>Akun Saya</h1>
-          <p className="task-subtitle">
-            Halaman ini merangkum profil user, status role, detail pengajuan, akses halaman, dan pengaturan akun.
-          </p>
+          <div className="me-header">
+            <div className="me-header-copy">
+              <h1>Akun Saya</h1>
+              <p className="task-subtitle">
+                Halaman ini merangkum profil user, status role, detail pengajuan, akses halaman, dan pengaturan akun.
+              </p>
+            </div>
+            <div className="me-avatar-panel">
+              <div className="me-avatar-frame">
+                {profilePhotoDataUrl ? (
+                  <Image
+                    src={profilePhotoDataUrl}
+                    alt="Foto profil user"
+                    className="me-avatar-image"
+                    fill
+                    sizes="108px"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="me-avatar-fallback">{profileAvatarInitials}</span>
+                )}
+                <button
+                  type="button"
+                  className="me-avatar-camera-btn"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={!isSignedIn || Boolean(busyAction)}
+                  aria-label="Ganti foto profil"
+                  title="Ganti foto profil"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M7.2 7.5 8.5 6h7l1.3 1.5H19a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2h2.2z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                    />
+                    <circle cx="12" cy="13" r="3.1" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  </svg>
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  className="sr-only"
+                  accept="image/*"
+                  onChange={onProfilePhotoSelected}
+                />
+              </div>
+              <p className="me-avatar-hint">Dummy foto bisa diganti (maks. 3 MB).</p>
+            </div>
+          </div>
           {!isConfigured ? (
             <p className="error-box">
               Supabase auth belum dikonfigurasi. Set `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
@@ -371,27 +531,59 @@ export default function MePage() {
               <h3>Ubah Password</h3>
               <label className="auth-field">
                 Password Baru
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  placeholder="Minimal 8 karakter"
-                  minLength={8}
-                  required
-                  disabled={!isSignedIn || Boolean(busyAction)}
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    type={newPasswordVisible ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="Minimal 8 karakter"
+                    minLength={8}
+                    required
+                    disabled={!isSignedIn || Boolean(busyAction)}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setNewPasswordVisible((prev) => !prev)}
+                    aria-label={newPasswordVisible ? "Sembunyikan password baru" : "Tampilkan password baru"}
+                    title={newPasswordVisible ? "Sembunyikan password baru" : "Tampilkan password baru"}
+                    disabled={!isSignedIn || Boolean(busyAction)}
+                  >
+                    <EyeIcon visible={newPasswordVisible} />
+                  </button>
+                </div>
               </label>
               <label className="auth-field">
                 Konfirmasi Password Baru
-                <input
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={(event) => setConfirmNewPassword(event.target.value)}
-                  placeholder="Ulangi password baru"
-                  minLength={8}
-                  required
-                  disabled={!isSignedIn || Boolean(busyAction)}
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    type={confirmNewPasswordVisible ? "text" : "password"}
+                    value={confirmNewPassword}
+                    onChange={(event) => setConfirmNewPassword(event.target.value)}
+                    placeholder="Ulangi password baru"
+                    minLength={8}
+                    required
+                    disabled={!isSignedIn || Boolean(busyAction)}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setConfirmNewPasswordVisible((prev) => !prev)}
+                    aria-label={
+                      confirmNewPasswordVisible
+                        ? "Sembunyikan konfirmasi password baru"
+                        : "Tampilkan konfirmasi password baru"
+                    }
+                    title={
+                      confirmNewPasswordVisible
+                        ? "Sembunyikan konfirmasi password baru"
+                        : "Tampilkan konfirmasi password baru"
+                    }
+                    disabled={!isSignedIn || Boolean(busyAction)}
+                  >
+                    <EyeIcon visible={confirmNewPasswordVisible} />
+                  </button>
+                </div>
               </label>
               <button type="submit" className="primary-cta" disabled={!isSignedIn || Boolean(busyAction)}>
                 {busyAction === "password" ? "Menyimpan password..." : "Simpan Password Baru"}

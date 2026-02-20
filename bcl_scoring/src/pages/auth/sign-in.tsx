@@ -11,11 +11,40 @@ import {
 } from "@/lib/authClient";
 import { useCredential } from "@/lib/useCredential";
 
+function EyeIcon({ visible }: { visible: boolean }) {
+  if (visible) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M2 12c2.6-4.2 6.1-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-6.1 6.3-10 6.3S4.6 16.2 2 12z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M2 12c2.6-4.2 6.1-6.3 10-6.3 1.8 0 3.5.5 5.1 1.5m2.1 1.8c1 1 1.9 2.2 2.8 3.7-2.6 4.2-6.1 6.3-10 6.3-1.8 0-3.5-.5-5.1-1.5M4.9 15.4A17.4 17.4 0 0 1 2 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M3 3l18 18" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export default function SignInPage() {
   const router = useRouter();
   const credential = useCredential();
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [profileEmployeeNumber, setProfileEmployeeNumber] = useState(credential.employee_number || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,13 +171,24 @@ export default function SignInPage() {
                 </label>
                 <label className="auth-field">
                   Password
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Masukkan password"
-                    required
-                  />
+                  <div className="auth-password-wrap">
+                    <input
+                      type={passwordVisible ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="Masukkan password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="auth-password-toggle"
+                      onClick={() => setPasswordVisible((prev) => !prev)}
+                      aria-label={passwordVisible ? "Sembunyikan password" : "Tampilkan password"}
+                      title={passwordVisible ? "Sembunyikan password" : "Tampilkan password"}
+                    >
+                      <EyeIcon visible={passwordVisible} />
+                    </button>
+                  </div>
                 </label>
                 <button type="submit" className="primary-cta" disabled={busy || !isConfigured}>
                   {busy ? "Memproses..." : "Masuk"}
