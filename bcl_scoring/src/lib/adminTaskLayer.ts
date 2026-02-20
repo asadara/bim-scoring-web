@@ -121,6 +121,30 @@ export type Role2BimUseProposal = {
   updated_at?: string | null;
 };
 
+export type AdminTestDataCleanupResult = {
+  dry_run: boolean;
+  filters: {
+    user_id: string | null;
+    project_id: string | null;
+    period_id: string | null;
+  };
+  matched: {
+    evidence: number;
+    role2_proposals: number;
+    periods_from_evidence: number;
+    storage_objects: number;
+  };
+  deleted: {
+    evidence_links: number;
+    evidence: number;
+    evidence_audit: number;
+    role2_proposals: number;
+    summary_snapshots: number;
+    storage_objects: number;
+  };
+  warnings: string[];
+};
+
 type AdminErrorPayload =
   | string
   | {
@@ -443,4 +467,23 @@ export async function decideRole2BimUseProposal(
       body: JSON.stringify(input),
     }
   );
+}
+
+export async function cleanupAdminTestData(
+  session: AdminSession,
+  input: {
+    user_id?: string | null;
+    project_id?: string | null;
+    period_id?: string | null;
+    dry_run?: boolean;
+    include_evidence?: boolean;
+    include_role2_proposals?: boolean;
+    include_snapshots?: boolean;
+    include_storage?: boolean;
+  }
+): Promise<AdminTestDataCleanupResult> {
+  return await requestAdmin<AdminTestDataCleanupResult>(session, "/admin/test-data/cleanup", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

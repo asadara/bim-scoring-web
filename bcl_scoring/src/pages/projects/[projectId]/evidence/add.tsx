@@ -219,7 +219,18 @@ export default function AddEvidencePage() {
   }, [context, form.bim_use_id]);
   const scopedProjectId = getRole1ScopedProjectId();
 
-  const indicators = selectedBimUse?.indicators || [];
+  const indicators = useMemo(() => selectedBimUse?.indicators || [], [selectedBimUse]);
+  const selectedIndicator = useMemo(() => {
+    if (form.indicator_ids.length === 0) return null;
+    return indicators.find((indicator) => indicator.id === form.indicator_ids[0]) || null;
+  }, [form.indicator_ids, indicators]);
+  const selectedBimUseLabel = selectedBimUse?.label || "Belum dipilih";
+  const selectedIndicatorLabel = selectedIndicator
+    ? `${selectedIndicator.code} - ${selectedIndicator.title}`
+    : "Belum dipilih";
+  const selectedEvidenceTypeLabel = form.type || "Belum dipilih";
+  const selectedFileTypeLabel =
+    form.type === "FILE" ? form.file_type || "Belum dipilih" : "N/A (bukan tipe FILE)";
 
   function setField<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -443,10 +454,6 @@ export default function AddEvidencePage() {
   const writeDisabled =
     fieldDisabled || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
   const isRevisionMode = mode === "revisi";
-  const selectedIndicator =
-    form.indicator_ids.length > 0
-      ? indicators.find((indicator) => indicator.id === form.indicator_ids[0]) || null
-      : null;
 
   return (
     <Role1Layout
@@ -469,6 +476,15 @@ export default function AddEvidencePage() {
               {label}
             </span>
           ))}
+        </div>
+        <div className="task-note">
+          <p>
+            <strong>Ringkasan Pilihan Saat Ini</strong>
+          </p>
+          <p>Step 1 - BIM Use: {selectedBimUseLabel}</p>
+          <p>Step 1 - Indicator: {selectedIndicatorLabel}</p>
+          <p>Step 2 - Evidence Type: {selectedEvidenceTypeLabel}</p>
+          <p>Step 2 - Jenis File: {selectedFileTypeLabel}</p>
         </div>
 
         {isLocked ? (
@@ -685,17 +701,6 @@ export default function AddEvidencePage() {
                     disabled={fieldDisabled}
                   />
                 </label>
-                <p className="inline-note">
-                  File disimpan di browser local storage (batas {formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).
-                </p>
-                {localFileMeta ? (
-                  <p className="inline-note">
-                    File lokal aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)})
-                  </p>
-                ) : null}
-                {form.file_reference_url.startsWith("data:") ? (
-                  <p className="inline-note">Reference URL saat ini berisi binary data URL (local prototype).</p>
-                ) : null}
                 <label htmlFor="file-view-url-input">
                   view_url ({form.file_type || "FILE"} - optional)
                   <input
@@ -771,6 +776,19 @@ export default function AddEvidencePage() {
         </div>
 
         <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
+        {form.type === "FILE" ? (
+          <p className="inline-note">
+            Upload file biner saat ini disimpan di browser local storage (batas {formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).
+          </p>
+        ) : null}
+        {form.type === "FILE" && localFileMeta ? (
+          <p className="inline-note">
+            File lokal aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)}).
+          </p>
+        ) : null}
+        {form.type === "FILE" && form.file_reference_url.startsWith("data:") ? (
+          <p className="inline-note">Reference URL saat ini menggunakan binary data URL (local prototype).</p>
+        ) : null}
         <p className="prototype-badge">Local draft (prototype, not used in scoring)</p>
 
         {submitError ? <p className="error-box">{submitError}</p> : null}

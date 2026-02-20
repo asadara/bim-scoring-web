@@ -8,8 +8,10 @@ import {
   AdminRoleMapping,
   AdminScoringPeriod,
   AdminSession,
+  AdminTestDataCleanupResult,
   AdminUser,
   Role2BimUseProposal,
+  cleanupAdminTestData,
   createAdminRoleMapping,
   createAdminIndicator,
   createAdminProject,
@@ -60,10 +62,18 @@ const WEEK_ANCHOR_OPTIONS: Array<{ value: WeekAnchor; label: string }> = [
 ];
 
 const ROLE_PRIORITY: AppRole[] = ["admin", "role3", "role2", "role1", "viewer"];
+const TEST_WORKSPACE_NAME = "Workspace Ujicoba";
 
 function toNonEmptyString(value: string): string | null {
   const out = value.trim();
   return out ? out : null;
+}
+
+function normalizeWorkspaceName(value: string | null | undefined): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 function asBooleanLabel(value: boolean | null): string {
@@ -234,6 +244,14 @@ export default function AdminControlPanelPage() {
   });
   const [lockReason, setLockReason] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [cleanupUserFilter, setCleanupUserFilter] = useState("");
+  const [cleanupProjectFilter, setCleanupProjectFilter] = useState("");
+  const [cleanupPeriodFilter, setCleanupPeriodFilter] = useState("");
+  const [cleanupIncludeEvidence, setCleanupIncludeEvidence] = useState(true);
+  const [cleanupIncludeRole2Proposals, setCleanupIncludeRole2Proposals] = useState(true);
+  const [cleanupIncludeSnapshots, setCleanupIncludeSnapshots] = useState(true);
+  const [cleanupIncludeStorage, setCleanupIncludeStorage] = useState(true);
+  const [cleanupResult, setCleanupResult] = useState<AdminTestDataCleanupResult | null>(null);
 
   const sortedPerspectiveOptions = useMemo(() => {
     return perspectives
@@ -292,6 +310,11 @@ export default function AdminControlPanelPage() {
     if (!periodProjectFilter) return null;
     return projects.find((item) => item.id === periodProjectFilter) || null;
   }, [projects, periodProjectFilter]);
+  const testWorkspaceProject = useMemo(() => {
+    return (
+      projects.find((item) => normalizeWorkspaceName(item.name) === normalizeWorkspaceName(TEST_WORKSPACE_NAME)) || null
+    );
+  }, [projects]);
   const hasActivePeriodProject = Boolean(
     selectedPeriodProject && selectedPeriodProject.is_active !== false
   );
@@ -299,6 +322,12 @@ export default function AdminControlPanelPage() {
   useEffect(() => {
     setWeekAnchorDraft(parseWeekAnchorFromConfigKey(selectedPeriodProject?.config_key));
   }, [selectedPeriodProject?.id, selectedPeriodProject?.config_key]);
+
+  useEffect(() => {
+    if (cleanupProjectFilter) return;
+    if (!testWorkspaceProject?.id) return;
+    setCleanupProjectFilter(testWorkspaceProject.id);
+  }, [cleanupProjectFilter, testWorkspaceProject?.id]);
 
   async function reloadBase(currentSession: AdminSession): Promise<string | null> {
     const [projectRows, perspectiveRows, userRows, roleMappingRows, lockRow] = await Promise.all([
@@ -527,6 +556,56 @@ export default function AdminControlPanelPage() {
       setShowProjectCreateForm(false);
       await reloadBase(session);
     }, "Workspace project berhasil dibuat.");
+  }
+
+  async function handleEnsureTestWorkspace() {
+    const existing = projects.find(
+      (item) => normalizeWorkspaceName(item.name) === normalizeWorkspaceName(TEST_WORKSPACE_NAME)
+    );
+    if (existing) {
+      setCleanupProjectFilter(existing.id);
+      setPeriodProjectFilter(existing.id);
+      setNotice(`Workspace ujicoba sudah tersedia: ${existing.name || TEST_WORKSPACE_NAME}.`);
+      setError(null);
+      return;
+    }
+
+    await runAction(async () => {
+      const created = await createAdminProject(session, {
+        name: TEST_WORKSPACE_NAME,
+        config_key: "workspace_type=test; week_anchor=MONDAY",
+        is_active: true,
+      });
+      setCleanupProjectFilter(created.id);
+      setPeriodProjectFilter(created.id);
+      await reloadBase(session);
+      await reloadPeriodsForProject(session, created.id);
+    }, "Workspace ujicoba berhasil dibuat.");
+  }
+
+  async function handleRunTestDataCleanup(dryRun: boolean) {
+    const userId = toNonEmptyString(cleanupUserFilter);
+    const projectId = toNonEmptyString(cleanupProjectFilter);
+    const periodId = toNonEmptyString(cleanupPeriodFilter);
+    if (!userId && !projectId && !periodId) {
+      setError("Isi minimal satu filter cleanup: user, workspace, atau period.");
+      return;
+    }
+
+    await runAction(async () => {
+      const result = await cleanupAdminTestData(session, {
+        user_id: userId,
+        project_id: projectId,
+        period_id: periodId,
+        dry_run: dryRun,
+        include_evidence: cleanupIncludeEvidence,
+        include_role2_proposals: cleanupIncludeRole2Proposals,
+        include_snapshots: cleanupIncludeSnapshots,
+        include_storage: cleanupIncludeStorage,
+      });
+      setCleanupResult(result);
+      await reloadAll(session);
+    }, dryRun ? "Simulasi cleanup selesai." : "Cleanup data ujicoba selesai.");
   }
 
   async function handleSaveWeeklyAnchor() {
@@ -942,6 +1021,144 @@ export default function AdminControlPanelPage() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="task-panel">
+        <h2>Workspace Ujicoba & Cleanup</h2>
+        <p className="task-subtitle">
+          Gunakan workspace ujicoba untuk data non-produksi. Cleanup menghapus data uji coba agar tidak ikut perhitungan.
+        </p>
+        <p className="inline-note">
+          Untuk keamanan, cleanup wajib memakai minimal 1 filter: user, workspace, atau period.
+        </p>
+        <div className="wizard-actions">
+          <button type="button" className="action-primary" disabled={working} onClick={() => void handleEnsureTestWorkspace()}>
+            Buat Workspace Ujicoba
+          </button>
+          {testWorkspaceProject ? (
+            <span className="inline-note">
+              Workspace ujicoba aktif: <strong>{testWorkspaceProject.name || TEST_WORKSPACE_NAME}</strong>
+            </span>
+          ) : (
+            <span className="inline-note">Workspace ujicoba belum dibuat.</span>
+          )}
+        </div>
+
+        <div className="field-grid">
+          <label>
+            Filter User (opsional)
+            <select value={cleanupUserFilter} onChange={(event) => setCleanupUserFilter(event.target.value)}>
+              <option value="">Semua user (sesuai filter lain)</option>
+              {sortedUsers.map((item) => (
+                <option key={`cleanup-user-${item.id}`} value={item.id}>
+                  {item.name || item.email || item.employee_number || item.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Filter Workspace (opsional)
+            <select value={cleanupProjectFilter} onChange={(event) => setCleanupProjectFilter(event.target.value)}>
+              <option value="">Semua workspace (sesuai filter lain)</option>
+              {projects.map((item) => (
+                <option key={`cleanup-project-${item.id}`} value={item.id}>
+                  {item.name || item.code || item.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Filter Period ID (opsional)
+            <input
+              value={cleanupPeriodFilter}
+              onChange={(event) => setCleanupPeriodFilter(event.target.value)}
+              placeholder="UUID period (opsional)"
+            />
+          </label>
+        </div>
+
+        <div className="wizard-actions">
+          <label>
+            <input
+              type="checkbox"
+              checked={cleanupIncludeEvidence}
+              onChange={(event) => setCleanupIncludeEvidence(event.target.checked)}
+            />
+            {" "}
+            Hapus evidence + links + audit
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={cleanupIncludeRole2Proposals}
+              onChange={(event) => setCleanupIncludeRole2Proposals(event.target.checked)}
+            />
+            {" "}
+            Hapus proposal Role 2
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={cleanupIncludeSnapshots}
+              onChange={(event) => setCleanupIncludeSnapshots(event.target.checked)}
+              disabled={!cleanupIncludeEvidence}
+            />
+            {" "}
+            Hapus summary snapshot period terkait
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={cleanupIncludeStorage}
+              onChange={(event) => setCleanupIncludeStorage(event.target.checked)}
+              disabled={!cleanupIncludeEvidence}
+            />
+            {" "}
+            Hapus file storage evidence
+          </label>
+        </div>
+
+        <div className="wizard-actions">
+          <button type="button" disabled={working} onClick={() => void handleRunTestDataCleanup(true)}>
+            Simulasi Cleanup (Dry Run)
+          </button>
+          <button
+            type="button"
+            className="action-primary"
+            disabled={working}
+            onClick={() =>
+              requestConfirm({
+                title: "Eksekusi cleanup data ujicoba?",
+                message: "Data test yang cocok dengan filter akan dihapus permanen dari database.",
+                confirmLabel: "Eksekusi Cleanup",
+                tone: "danger",
+                onConfirm: () => handleRunTestDataCleanup(false),
+              })
+            }
+          >
+            Eksekusi Cleanup
+          </button>
+        </div>
+
+        {cleanupResult ? (
+          <div className="admin-lock-bar">
+            <p>
+              Mode: <strong>{cleanupResult.dry_run ? "Dry Run" : "Eksekusi"}</strong>
+            </p>
+            <p>
+              Filter: user={cleanupResult.filters.user_id || "-"} | workspace={cleanupResult.filters.project_id || "-"} | period={cleanupResult.filters.period_id || "-"}
+            </p>
+            <p>
+              Matched: evidence={cleanupResult.matched.evidence}, proposal role2={cleanupResult.matched.role2_proposals}, period terkait={cleanupResult.matched.periods_from_evidence}, file storage={cleanupResult.matched.storage_objects}
+            </p>
+            <p>
+              Deleted: links={cleanupResult.deleted.evidence_links}, evidence={cleanupResult.deleted.evidence}, audit={cleanupResult.deleted.evidence_audit}, proposal role2={cleanupResult.deleted.role2_proposals}, snapshots={cleanupResult.deleted.summary_snapshots}, storage={cleanupResult.deleted.storage_objects}
+            </p>
+            {cleanupResult.warnings.length > 0 ? (
+              <p className="inline-note">Warning: {cleanupResult.warnings.join(" | ")}</p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="task-panel">
