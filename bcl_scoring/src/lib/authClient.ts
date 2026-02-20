@@ -31,6 +31,13 @@ export type CurrentAuthAccount = {
   last_sign_in_at: string | null;
   updated_at: string | null;
 };
+export type AuthProfilePhoto = {
+  user_id: string;
+  object_path: string | null;
+  signed_url: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+};
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
@@ -516,4 +523,61 @@ export async function updateAuthPassword(input: { new_password: string }): Promi
   const { error } = await supabase.auth.updateUser({ password: nextPassword });
   if (error) throw new Error(error.message || "Ubah password gagal");
   await syncCredentialFromAuth();
+}
+
+export async function getAuthProfilePhoto(input: { user_id: string }): Promise<AuthProfilePhoto> {
+  const user_id = normalizeText(input.user_id);
+  if (!user_id) {
+    throw new Error("user_id wajib diisi.");
+  }
+
+  const result = await safeFetchJson<unknown>(buildApiUrl(`/auth/profile-photo/${encodeURIComponent(user_id)}`));
+  if (!result.ok) {
+    throw new Error(result.error || "Gagal memuat foto profil.");
+  }
+
+  const root = result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};
+  const data = root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : {};
+  return {
+    user_id,
+    object_path: normalizeText(data.object_path),
+    signed_url: normalizeText(data.signed_url),
+    mime_type: normalizeText(data.mime_type),
+    size_bytes: typeof data.size_bytes === "number" && Number.isFinite(data.size_bytes) ? data.size_bytes : null,
+  };
+}
+
+export async function uploadAuthProfilePhoto(input: {
+  user_id: string;
+  data_url: string;
+}): Promise<AuthProfilePhoto> {
+  const user_id = normalizeText(input.user_id);
+  if (!user_id) {
+    throw new Error("user_id wajib diisi.");
+  }
+  if (typeof input.data_url !== "string" || !input.data_url.trim()) {
+    throw new Error("data_url wajib diisi.");
+  }
+
+  const result = await safeFetchJson<unknown>(buildApiUrl("/auth/profile-photo"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id,
+      data_url: input.data_url,
+    }),
+  });
+  if (!result.ok) {
+    throw new Error(result.error || "Gagal mengunggah foto profil.");
+  }
+
+  const root = result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};
+  const data = root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : {};
+  return {
+    user_id,
+    object_path: normalizeText(data.object_path),
+    signed_url: normalizeText(data.signed_url),
+    mime_type: normalizeText(data.mime_type),
+    size_bytes: typeof data.size_bytes === "number" && Number.isFinite(data.size_bytes) ? data.size_bytes : null,
+  };
 }

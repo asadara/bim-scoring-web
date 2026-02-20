@@ -6,13 +6,16 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "re
 
 import { getMainNavItemsForRole } from "@/lib/accessControl";
 import {
+  AuthProfilePhoto,
   CurrentAuthAccount,
   RequestedRole,
+  getAuthProfilePhoto,
   getCurrentAuthAccount,
   isAuthConfigured,
   signOutAllAuthSessions,
   signOutAuth,
   syncCredentialFromAuth,
+  uploadAuthProfilePhoto,
   updateAuthPassword,
   updateAuthProfile,
 } from "@/lib/authClient";
@@ -33,8 +36,7 @@ const REQUESTED_ROLE_LABEL: Record<RequestedRole, string> = {
   role3: "BIM Manager",
   viewer: "Viewer / Auditor",
 };
-const PROFILE_PHOTO_STORAGE_KEY = "bim_user_profile_photo_v1";
-const MAX_PROFILE_PHOTO_SIZE_BYTES = 3 * 1024 * 1024;
+const MAX_PROFILE_PHOTO_SIZE_BYTES = 1 * 1024 * 1024;
 
 const EMPTY_ACCOUNT: CurrentAuthAccount = {
   user_id: null,
@@ -153,16 +155,6 @@ export default function MePage() {
   const [confirmNewPasswordVisible, setConfirmNewPasswordVisible] = useState(false);
   const [profilePhotoDataUrl, setProfilePhotoDataUrl] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
-  const profilePhotoStorageKey = useMemo(
-    () => `${PROFILE_PHOTO_STORAGE_KEY}:${credential.user_id || "anon"}`,
-    [credential.user_id]
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedPhoto = normalizeText(window.localStorage.getItem(profilePhotoStorageKey));
-    setProfilePhotoDataUrl(savedPhoto);
-  }, [profilePhotoStorageKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -176,6 +168,14 @@ export default function MePage() {
         setAccount(snapshot);
         setProfileName(snapshot.full_name || "");
         setProfileEmployeeNumber(snapshot.employee_number || "");
+        const resolvedUserId = snapshot.user_id || credential.user_id;
+        if (resolvedUserId) {
+          const profilePhoto = await getAuthProfilePhoto({ user_id: resolvedUserId });
+          if (!mounted) return;
+          setProfilePhotoDataUrl(profilePhoto.signed_url || null);
+        } else if (mounted) {
+          setProfilePhotoDataUrl(null);
+        }
       } catch (err) {
         if (!mounted) return;
         setError(err instanceof Error ? err.message : "Gagal memuat data akun.");
@@ -202,7 +202,7 @@ export default function MePage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [credential.user_id]);
 
   const isConfigured = isAuthConfigured();
   const isSignedIn = Boolean(credential.user_id);
@@ -325,16 +325,21 @@ export default function MePage() {
       return;
     }
     if (file.size > MAX_PROFILE_PHOTO_SIZE_BYTES) {
-      setError("Ukuran foto maksimal 3 MB.");
+      setError("Ukuran foto maksimal 1 MB.");
       return;
     }
 
     try {
       const dataUrl = await readFileAsDataUrl(file);
-      setProfilePhotoDataUrl(dataUrl);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(profilePhotoStorageKey, dataUrl);
+      const userId = account.user_id || credential.user_id;
+      if (!userId) {
+        throw new Error("User belum terautentikasi.");
       }
+      const uploaded: AuthProfilePhoto = await uploadAuthProfilePhoto({
+        user_id: userId,
+        data_url: dataUrl,
+      });
+      setProfilePhotoDataUrl(uploaded.signed_url || null);
       setError(null);
       setInfo("Foto profil berhasil diperbarui.");
     } catch (err) {
@@ -396,7 +401,7 @@ export default function MePage() {
                   onChange={onProfilePhotoSelected}
                 />
               </div>
-              <p className="me-avatar-hint">Dummy foto bisa diganti (maks. 3 MB).</p>
+              <p className="me-avatar-hint">Dummy foto bisa diganti (maks. 1 MB).</p>
             </div>
           </div>
           {!isConfigured ? (
