@@ -96,7 +96,7 @@ export default function ApproverHomePage() {
         if (!mounted) return;
         setRows([]);
         setInsightRows([]);
-        setDataMode("prototype");
+        setDataMode("backend");
         setBackendMessage(e instanceof Error ? e.message : "Backend not available");
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {

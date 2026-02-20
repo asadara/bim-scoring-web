@@ -1,15 +1,12 @@
 import {
   DataMode,
   NA_TEXT,
-  PROTOTYPE_WRITE_DISABLED_MESSAGE,
   normalizePrototypePeriodId,
   PrototypeApprovalDecisionRecord,
   PrototypeSnapshotRecord,
   ReviewStatusCount,
   getPrototypePeriodLock,
-  isRealBackendWriteEnabled,
   listPrototypeApprovalDecisions,
-  listPrototypeSnapshots,
 } from "@/lib/role1TaskLayer";
 import { buildApiUrl, safeFetchJson, toUserFacingSafeFetchError } from "@/lib/http";
 import { getPrototypePeriodStatusFromStore } from "@/lib/prototypeStore";
@@ -133,14 +130,6 @@ async function fetchBackendSnapshots(): Promise<{
   mode: DataMode;
   backend_message: string | null;
 }> {
-  if (!isRealBackendWriteEnabled()) {
-    return {
-      data: listAuditSnapshots(),
-      mode: "prototype",
-      backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
-    };
-  }
-
   const candidates = [
     buildApiUrl("/summary_snapshots"),
     buildApiUrl("/summary-snapshots"),
@@ -192,14 +181,14 @@ async function fetchBackendSnapshots(): Promise<{
   }
 
   return {
-    data: listAuditSnapshots(),
-    mode: "prototype",
+    data: [],
+    mode: "backend",
     backend_message: lastMessage || "Backend unavailable",
   };
 }
 
 export function listAuditSnapshots(): AuditSnapshotView[] {
-  const snapshots = listPrototypeSnapshots();
+  const snapshots: PrototypeSnapshotRecord[] = [];
 
   return snapshots
     .map((snapshot, index) => ({
@@ -247,7 +236,7 @@ export async function fetchAdminAuditLogsReadMode(input: {
   if (role !== "admin") {
     return {
       data: [],
-      mode: "prototype",
+      mode: "backend",
       backend_message: "Recent governance events require Admin role",
     };
   }
@@ -267,7 +256,7 @@ export async function fetchAdminAuditLogsReadMode(input: {
   if (!response.ok) {
     return {
       data: [],
-      mode: "prototype",
+      mode: "backend",
       backend_message: toSafeErrorMessage(response),
     };
   }
@@ -276,7 +265,7 @@ export async function fetchAdminAuditLogsReadMode(input: {
   if (!unwrapped.ok) {
     return {
       data: [],
-      mode: "prototype",
+      mode: "backend",
       backend_message: unwrapped.error,
     };
   }
@@ -524,7 +513,7 @@ export function buildPrintableAuditSnapshot(input: {
       },
       {
         title: "Snapshot Created (System)",
-        role: "System record layer (prototype)",
+        role: "System record layer (backend)",
         meaning: "Snapshot immutable dibuat saat approval dan disimpan append-only.",
         not_done: "Tidak mengklaim compliance final; hanya rekam jejak referensi internal.",
       },

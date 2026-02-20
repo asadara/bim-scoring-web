@@ -46,7 +46,7 @@ export default function HoProjectReviewPage() {
         if (!mounted) return;
         setContext(null);
         setSubmitted([]);
-        setEvidenceMode("prototype");
+        setEvidenceMode("backend");
         setEvidenceMessage(e instanceof Error ? e.message : "Backend not available");
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -71,7 +71,7 @@ export default function HoProjectReviewPage() {
         })
         .catch((e) => {
           setSubmitted([]);
-          setEvidenceMode("prototype");
+          setEvidenceMode("backend");
           setEvidenceMessage(e instanceof Error ? e.message : "Backend not available");
         });
     };
@@ -134,7 +134,7 @@ export default function HoProjectReviewPage() {
         </p>
         {context.period_locked ? <p className="warning-box">LOCKED (read-only)</p> : null}
         <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
-        <p className="prototype-badge">Prototype review (not final, not used in scoring)</p>
+        <p className="inline-note">Review queue ditarik dari database backend.</p>
       </section>
 
       <section className="task-panel">

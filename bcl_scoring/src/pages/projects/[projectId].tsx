@@ -6,10 +6,12 @@ import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
+  DataMode,
   NA_TEXT,
   buildEvidenceCounts,
+  fetchEvidenceListReadMode,
   fetchRole1Context,
-  listLocalEvidenceWithReview,
+  mapEvidenceRowsWithReview,
   statusLabel,
 } from "@/lib/role1TaskLayer";
 import { useCredential } from "@/lib/useCredential";
@@ -23,7 +25,9 @@ export default function ProjectRole1HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [context, setContext] = useState<Awaited<ReturnType<typeof fetchRole1Context>> | null>(null);
-  const [localItems, setLocalItems] = useState<ReturnType<typeof listLocalEvidenceWithReview>>([]);
+  const [evidenceRows, setEvidenceRows] = useState<ReturnType<typeof mapEvidenceRowsWithReview>>([]);
+  const [evidenceMode, setEvidenceMode] = useState<DataMode>("backend");
+  const [evidenceMessage, setEvidenceMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string") return;
@@ -53,9 +57,21 @@ export default function ProjectRole1HomePage() {
   useEffect(() => {
     if (!context || typeof projectId !== "string") return;
 
+    let mounted = true;
     const refresh = () => {
-      const items = listLocalEvidenceWithReview(projectId, context.active_period?.id ?? null);
-      setLocalItems(items);
+      fetchEvidenceListReadMode(projectId, context.active_period?.id ?? null)
+        .then((result) => {
+          if (!mounted) return;
+          setEvidenceRows(mapEvidenceRowsWithReview(result.data));
+          setEvidenceMode(result.mode);
+          setEvidenceMessage(result.backend_message);
+        })
+        .catch((e) => {
+          if (!mounted) return;
+          setEvidenceRows([]);
+          setEvidenceMode("backend");
+          setEvidenceMessage(e instanceof Error ? e.message : "Backend not available");
+        });
     };
 
     refresh();
@@ -63,12 +79,13 @@ export default function ProjectRole1HomePage() {
     window.addEventListener("focus", refresh);
 
     return () => {
+      mounted = false;
       window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
     };
   }, [context, projectId]);
 
-  const counts = useMemo(() => buildEvidenceCounts(localItems), [localItems]);
+  const counts = useMemo(() => buildEvidenceCounts(evidenceRows), [evidenceRows]);
 
   if (loading) {
     return (
@@ -112,7 +129,10 @@ export default function ProjectRole1HomePage() {
       periodStatusLabel={context.period_status_label}
     >
       {error ? <p className="error-box">{error}</p> : null}
-      <BackendStatusBanner mode={context.data_mode} message={context.backend_message} />
+      <BackendStatusBanner
+        mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
+        message={context.backend_message || evidenceMessage}
+      />
 
       <section className="task-grid-3" aria-label="Evidence status summary">
         <Link className="summary-card summary-card-action" href={`/projects/${projectId}/evidence#draft`}>
@@ -185,15 +205,6 @@ export default function ProjectRole1HomePage() {
         <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
       </section>
 
-      {localItems.length > 0 ? (
-        <section className="task-panel">
-          <h3>Prototype Storage</h3>
-          <p className="prototype-badge">Local draft (prototype, not used in scoring)</p>
-          <p>
-            {localItems.length} item disimpan sementara di localStorage untuk alur draft/submitted sampai endpoint write tersedia.
-          </p>
-        </section>
-      ) : null}
     </Role1Layout>
   );
 }

@@ -12,7 +12,6 @@ import {
   formatBimUseDisplay,
   fetchEvidenceListReadMode,
   fetchRole1Context,
-  listLocalEvidence,
   mapEvidenceRowsWithReview,
   statusLabel,
 } from "@/lib/role1TaskLayer";
@@ -25,9 +24,7 @@ type GroupedEvidence = {
   NEEDS_REVISION: EvidenceViewItem[];
 };
 
-type EvidenceViewItem = LocalEvidenceWithReview & {
-  isPrototypeItem: boolean;
-};
+type EvidenceViewItem = LocalEvidenceWithReview;
 
 function renderEvidenceValue(item: LocalEvidenceWithReview) {
   if (item.type === "TEXT") {
@@ -114,21 +111,14 @@ export default function MyEvidenceListPage() {
       fetchEvidenceListReadMode(projectId, context.active_period?.id ?? null)
         .then((result) => {
           if (!mounted) return;
-          const localIds = new Set(
-            listLocalEvidence(projectId, context.active_period?.id ?? null).map((row) => row.id)
-          );
-          const hydrated = mapEvidenceRowsWithReview(result.data).map((row) => ({
-            ...row,
-            isPrototypeItem: localIds.has(row.id),
-          }));
-          setItems(hydrated);
+          setItems(mapEvidenceRowsWithReview(result.data));
           setEvidenceMode(result.mode);
           setEvidenceMessage(result.backend_message);
         })
         .catch((e) => {
           if (!mounted) return;
           setItems([]);
-          setEvidenceMode("prototype");
+          setEvidenceMode("backend");
           setEvidenceMessage(e instanceof Error ? e.message : "Backend not available");
         });
     };
@@ -213,7 +203,7 @@ export default function MyEvidenceListPage() {
     <Role1Layout
       projectId={projectId}
       title="My Evidence List"
-      subtitle="Daftar evidence prototype Anda untuk project dan period aktif."
+      subtitle="Daftar evidence dari database untuk project dan period aktif."
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
@@ -224,7 +214,7 @@ export default function MyEvidenceListPage() {
       />
       <section className="task-panel">
         <h2>Evidence Status Groups</h2>
-        <p className="inline-note">Local draft (prototype, not used in scoring)</p>
+        <p className="inline-note">Data evidence sinkron dari backend.</p>
         {credential.role === "admin" ? (
           <p className="inline-note">
             Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence).
@@ -289,11 +279,7 @@ export default function MyEvidenceListPage() {
                       <p>Review reason: {item.latest_review_reason || item.review_reason || NA_TEXT}</p>
                     ) : null}
 
-                    {item.isPrototypeItem ? (
-                      <p className="prototype-badge">{item.storage_label}</p>
-                    ) : (
-                      <p className="inline-note">Backend read-only evidence</p>
-                    )}
+                    <p className="inline-note">Source: {item.storage_label || "Database"}</p>
 
                     <div className="item-actions">
                       {context.period_locked || !canWrite ? (

@@ -211,7 +211,7 @@ export default function ApprovalDecisionPage() {
 
       <section className="task-panel">
         <p className="warning-box">Approval akan mengunci period dan membentuk rekam jejak final.</p>
-        <p className="prototype-badge">Prototype snapshot (not used for audit/compliance)</p>
+        <p className="inline-note">Snapshot source: backend database.</p>
         {approveBlockedByPolicy ? (
           <p className="warning-box">
             APPROVE PERIOD dinonaktifkan karena gating policy belum terpenuhi.

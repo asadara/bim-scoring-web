@@ -345,6 +345,25 @@ a {
   margin: 0 auto;
 }
 
+.me-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.me-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.me-section-grid .task-panel {
+  margin-top: 0;
+}
+
+.me-panel-wide {
+  grid-column: 1 / -1;
+}
+
 .me-header {
   display: flex;
   flex-wrap: wrap;
@@ -1574,6 +1593,14 @@ a {
     margin-left: 0;
     display: block;
     margin-top: 8px;
+  }
+
+  .me-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .me-panel-wide {
+    grid-column: auto;
   }
 
   .me-avatar-panel {

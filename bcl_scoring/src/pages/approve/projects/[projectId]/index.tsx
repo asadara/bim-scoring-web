@@ -233,7 +233,7 @@ export default function ProjectApprovalContextPage() {
 
         {context.snapshots.length > 0 ? (
           <>
-            <p className="prototype-badge">Prototype snapshot (not used for audit/compliance)</p>
+            <p className="inline-note">Snapshot source: backend database.</p>
             <p>Snapshots: {context.snapshots.length}</p>
           </>
         ) : null}

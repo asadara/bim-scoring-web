@@ -138,7 +138,7 @@ export default function ProjectsIndexPage() {
       } catch (e) {
         if (!mounted) return;
         setRows([]);
-        setDataMode("prototype");
+        setDataMode("backend");
         setBackendMessage(e instanceof Error ? e.message : "Backend not available");
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -215,7 +215,7 @@ export default function ProjectsIndexPage() {
               </div>
               <div className="context-card role-context-card">
                 <span>Data mode</span>
-                <strong>{dataMode === "backend" ? "Backend" : "Prototype fallback"}</strong>
+                <strong>{dataMode === "backend" ? "Backend (Supabase)" : "Backend (partial)"}</strong>
               </div>
             </div>
           </aside>

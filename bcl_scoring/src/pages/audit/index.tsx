@@ -10,7 +10,6 @@ import {
   fetchAuditSnapshotsReadMode,
 } from "@/lib/auditTaskLayer";
 import { toUserFacingErrorMessage } from "@/lib/http";
-import { getPrototypeProjectMetaFromStore } from "@/lib/prototypeStore";
 import {
   DataMode,
   NA_TEXT,
@@ -197,8 +196,7 @@ export default function AuditHomePage() {
     }
     for (const entry of snapshots) {
       if (map.has(entry.snapshot.project_id)) continue;
-      const meta = getPrototypeProjectMetaFromStore(entry.snapshot.project_id);
-      map.set(entry.snapshot.project_id, meta?.project_name || meta?.project_code || entry.snapshot.project_id);
+      map.set(entry.snapshot.project_id, entry.snapshot.project_id);
     }
     return map;
   }, [projects, snapshots]);

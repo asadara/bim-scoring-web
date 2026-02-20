@@ -1,15 +1,10 @@
 import {
   getPrototypePeriodLockFromStore,
-  getPrototypePeriodMetaFromStore,
-  getPrototypeProjectMetaFromStore,
-  getPrototypePeriodStatusFromStore,
   listPrototypeApprovalDecisionsFromStore,
   listPrototypeEvidenceItemsFromStore,
   listPrototypePeriodLocksFromStore,
-  listPrototypeProjectIdsFromStore,
   listPrototypeReviewsMapFromStore,
   listPrototypeSnapshotsFromStore,
-  listPrototypePeriodIdsByProjectFromStore,
   normalizePrototypePeriodId,
   rememberPrototypePeriodMetaInStore,
   rememberPrototypeProjectMetaInStore,
@@ -41,7 +36,7 @@ import { addJakartaDays, formatJakartaYmd } from "@/lib/jakartaTime";
 
 export { normalizePrototypePeriodId } from "@/lib/prototypeStore";
 
-export const NA_TEXT = "Not available";
+export const NA_TEXT = "N/A";
 export const NO_BIM_USE_ID = "__NOT_AVAILABLE__";
 export const LOCKED_READ_ONLY_ERROR = "LOCKED (read-only)";
 export const PROTOTYPE_WRITE_DISABLED_MESSAGE = "Prototype mode (backend write disabled)";
@@ -128,7 +123,7 @@ export type LocalEvidenceItem = {
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
-  storage_label: "Local draft (prototype, not used in scoring)";
+  storage_label: string;
 };
 
 export type EvidenceDraftInput = {
@@ -219,6 +214,14 @@ type ReadResult<T> = {
   mode: DataMode;
   backend_message: string | null;
 };
+
+function backendReadResult<T>(data: T, backendMessage: string | null): ReadResult<T> {
+  return {
+    data,
+    mode: "backend",
+    backend_message: backendMessage,
+  };
+}
 
 function resolvePeriodStatus(period: Record<string, unknown>): PeriodStatus | null {
   const byString =
@@ -414,45 +417,6 @@ function unwrapPayload(payload: unknown): { ok: true; data: unknown } | { ok: fa
   return { ok: true, data: payload };
 }
 
-function fallbackProject(projectId: string): ProjectRecord {
-  const meta = getPrototypeProjectMetaFromStore(projectId);
-  return {
-    id: projectId,
-    code: meta?.project_code || null,
-    name: meta?.project_name || null,
-    phase: null,
-    is_active: null,
-  };
-}
-
-function fallbackProjects(): ProjectRecord[] {
-  return listPrototypeProjectIdsFromStore().map((projectId) => fallbackProject(projectId));
-}
-
-function fallbackPeriods(projectId: string): ScoringPeriod[] {
-  const periodIds = listPrototypePeriodIdsByProjectFromStore(projectId);
-  return periodIds.map((periodId) => {
-    const meta = getPrototypePeriodMetaFromStore(projectId, periodId);
-    const item: ScoringPeriod = {
-      id: periodId,
-      project_id: projectId,
-      year: null,
-      week: null,
-      start_date: null,
-      end_date: null,
-      status: null,
-      version: null,
-    };
-    const label = meta?.period_label || "";
-    const match = label.match(/^(\d{4})\s+W(\d{1,2})\b/i);
-    if (match) {
-      item.year = Number(match[1]);
-      item.week = Number(match[2]);
-    }
-    return item;
-  });
-}
-
 const MONTH_SHORT_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"] as const;
 
 function pad2(value: number): string {
@@ -552,20 +516,12 @@ export function formatProjectLabel(project: ProjectRecord | null): string {
 export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[]>> {
   const response = await safeFetchJson<unknown>(buildApiUrl("/projects"));
   if (!response.ok) {
-    return {
-      data: fallbackProjects(),
-      mode: "prototype",
-      backend_message: toSafeErrorMessage(response),
-    };
+    return backendReadResult([], toSafeErrorMessage(response));
   }
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
-    return {
-      data: fallbackProjects(),
-      mode: "prototype",
-      backend_message: unwrapped.error,
-    };
+    return backendReadResult([], unwrapped.error);
   }
 
   const rows = Array.isArray(unwrapped.data) ? unwrapped.data : [];
@@ -605,20 +561,30 @@ export async function fetchProjects(): Promise<ProjectRecord[]> {
 export async function fetchProjectReadMode(projectId: string): Promise<ReadResult<ProjectRecord>> {
   const response = await safeFetchJson<unknown>(buildApiUrl(`/projects/${encodeURIComponent(projectId)}`));
   if (!response.ok) {
-    return {
-      data: fallbackProject(projectId),
-      mode: "prototype",
-      backend_message: toSafeErrorMessage(response),
-    };
+    return backendReadResult(
+      {
+        id: projectId,
+        code: null,
+        name: null,
+        phase: null,
+        is_active: null,
+      },
+      toSafeErrorMessage(response)
+    );
   }
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
-    return {
-      data: fallbackProject(projectId),
-      mode: "prototype",
-      backend_message: unwrapped.error,
-    };
+    return backendReadResult(
+      {
+        id: projectId,
+        code: null,
+        name: null,
+        phase: null,
+        is_active: null,
+      },
+      unwrapped.error
+    );
   }
 
   const row = (unwrapped.data ?? {}) as Record<string, unknown>;
@@ -653,20 +619,12 @@ export async function fetchProjectPeriodsReadMode(projectId: string): Promise<Re
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/periods`)
   );
   if (!response.ok) {
-    return {
-      data: fallbackPeriods(projectId),
-      mode: "prototype",
-      backend_message: toSafeErrorMessage(response),
-    };
+    return backendReadResult([], toSafeErrorMessage(response));
   }
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
-    return {
-      data: fallbackPeriods(projectId),
-      mode: "prototype",
-      backend_message: unwrapped.error,
-    };
+    return backendReadResult([], unwrapped.error);
   }
 
   const rows = Array.isArray(unwrapped.data) ? unwrapped.data : [];
@@ -750,11 +708,7 @@ async function fetchIndicatorsFromCandidates(
 
     const unwrapped = unwrapPayload(response.data);
     if (!unwrapped.ok) {
-      return {
-        data: [],
-        mode: "prototype",
-        backend_message: unwrapped.error,
-      };
+      return backendReadResult([], unwrapped.error);
     }
 
     const rows = Array.isArray(unwrapped.data) ? unwrapped.data : [];
@@ -773,7 +727,7 @@ async function fetchIndicatorsFromCandidates(
 
   return {
     data: [],
-    mode: "prototype",
+    mode: "backend",
     backend_message: lastFailure ? toSafeErrorMessage(lastFailure) : "Backend not available",
   };
 }
@@ -865,7 +819,7 @@ function mapFlatEvidenceRows(
         created_at: createdAt,
         updated_at: updatedAt,
         submitted_at: status === "SUBMITTED" ? updatedAt : null,
-        storage_label: "Local draft (prototype, not used in scoring)",
+        storage_label: "Database",
       } satisfies LocalEvidenceItem;
     })
     .filter((row): row is LocalEvidenceItem => Boolean(row));
@@ -899,7 +853,6 @@ export async function fetchEvidenceListReadMode(
   periodId: string | null
 ): Promise<ReadResult<LocalEvidenceItem[]>> {
   const periodKey = normalizePrototypePeriodId(periodId);
-  const localFallback = listLocalEvidence(projectId, periodKey);
 
   const query = periodKey ? `?period_id=${encodeURIComponent(periodKey)}` : "";
   const candidates = [
@@ -922,11 +875,7 @@ export async function fetchEvidenceListReadMode(
     }
     const unwrapped = unwrapPayload(response.data);
     if (!unwrapped.ok) {
-      return {
-        data: localFallback,
-        mode: "prototype",
-        backend_message: unwrapped.error,
-      };
+      return backendReadResult([], unwrapped.error);
     }
 
     const payload = unwrapped.data;
@@ -951,8 +900,8 @@ export async function fetchEvidenceListReadMode(
   }
 
   return {
-    data: localFallback,
-    mode: "prototype",
+    data: [],
+    mode: "backend",
     backend_message: lastFailure ? toSafeErrorMessage(lastFailure) : "Backend not available",
   };
 }
@@ -997,7 +946,7 @@ function toLocalEvidence(input: EvidenceDraftInput): LocalEvidenceItem {
     created_at: now,
     updated_at: now,
     submitted_at: normalizedStatus === "SUBMITTED" ? now : null,
-    storage_label: "Local draft (prototype, not used in scoring)",
+    storage_label: "Database",
   };
 }
 
@@ -1683,10 +1632,10 @@ export function resolvePeriodLockWithPrototype(
   periodId: string | null,
   backendStatus: PeriodStatus | null
 ): boolean {
+  void projectId;
+  void periodId;
   if (resolvePeriodLock(backendStatus)) return true;
-  const normalized = normalizePrototypePeriodId(periodId);
-  if (!normalized || normalized === UNKNOWN_ACTIVE_PERIOD_KEY) return false;
-  return isPeriodLockedByPrototype(projectId, periodId);
+  return false;
 }
 
 export function resolvePeriodStatusLabelWithPrototype(
@@ -1694,13 +1643,11 @@ export function resolvePeriodStatusLabelWithPrototype(
   periodId: string | null,
   backendStatus: PeriodStatus | null
 ): string {
+  void projectId;
+  void periodId;
   const locked = resolvePeriodLockWithPrototype(projectId, periodId, backendStatus);
   if (locked) return "LOCKED";
   if (backendStatus) return backendStatus;
-
-  const byStore = getPrototypePeriodStatusFromStore(projectId, periodId);
-  if (byStore) return byStore;
-
   return NA_TEXT;
 }
 
@@ -1891,12 +1838,8 @@ export async function fetchRole1Context(projectId: string): Promise<Role1Context
   ]);
 
   const project = projectResult.data;
-  let periods = periodsResult.data;
+  const periods = periodsResult.data;
   const indicators = indicatorsResult.data;
-
-  if (periods.length === 0) {
-    periods = fallbackPeriods(projectId);
-  }
 
   const activePeriod = selectPeriodByJakartaDate(periods) ?? selectActivePeriod(periods);
   const periodStatus = activePeriod?.status ?? null;

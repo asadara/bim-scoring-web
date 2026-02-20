@@ -42,7 +42,7 @@ type StoreEvidenceItem = {
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
-  storage_label: "Local draft (prototype, not used in scoring)";
+  storage_label: string;
 };
 
 type StoreReviewHistoryEntry = {

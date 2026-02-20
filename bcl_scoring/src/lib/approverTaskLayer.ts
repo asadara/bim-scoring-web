@@ -1,4 +1,4 @@
-import {
+﻿import {
   DataMode,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
@@ -16,9 +16,6 @@ import {
   formatPeriodLabel,
   getPrototypePeriodLock,
   isRealBackendWriteEnabled,
-  listLocalEvidence,
-  listPrototypeApprovalDecisions,
-  listPrototypeSnapshots,
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
   selectActivePeriod,
@@ -26,10 +23,6 @@ import {
   setPrototypePeriodLock,
 } from "@/lib/role1TaskLayer";
 import {
-  getPrototypePeriodMetaFromStore,
-  getPrototypeProjectMetaFromStore,
-  listPrototypePeriodIdsByProjectFromStore,
-  listPrototypeProjectIdsFromStore,
   normalizePrototypePeriodId,
 } from "@/lib/prototypeStore";
 import { SafeFetchFail, buildApiUrl, safeFetchJson } from "@/lib/http";
@@ -159,27 +152,6 @@ function requirePeriodId(periodId: string | null): string {
   return normalized;
 }
 
-function formatPeriodLabelFallback(projectId: string, periodId: string | null): string {
-  if (!periodId) return NA_TEXT;
-  const meta = getPrototypePeriodMetaFromStore(projectId, periodId);
-  return meta?.period_label || NA_TEXT;
-}
-
-function fallbackProject(projectId: string): ProjectRecord {
-  const meta = getPrototypeProjectMetaFromStore(projectId);
-  return {
-    id: projectId,
-    code: meta?.project_code || null,
-    name: meta?.project_name || null,
-    phase: null,
-    is_active: null,
-  };
-}
-
-function fallbackPeriodId(projectId: string): string | null {
-  return listPrototypePeriodIdsByProjectFromStore(projectId)[0] || null;
-}
-
 function toSummaryBreakdown(value: unknown): SummaryBreakdownRow[] {
   if (!Array.isArray(value)) return [];
 
@@ -238,7 +210,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
         confidence: null,
         breakdown: [],
       },
-      mode: "prototype",
+      mode: "backend",
       backend_message: "Period is Not available",
       available: false,
     };
@@ -256,7 +228,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
         confidence: null,
         breakdown: [],
       },
-      mode: "prototype",
+      mode: "backend",
       backend_message: toSafeErrorMessage(response),
       available: false,
     };
@@ -285,7 +257,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
         confidence: null,
         breakdown: [],
       },
-      mode: "prototype",
+      mode: "backend",
       backend_message: e instanceof Error ? e.message : "Invalid backend payload",
       available: false,
     };
@@ -363,7 +335,7 @@ async function fetchDashboardSummaryReadMode(
         confidence: null,
         breakdown: [],
       },
-      mode: "prototype",
+      mode: "backend",
       backend_message: "Period label is Not available",
       available: false,
     };
@@ -386,7 +358,7 @@ async function fetchDashboardSummaryReadMode(
         confidence: null,
         breakdown: [],
       },
-      mode: "prototype",
+      mode: "backend",
       backend_message: toSafeErrorMessage(response),
       available: false,
     };
@@ -415,7 +387,7 @@ async function fetchDashboardSummaryReadMode(
           confidence: null,
           breakdown: [],
         },
-        mode: "prototype",
+        mode: "backend",
         backend_message: "Dashboard summary not available",
         available: false,
       };
@@ -438,7 +410,7 @@ async function fetchDashboardSummaryReadMode(
         confidence: null,
         breakdown: [],
       },
-      mode: "prototype",
+      mode: "backend",
       backend_message: e instanceof Error ? e.message : "Invalid dashboard payload",
       available: false,
     };
@@ -446,38 +418,27 @@ async function fetchDashboardSummaryReadMode(
 }
 
 export function getLatestApprovalDecision(projectId: string, periodId: string | null): PrototypeApprovalDecisionRecord | null {
-  const normalized = normalizePeriodId(periodId);
-  const items = listPrototypeApprovalDecisions().filter(
-    (row) => row.project_id === projectId && row.period_id === normalized
-  );
-  if (!items.length) return null;
-
-  return items
-    .slice()
-    .sort((a, b) => String(b.decided_at).localeCompare(String(a.decided_at)))[0];
+  void projectId;
+  void periodId;
+  return null;
 }
 
 export function listSnapshotsForPeriod(projectId: string, periodId: string | null): PrototypeSnapshotRecord[] {
-  const normalized = normalizePeriodId(periodId);
-  return listPrototypeSnapshots()
-    .filter((row) => row.project_id === projectId && row.period_id === normalized)
-    .sort((a, b) => String(b.approved_at).localeCompare(String(a.approved_at)));
+  void projectId;
+  void periodId;
+  return [];
 }
 
 export async function fetchApproverHomeContext(): Promise<ApproverHomeContext> {
   const projectsResult = await fetchProjectsReadMode();
-  let projects: ProjectRecord[] = projectsResult.data;
-
-  if (projects.length === 0) {
-    projects = listPrototypeProjectIdsFromStore().map((projectId) => fallbackProject(projectId));
-  }
+  const projects: ProjectRecord[] = projectsResult.data;
 
   const rows = await Promise.all(
     projects.map(async (project) => {
       const periodsResult = await fetchProjectPeriodsReadMode(project.id);
       const activePeriod = selectPeriodByJakartaDate(periodsResult.data) ?? selectActivePeriod(periodsResult.data);
 
-      const periodId = activePeriod?.id ?? fallbackPeriodId(project.id);
+      const periodId = activePeriod?.id ?? null;
       const backendStatus = activePeriod?.status ?? null;
       const periodStatusLabel = resolvePeriodStatusLabelWithPrototype(project.id, periodId, backendStatus);
       const latestDecision = getLatestApprovalDecision(project.id, periodId);
@@ -487,9 +448,7 @@ export async function fetchApproverHomeContext(): Promise<ApproverHomeContext> {
       return {
         project,
         period_id: periodId,
-        period_label: activePeriod
-          ? formatPeriodLabel(activePeriod)
-          : formatPeriodLabelFallback(project.id, periodId),
+        period_label: activePeriod ? formatPeriodLabel(activePeriod) : NA_TEXT,
         period_status_label: periodStatusLabel,
         approval_status:
           latestDecision?.decision || (periodId ? (periodStatusLabel === "LOCKED" ? "APPROVED" : "OPEN") : NA_TEXT),
@@ -533,13 +492,13 @@ export async function fetchApproverProjectContext(
     fetchProjectPeriodsReadMode(projectId),
   ]);
 
-  const project = projectResult.data || fallbackProject(projectId);
+  const project = projectResult.data;
   const periods = periodsResult.data;
 
   const overrideId = typeof periodIdOverride === "string" && periodIdOverride.trim() ? periodIdOverride.trim() : null;
   const overridePeriod = overrideId ? periods.find((row) => String(row?.id) === overrideId) || null : null;
   const active = overridePeriod ?? selectPeriodByJakartaDate(periods) ?? selectActivePeriod(periods);
-  const periodId = active?.id ?? overrideId ?? fallbackPeriodId(projectId);
+  const periodId = active?.id ?? overrideId ?? null;
   const backendStatus = active?.status ?? null;
   const periodStatusLabel = resolvePeriodStatusLabelWithPrototype(projectId, periodId, backendStatus);
   const periodLocked = resolvePeriodLockWithPrototype(projectId, periodId, backendStatus);
@@ -565,9 +524,7 @@ export async function fetchApproverProjectContext(
   let summarySourceMode: DataMode = summaryResult.mode;
 
   const evidenceResult = await fetchEvidenceListReadMode(projectId, periodId);
-  const evidenceCounts = buildReviewStatusCounts(
-    evidenceResult.data.length > 0 ? evidenceResult.data : listLocalEvidence(projectId, periodId)
-  );
+  const evidenceCounts = buildReviewStatusCounts(evidenceResult.data);
   const latestDecision = getLatestApprovalDecision(projectId, periodId);
   const snapshots = listSnapshotsForPeriod(projectId, periodId);
 
@@ -578,30 +535,6 @@ export async function fetchApproverProjectContext(
       summaryAvailable = true;
       summarySourceMode = dashboardSummaryResult.mode;
     }
-  }
-
-  if (!summaryAvailable && snapshots.length > 0) {
-    const latestSnapshot = snapshots[0];
-    summary = {
-      total_score: latestSnapshot.final_bim_score,
-      // In prototype mode, snapshot payload doesn't carry confidence coverage.
-      // Provide a safe default so approval gates can be exercised end-to-end locally.
-      confidence: {
-        coverage: 1,
-        frequency: null,
-        confidence: null,
-        indicators_with_submission: null,
-        total_active_indicators: null,
-        total_submission: null,
-        target_submission: null,
-      },
-      breakdown: latestSnapshot.breakdown.map((row) => ({
-        perspective_id: row.perspective_id,
-        score: row.score,
-      })),
-    };
-    summaryAvailable = true;
-    summarySourceMode = "prototype";
   }
 
   const dataMode: DataMode =
@@ -621,9 +554,7 @@ export async function fetchApproverProjectContext(
     project,
     period_id: periodId,
     period_version: active?.version ?? null,
-    period_label: active
-      ? formatPeriodLabel(active)
-      : formatPeriodLabelFallback(projectId, periodId),
+    period_label: active ? formatPeriodLabel(active) : NA_TEXT,
     period_status_label: periodStatusLabel,
     period_locked: periodLocked,
     summary,
@@ -823,3 +754,4 @@ export async function applyApproverDecision(input: {
     throw normalizeWriteError(error);
   }
 }
+

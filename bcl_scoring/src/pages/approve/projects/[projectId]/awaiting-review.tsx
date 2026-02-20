@@ -56,7 +56,7 @@ export default function AwaitingReviewQueuePage() {
         if (!mounted) return;
         setContext(null);
         setRows([]);
-        setEvidenceMode("prototype");
+        setEvidenceMode("backend");
         setEvidenceMessage(e instanceof Error ? e.message : "Backend not available");
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {

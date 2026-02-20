@@ -306,7 +306,7 @@ export default function HoEvidenceReviewPage() {
         evidence_id: evidence.id,
         review_outcome: outcome,
         review_reason: reason,
-        reviewed_by: "BIM Coordinator HO (Prototype)",
+        reviewed_by: "BIM Coordinator HO",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to apply review.";
@@ -340,7 +340,7 @@ export default function HoEvidenceReviewPage() {
 
       <section className="task-panel">
         <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
-        <p className="prototype-badge">Prototype review (not final, not used in scoring)</p>
+        <p className="inline-note">Evidence review tersimpan ke backend.</p>
         {isLocked ? <p className="warning-box">LOCKED (read-only)</p> : null}
         {!canWrite ? (
           <p className="read-only-banner">

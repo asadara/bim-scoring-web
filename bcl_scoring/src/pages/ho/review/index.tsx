@@ -11,12 +11,10 @@ import {
   fetchProjectPeriodsReadMode,
   fetchProjectsReadMode,
   resolvePeriodStatusLabelWithPrototype,
+  selectActivePeriod,
+  selectPeriodByJakartaDate,
 } from "@/lib/role1TaskLayer";
-import {
-  fetchSubmittedEvidenceByProjectReadMode,
-  listPrototypeProjectRecords,
-} from "@/lib/role2TaskLayer";
-import { getPrototypePeriodMetaFromStore, listPrototypePeriodIdsByProjectFromStore } from "@/lib/prototypeStore";
+import { fetchSubmittedEvidenceByProjectReadMode } from "@/lib/role2TaskLayer";
 import { useCredential } from "@/lib/useCredential";
 
 type ProjectReviewRow = {
@@ -64,9 +62,6 @@ export default function HoReviewHomePage() {
         setLoading(true);
         const projectsResult = await fetchProjectsReadMode();
         let projects = projectsResult.data;
-        if (projects.length === 0) {
-          projects = listPrototypeProjectRecords();
-        }
         if (credential.role === "role2" && Array.isArray(credential.scoped_project_ids) && credential.scoped_project_ids.length > 0) {
           const allowed = new Set(credential.scoped_project_ids);
           projects = projects.filter((project) => allowed.has(project.id));
@@ -75,10 +70,8 @@ export default function HoReviewHomePage() {
         const periodResults = await Promise.all(
           projects.map(async (project) => {
             const periodsResult = await fetchProjectPeriodsReadMode(project.id);
-            const active = periodsResult.data[0] ?? null;
-            const fallbackPeriodId = listPrototypePeriodIdsByProjectFromStore(project.id)[0] || null;
-            const periodId = active?.id ?? fallbackPeriodId;
-            const periodMeta = getPrototypePeriodMetaFromStore(project.id, periodId);
+            const active = selectPeriodByJakartaDate(periodsResult.data) ?? selectActivePeriod(periodsResult.data);
+            const periodId = active?.id ?? null;
             const evidenceResult = await fetchSubmittedEvidenceByProjectReadMode(project.id, periodId);
             const rowMode: DataMode =
               projectsResult.mode === "prototype" ||
@@ -90,7 +83,7 @@ export default function HoReviewHomePage() {
             return {
               project,
               submitted_count: evidenceResult.data.length,
-              period_label: active ? formatPeriodLabel(active) : periodMeta?.period_label || NA_TEXT,
+              period_label: active ? formatPeriodLabel(active) : NA_TEXT,
               period_status: resolvePeriodStatusLabelWithPrototype(
                 project.id,
                 periodId,
@@ -135,6 +128,8 @@ export default function HoReviewHomePage() {
       } catch (e) {
         if (!mounted) return;
         setRows([]);
+        setDataMode("backend");
+        setBackendMessage(e instanceof Error ? e.message : "Backend not available");
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
         if (mounted) setLoading(false);
@@ -267,13 +262,13 @@ export default function HoReviewHomePage() {
           BIM Coordinator HO memproses evidence SUBMITTED -&gt; tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.
         </p>
         <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
-        <p className="prototype-badge">Prototype review (not final, not used in scoring)</p>
+        <p className="inline-note">Sumber data review: database backend.</p>
 
         {loading ? <p>Loading...</p> : null}
         {error ? <p className="error-box">{error}</p> : null}
 
         {!loading && !error && rows.length === 0 ? (
-          <p className="empty-state">No submitted evidence in prototype store.</p>
+          <p className="empty-state">No submitted evidence available.</p>
         ) : null}
 
         {!loading && !error && rows.length > 0 ? (

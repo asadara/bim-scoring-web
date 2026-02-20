@@ -19,7 +19,6 @@ import {
   ISO19650_REFERENCE_ONLY_LABEL,
   ISO19650_REFERENCE_ROWS,
 } from "@/lib/iso19650Reference";
-import { getPrototypeProjectMetaFromStore } from "@/lib/prototypeStore";
 import {
   DataMode,
   NA_TEXT,
@@ -87,7 +86,7 @@ export default function AuditSnapshotDetailPage() {
           fetchProjectPeriodsReadMode(hit.snapshot.project_id),
         ]);
         let projectInfo: ProjectRecord | null = projectResult.data;
-        let pageDataMode: DataMode =
+        const pageDataMode: DataMode =
           snapshotResult.mode === "prototype" ||
           projectResult.mode === "prototype" ||
           periodResult.mode === "prototype"
@@ -97,15 +96,13 @@ export default function AuditSnapshotDetailPage() {
           snapshotResult.backend_message || projectResult.backend_message || periodResult.backend_message;
 
         if (!projectInfo) {
-          const meta = getPrototypeProjectMetaFromStore(hit.snapshot.project_id);
           projectInfo = {
             id: hit.snapshot.project_id,
-            name: meta?.project_name || null,
-            code: meta?.project_code || null,
+            name: null,
+            code: null,
             phase: null,
             is_active: null,
           };
-          pageDataMode = "prototype";
           pageBackendMessage = pageBackendMessage || "Backend not available";
         }
 
@@ -117,10 +114,7 @@ export default function AuditSnapshotDetailPage() {
 
         let summary: typeof backendSummary = null;
         const summaryResult = await fetchReadOnlySummaryReadMode(hit.snapshot.project_id, hit.snapshot.period_id);
-        if (summaryResult.mode === "prototype") {
-          pageDataMode = "prototype";
-          pageBackendMessage = pageBackendMessage || summaryResult.backend_message;
-        }
+        pageBackendMessage = pageBackendMessage || summaryResult.backend_message;
         if (summaryResult.available) {
           summary = {
             total_score: summaryResult.data.total_score,
@@ -144,7 +138,7 @@ export default function AuditSnapshotDetailPage() {
         setSnapshotView(null);
         setProject(null);
         setPeriod(null);
-        setDataMode("prototype");
+        setDataMode("backend");
         setBackendMessage(e instanceof Error ? e.message : "Backend not available");
         setBackendSummary(null);
         setError(e instanceof Error ? e.message : "Unknown error");
@@ -268,7 +262,7 @@ export default function AuditSnapshotDetailPage() {
   return (
     <AuditorLayout
       title="Read-only Auditor View"
-      subtitle="Snapshot detail sebagai catatan immutable prototype."
+      subtitle="Snapshot detail sebagai catatan immutable dari backend."
       projectLabel={formatProjectLabel(project || { id: snapshot.project_id, name: null, code: null, phase: null, is_active: null })}
       periodLabel={periodLabel}
       snapshotId={typeof snapshotId === "string" ? decodeURIComponent(snapshotId) : null}
@@ -285,7 +279,7 @@ export default function AuditSnapshotDetailPage() {
         <p>Approved at: {formatDateText(snapshot.approved_at)}</p>
         <p>Lock status: {getSnapshotLockStatus(snapshot)}</p>
         <p>Snapshot ID: {snapshotView.snapshot_id || NA_TEXT}</p>
-        <p className="prototype-badge">Prototype snapshot (not used for audit/compliance)</p>
+        <p className="inline-note">Snapshot source: backend database.</p>
       </section>
 
       <section className="task-panel">
@@ -362,7 +356,7 @@ export default function AuditSnapshotDetailPage() {
             <p>
               <strong>Snapshot Created (System)</strong>
             </p>
-            <p>Role: System record layer (prototype).</p>
+            <p>Role: System record layer (backend).</p>
             <p>Meaning: Snapshot immutable dibuat saat approval dan disimpan append-only.</p>
             <p>NOT done: Tidak mengklaim compliance final; hanya rekam jejak referensi internal.</p>
           </li>

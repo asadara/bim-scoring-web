@@ -352,7 +352,7 @@ export default function MePage() {
       <Head>
         <title>Akun Saya - BIM Scoring</title>
       </Head>
-      <main className="task-shell auth-shell">
+      <main className="task-shell me-shell">
         <section className="task-panel">
           <div className="me-header">
             <div className="me-header-copy">
@@ -419,94 +419,95 @@ export default function MePage() {
           {loading ? <p className="inline-note">Memuat ringkasan akun...</p> : null}
         </section>
 
-        <section className="task-panel">
-          <h2>1. Identitas Akun</h2>
-          <div className="task-context-grid">
-            <div className="context-card">
-              <span>Nama Lengkap</span>
-              <strong>{account.full_name || credential.full_name || "-"}</strong>
+        <div className="me-section-grid">
+          <section className="task-panel">
+            <h2>1. Identitas Akun</h2>
+            <div className="task-context-grid">
+              <div className="context-card">
+                <span>Nama Lengkap</span>
+                <strong>{account.full_name || credential.full_name || "-"}</strong>
+              </div>
+              <div className="context-card">
+                <span>Email</span>
+                <strong>{account.email || "-"}</strong>
+              </div>
+              <div className="context-card">
+                <span>Nomor Pegawai</span>
+                <strong>{account.employee_number || credential.employee_number || "-"}</strong>
+              </div>
+              <div className="context-card">
+                <span>Provider Login</span>
+                <strong>{providerLabel(account.auth_provider || credential.auth_provider)}</strong>
+              </div>
+              <div className="context-card">
+                <span>User ID</span>
+                <strong>{account.user_id || credential.user_id || "-"}</strong>
+              </div>
             </div>
-            <div className="context-card">
-              <span>Email</span>
-              <strong>{account.email || "-"}</strong>
-            </div>
-            <div className="context-card">
-              <span>Nomor Pegawai</span>
-              <strong>{account.employee_number || credential.employee_number || "-"}</strong>
-            </div>
-            <div className="context-card">
-              <span>Provider Login</span>
-              <strong>{providerLabel(account.auth_provider || credential.auth_provider)}</strong>
-            </div>
-            <div className="context-card">
-              <span>User ID</span>
-              <strong>{account.user_id || credential.user_id || "-"}</strong>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="task-panel">
-          <h2>2. Status Role</h2>
-          <div className="task-context-grid">
-            <div className="context-card">
-              <span>Role Aktif</span>
-              <strong>{getRoleLabel(credential.role)}</strong>
+          <section className="task-panel">
+            <h2>2. Status Role</h2>
+            <div className="task-context-grid">
+              <div className="context-card">
+                <span>Role Aktif</span>
+                <strong>{getRoleLabel(credential.role)}</strong>
+              </div>
+              <div className="context-card">
+                <span>Status Role</span>
+                <strong>{roleStatusText}</strong>
+              </div>
+              <div className="context-card">
+                <span>Role Diajukan</span>
+                <strong>{requestedRoleLabel}</strong>
+              </div>
+              <div className="context-card">
+                <span>Login Terakhir</span>
+                <strong>{formatDateTime(account.last_sign_in_at)}</strong>
+              </div>
+              <div className="context-card">
+                <span>Sinkronisasi Terakhir</span>
+                <strong>{formatDateTime(credential.updated_at)}</strong>
+              </div>
             </div>
-            <div className="context-card">
-              <span>Status Role</span>
-              <strong>{roleStatusText}</strong>
-            </div>
-            <div className="context-card">
-              <span>Role Diajukan</span>
-              <strong>{requestedRoleLabel}</strong>
-            </div>
-            <div className="context-card">
-              <span>Login Terakhir</span>
-              <strong>{formatDateTime(account.last_sign_in_at)}</strong>
-            </div>
-            <div className="context-card">
-              <span>Sinkronisasi Terakhir</span>
-              <strong>{formatDateTime(credential.updated_at)}</strong>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="task-panel">
-          <h2>3. Detail Pengajuan Role</h2>
-          <div className="task-context-grid">
-            <div className="context-card">
-              <span>Role Pengajuan</span>
-              <strong>{requestedRoleLabel}</strong>
+          <section className="task-panel">
+            <h2>3. Detail Pengajuan Role</h2>
+            <div className="task-context-grid">
+              <div className="context-card">
+                <span>Role Pengajuan</span>
+                <strong>{requestedRoleLabel}</strong>
+              </div>
+              <div className="context-card">
+                <span>Estimasi Waktu Pengajuan</span>
+                <strong>{formatDateTime(account.created_at)}</strong>
+              </div>
+              <div className="context-card">
+                <span>Scope Project Diajukan</span>
+                <strong>{requestedProjectLabels.length > 0 ? requestedProjectLabels.join(", ") : "-"}</strong>
+              </div>
             </div>
-            <div className="context-card">
-              <span>Estimasi Waktu Pengajuan</span>
-              <strong>{formatDateTime(account.created_at)}</strong>
-            </div>
-            <div className="context-card">
-              <span>Scope Project Diajukan</span>
-              <strong>{requestedProjectLabels.length > 0 ? requestedProjectLabels.join(", ") : "-"}</strong>
-            </div>
-          </div>
-          {projectLoadError ? <p className="inline-note">{projectLoadError}</p> : null}
-        </section>
+            {projectLoadError ? <p className="inline-note">{projectLoadError}</p> : null}
+          </section>
 
-        <section className="task-panel">
-          <h2>4. Akses Saya Saat Ini</h2>
-          <p className="task-subtitle">
-            Halaman berikut dapat diakses oleh role aktif Anda: <strong>{getRoleLabel(credential.role)}</strong>.
-          </p>
-          <div className="wizard-actions">
-            {accessibleMenus.map((item) => (
-              <Link key={item.href} href={item.href} className="action-primary">
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </section>
+          <section className="task-panel">
+            <h2>4. Akses Saya Saat Ini</h2>
+            <p className="task-subtitle">
+              Halaman berikut dapat diakses oleh role aktif Anda: <strong>{getRoleLabel(credential.role)}</strong>.
+            </p>
+            <div className="wizard-actions">
+              {accessibleMenus.map((item) => (
+                <Link key={item.href} href={item.href} className="action-primary">
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </section>
 
-        <section className="task-panel">
-          <h2>5. Pengaturan Akun Dasar</h2>
-          <div className="auth-stack">
+          <section className="task-panel me-panel-wide">
+            <h2>5. Pengaturan Akun Dasar</h2>
+            <div className="auth-stack">
             <form className="auth-stack" onSubmit={onSaveProfile}>
               <h3>Perbarui Profil</h3>
               <label className="auth-field">
@@ -606,18 +607,19 @@ export default function MePage() {
                 </button>
               </div>
             </div>
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section className="task-panel">
-          <h2>6. Bantuan</h2>
-          <p className="inline-note">
-            Perubahan role, scope project, atau kebutuhan akses tambahan diproses oleh Admin melalui panel Admin.
-          </p>
-          <p className="inline-note">
-            Jika role belum sesuai kebutuhan kerja Anda, ajukan ulang dari form pendaftaran atau hubungi Admin BIM internal.
-          </p>
-        </section>
+          <section className="task-panel me-panel-wide">
+            <h2>6. Bantuan</h2>
+            <p className="inline-note">
+              Perubahan role, scope project, atau kebutuhan akses tambahan diproses oleh Admin melalui panel Admin.
+            </p>
+            <p className="inline-note">
+              Jika role belum sesuai kebutuhan kerja Anda, ajukan ulang dari form pendaftaran atau hubungi Admin BIM internal.
+            </p>
+          </section>
+        </div>
       </main>
     </>
   );

@@ -23,10 +23,6 @@ import {
   syncReviewedEvidenceFromBackend,
 } from "@/lib/role1TaskLayer";
 import {
-  getPrototypePeriodMetaFromStore,
-  getPrototypeProjectMetaFromStore,
-  listPrototypePeriodIdsByProjectFromStore,
-  listPrototypeProjectIdsFromStore,
   normalizePrototypePeriodId,
 } from "@/lib/prototypeStore";
 import {
@@ -36,43 +32,6 @@ import {
 } from "@/lib/backendWriteClient";
 import { UNKNOWN_ACTIVE_PERIOD_KEY } from "@/lib/statusModel";
 import { getStoredCredential } from "@/lib/userCredential";
-
-function fallbackProject(projectId: string): ProjectRecord {
-  const meta = getPrototypeProjectMetaFromStore(projectId);
-  return {
-    id: projectId,
-    code: meta?.project_code || null,
-    name: meta?.project_name || null,
-    phase: null,
-    is_active: null,
-  };
-}
-
-function fallbackPeriod(projectId: string): ScoringPeriod | null {
-  const periodId = listPrototypePeriodIdsByProjectFromStore(projectId)[0] || null;
-  if (!periodId) return null;
-
-  const meta = getPrototypePeriodMetaFromStore(projectId, periodId);
-  const row: ScoringPeriod = {
-    id: periodId,
-    project_id: projectId,
-    year: null,
-    week: null,
-    start_date: null,
-    end_date: null,
-    status: null,
-    version: null,
-  };
-
-  const label = meta?.period_label || "";
-  const match = label.match(/^(\d{4})\s+W(\d{1,2})$/i);
-  if (match) {
-    row.year = Number(match[1]);
-    row.week = Number(match[2]);
-  }
-
-  return row;
-}
 
 export async function fetchIndicatorsStrict(projectId: string): Promise<IndicatorRecord[]> {
   const result = await fetchIndicatorsReadMode(projectId);
@@ -106,15 +65,14 @@ export async function fetchRole2ProjectContext(
     fetchProjectPeriodsReadMode(projectId),
   ]);
 
-  const project = projectResult.data || fallbackProject(projectId);
+  const project = projectResult.data;
   const overrideId = typeof periodIdOverride === "string" && periodIdOverride.trim() ? periodIdOverride.trim() : null;
   const overridePeriod =
     overrideId ? periodsResult.data.find((row) => String(row?.id) === overrideId) || null : null;
   const activePeriod =
     overridePeriod ??
     selectPeriodByJakartaDate(periodsResult.data) ??
-    selectActivePeriod(periodsResult.data) ??
-    fallbackPeriod(projectId);
+    selectActivePeriod(periodsResult.data);
   const backendStatus = activePeriod?.status ?? null;
   const dataMode: DataMode =
     projectResult.mode === "prototype" || periodsResult.mode === "prototype" ? "prototype" : "backend";
@@ -140,13 +98,10 @@ export async function fetchSubmittedEvidenceByProjectReadMode(
   projectId: string,
   periodId: string | null
 ): Promise<{ data: LocalEvidenceWithReview[]; mode: DataMode; backend_message: string | null }> {
-  const localSubmitted = listLocalEvidenceWithReview(projectId, periodId).filter(
-    (row) => row.effective_status === "SUBMITTED"
-  );
   const result = await fetchEvidenceListReadMode(projectId, periodId);
   const mapped = mapEvidenceRowsWithReview(result.data).filter((row) => row.effective_status === "SUBMITTED");
   return {
-    data: mapped.length > 0 ? mapped : localSubmitted,
+    data: mapped,
     mode: result.mode,
     backend_message: result.backend_message,
   };
@@ -273,5 +228,5 @@ export function listSubmittedEvidenceAcrossProjects(): Record<string, LocalEvide
 }
 
 export function listPrototypeProjectRecords(): ProjectRecord[] {
-  return listPrototypeProjectIdsFromStore().map((projectId) => fallbackProject(projectId));
+  return [];
 }

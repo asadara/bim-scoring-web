@@ -14,7 +14,7 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
     if (FEATURE_REAL_BACKEND_WRITE) return null;
     return {
       status: "available",
-      service: "prototype",
+      service: "backend-readonly",
       endpoint: null,
       checked_at: new Date().toISOString(),
       message: null,
@@ -72,7 +72,7 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
     }
     return (
       <p className="backend-status-banner backend-status-neutral" role="status">
-        Backend read endpoint not available (prototype fallback)
+        Backend read endpoint is partially available
       </p>
     );
   }
@@ -112,7 +112,7 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
   if (hasUnavailableIssue || handshake.status === "unavailable") {
     return (
       <p className="backend-status-banner" role="status">
-        Backend unavailable - prototype mode
+        Backend unavailable
       </p>
     );
   }
@@ -128,7 +128,7 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
   if (handshake.status === "available" && mode === "prototype") {
     return (
       <p className="backend-status-banner" role="status">
-        Backend available, but data endpoint is not available. Prototype mode (not used in scoring/audit/compliance)
+        Backend available, but some read endpoints return empty/Not available.
         {normalizedMessage ? ` - ${normalizedMessage}` : ""}
       </p>
     );
@@ -136,7 +136,7 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
 
   return (
     <p className="backend-status-banner" role="status">
-      Backend unavailable. Prototype mode (not used in scoring/audit/compliance)
+      Backend unavailable
       {normalizedMessage ? ` - ${normalizedMessage}` : ""}
     </p>
   );
