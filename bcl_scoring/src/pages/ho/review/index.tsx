@@ -162,6 +162,12 @@ export default function HoReviewHomePage() {
     () => rows.find((row) => row.queue_level === "High")?.project.id || null,
     [rows]
   );
+  const scopedProjectSummary = useMemo(() => {
+    if (!Array.isArray(credential.scoped_project_ids) || credential.scoped_project_ids.length === 0) {
+      return "Semua workspace";
+    }
+    return credential.scoped_project_ids.join(", ");
+  }, [credential.scoped_project_ids]);
   const headerProjectLabel = useMemo(() => {
     if (loading) return "Loading review queue...";
     if (rows.length === 0) return "No project pending review";
@@ -268,7 +274,13 @@ export default function HoReviewHomePage() {
         {error ? <p className="error-box">{error}</p> : null}
 
         {!loading && !error && rows.length === 0 ? (
-          <p className="empty-state">No submitted evidence available.</p>
+          <>
+            <p className="empty-state">No submitted evidence available.</p>
+            <p className="inline-note">
+              Scope Role 2 saat ini: <strong>{scopedProjectSummary}</strong>.
+              Pastikan evidence sudah <strong>SUBMITTED</strong> oleh Role 1 pada period aktif workspace.
+            </p>
+          </>
         ) : null}
 
         {!loading && !error && rows.length > 0 ? (

@@ -701,38 +701,45 @@ export default function AddEvidencePage() {
                     disabled={fieldDisabled}
                   />
                 </label>
-                <label htmlFor="file-view-url-input">
-                  view_url ({form.file_type || "FILE"} - optional)
-                  <input
-                    id="file-view-url-input"
-                    value={form.file_view_url}
-                    onChange={(event) => setField("file_view_url", event.target.value)}
-                    disabled={fieldDisabled}
-                    placeholder="https://..."
-                  />
-                </label>
+                <details className="collapsible-section">
+                  <summary className="collapsible-summary">
+                    Field URL Optional (default tertutup)
+                  </summary>
+                  <div className="collapsible-content">
+                    <label htmlFor="file-view-url-input">
+                      view_url ({form.file_type || "FILE"} - optional)
+                      <input
+                        id="file-view-url-input"
+                        value={form.file_view_url}
+                        onChange={(event) => setField("file_view_url", event.target.value)}
+                        disabled={fieldDisabled}
+                        placeholder="https://..."
+                      />
+                    </label>
 
-                <label htmlFor="file-download-url-input">
-                  download_url ({form.file_type || "FILE"} - optional)
-                  <input
-                    id="file-download-url-input"
-                    value={form.file_download_url}
-                    onChange={(event) => setField("file_download_url", event.target.value)}
-                    disabled={fieldDisabled}
-                    placeholder="https://..."
-                  />
-                </label>
+                    <label htmlFor="file-download-url-input">
+                      download_url ({form.file_type || "FILE"} - optional)
+                      <input
+                        id="file-download-url-input"
+                        value={form.file_download_url}
+                        onChange={(event) => setField("file_download_url", event.target.value)}
+                        disabled={fieldDisabled}
+                        placeholder="https://..."
+                      />
+                    </label>
 
-                <label htmlFor="file-reference-url-input">
-                  single reference URL ({form.file_type || "FILE"} - optional)
-                  <input
-                    id="file-reference-url-input"
-                    value={form.file_reference_url}
-                    onChange={(event) => setField("file_reference_url", event.target.value)}
-                    disabled={fieldDisabled}
-                    placeholder="https://..."
-                  />
-                </label>
+                    <label htmlFor="file-reference-url-input">
+                      single reference URL ({form.file_type || "FILE"} - optional)
+                      <input
+                        id="file-reference-url-input"
+                        value={form.file_reference_url}
+                        onChange={(event) => setField("file_reference_url", event.target.value)}
+                        disabled={fieldDisabled}
+                        placeholder="https://..."
+                      />
+                    </label>
+                  </div>
+                </details>
               </>
             ) : null}
 

@@ -236,6 +236,18 @@ export default function AdminControlPanelPage() {
     name: "",
     config_key: "",
   });
+  const [editingProjectId, setEditingProjectId] = useState("");
+  const [projectSettingForm, setProjectSettingForm] = useState<{
+    name: string;
+    config_key: string;
+    is_active: boolean;
+    week_anchor: WeekAnchor;
+  }>({
+    name: "",
+    config_key: "",
+    is_active: true,
+    week_anchor: "MONDAY",
+  });
   const [weekAnchorDraft, setWeekAnchorDraft] = useState<WeekAnchor>("MONDAY");
   const [indicatorForm, setIndicatorForm] = useState({
     perspective_id: "",
@@ -556,6 +568,60 @@ export default function AdminControlPanelPage() {
       setShowProjectCreateForm(false);
       await reloadBase(session);
     }, "Workspace project berhasil dibuat.");
+  }
+
+  function handleOpenProjectSettingEditor(project: AdminProject) {
+    setEditingProjectId(project.id);
+    setProjectSettingForm({
+      name: project.name || "",
+      config_key: project.config_key || "",
+      is_active: project.is_active !== false,
+      week_anchor: parseWeekAnchorFromConfigKey(project.config_key),
+    });
+    setPeriodProjectFilter(project.id);
+    setError(null);
+    setNotice(null);
+  }
+
+  function handleCloseProjectSettingEditor() {
+    setEditingProjectId("");
+    setProjectSettingForm({
+      name: "",
+      config_key: "",
+      is_active: true,
+      week_anchor: "MONDAY",
+    });
+  }
+
+  async function handleSaveProjectSetting(event: FormEvent) {
+    event.preventDefault();
+    const projectId = toNonEmptyString(editingProjectId);
+    const name = toNonEmptyString(projectSettingForm.name);
+    if (!projectId) {
+      setError("Pilih workspace yang akan diubah.");
+      return;
+    }
+    if (!name) {
+      setError("Nama workspace wajib diisi.");
+      return;
+    }
+
+    await runAction(async () => {
+      const nextConfigKey = upsertWeekAnchorConfigKey(
+        projectSettingForm.config_key,
+        projectSettingForm.week_anchor
+      );
+      await updateAdminProject(session, projectId, {
+        name,
+        config_key: toNonEmptyString(nextConfigKey),
+        is_active: projectSettingForm.is_active,
+      });
+      await reloadBase(session);
+      await reloadPeriodsForProject(session, projectId);
+      setPeriodProjectFilter(projectId);
+      setCleanupProjectFilter(projectId);
+      handleCloseProjectSettingEditor();
+    }, "Setting workspace berhasil diperbarui.");
   }
 
   async function handleEnsureTestWorkspace() {
@@ -1281,6 +1347,9 @@ export default function AdminControlPanelPage() {
         <p className="inline-note">
           Untuk keamanan, aksi hapus workspace dinonaktifkan. Gunakan Nonaktifkan untuk menonaktifkan workspace tanpa menghapus data.
         </p>
+        <p className="inline-note">
+          Catatan: queue Role 2 hanya menampilkan evidence berstatus <strong>SUBMITTED</strong> pada period aktif dan workspace yang masuk scope role2.
+        </p>
         <div className="wizard-actions">
           <button
             type="button"
@@ -1336,12 +1405,85 @@ export default function AdminControlPanelPage() {
                     >
                       {item.is_active === false ? "Aktifkan" : "Nonaktifkan"}
                     </button>
+                    <button
+                      type="button"
+                      disabled={working}
+                      onClick={() => handleOpenProjectSettingEditor(item)}
+                    >
+                      Edit Setting
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {editingProjectId ? (
+          <form className="field-grid" onSubmit={(event) => void handleSaveProjectSetting(event)}>
+            <label>
+              Nama Workspace
+              <input
+                value={projectSettingForm.name}
+                onChange={(event) =>
+                  setProjectSettingForm((prev) => ({ ...prev, name: event.target.value }))
+                }
+                placeholder="Nama Workspace"
+                required
+              />
+            </label>
+            <label>
+              Hari Mulai Periode (Anchor Mingguan)
+              <select
+                value={projectSettingForm.week_anchor}
+                onChange={(event) =>
+                  setProjectSettingForm((prev) => ({
+                    ...prev,
+                    week_anchor: event.target.value as WeekAnchor,
+                  }))
+                }
+              >
+                {WEEK_ANCHOR_OPTIONS.map((item) => (
+                  <option key={`project-setting-${item.value}`} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Kunci Konfigurasi (lanjutan, opsional)
+              <input
+                value={projectSettingForm.config_key}
+                onChange={(event) =>
+                  setProjectSettingForm((prev) => ({ ...prev, config_key: event.target.value }))
+                }
+                placeholder="Contoh: workspace_type=test"
+              />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={projectSettingForm.is_active}
+                onChange={(event) =>
+                  setProjectSettingForm((prev) => ({ ...prev, is_active: event.target.checked }))
+                }
+              />
+              {" "}
+              Workspace aktif
+            </label>
+            <p className="inline-note">
+              Saat disimpan, nilai anchor mingguan otomatis ditulis ke <code>config_key</code>.
+            </p>
+            <div className="wizard-actions">
+              <button type="submit" className="action-primary" disabled={working}>
+                Simpan Setting Workspace
+              </button>
+              <button type="button" disabled={working} onClick={() => handleCloseProjectSettingEditor()}>
+                Batal
+              </button>
+            </div>
+          </form>
+        ) : null}
 
         {showProjectCreateForm && (
           <form className="field-grid" onSubmit={(event) => void handleCreateProject(event)}>
