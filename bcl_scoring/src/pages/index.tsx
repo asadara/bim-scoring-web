@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -15,6 +16,7 @@ import {
 import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
 import { isTestWorkspaceProject } from "@/lib/testWorkspace";
 import { useCredential } from "@/lib/useCredential";
+import { getRoleLabel } from "@/lib/userCredential";
 
 type ProjectRow = {
   id: string;
@@ -294,6 +296,8 @@ export default function Home() {
   const [indicatorScores, setIndicatorScores] = useState<IndicatorScoreRow[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>("");
   const [activePerspectiveId, setActivePerspectiveId] = useState<string | null>(null);
+  const [showNkeLogo, setShowNkeLogo] = useState(true);
+  const [showBimProgramLogo, setShowBimProgramLogo] = useState(true);
 
   const selectedProject = useMemo(
     () => projects.find((item) => item.id === selectedProjectId) || null,
@@ -314,7 +318,6 @@ export default function Home() {
   const alertsCard = useMemo(() => cards.find((item) => item.id === "alerts") || null, [cards]);
   const perspectiveCard = useMemo(() => cards.find((item) => item.id === "perspectives") || null, [cards]);
 
-  const scoreValue = asNumber(scoreCard?.value);
   const weeklyDelta = asNumber(weeklyTrendCard?.value);
   const monthlyDelta = asNumber(monthlyTrendCard?.value);
   const alertsCount = asNumber(alertsCard?.value);
@@ -652,6 +655,28 @@ export default function Home() {
       ? `Connected (${backend.service})`
       : `Unavailable (${backend.message || "no message"})`
     : "Checking backend...";
+  const environmentLabel = useMemo(() => {
+    const appEnv = String(process.env.NEXT_PUBLIC_APP_ENV || "").trim().toLowerCase();
+    if (appEnv.includes("prod")) return "Production";
+    if (appEnv.includes("beta") || appEnv.includes("staging") || appEnv.includes("dev")) return "Beta";
+    if (backend?.service && /prod/i.test(backend.service)) return "Production";
+    return "Beta";
+  }, [backend?.service]);
+  const activeRoleLabel = credential?.role ? getRoleLabel(credential.role) : "User";
+  const scoreMetric = Number.isFinite(Number(scoreCard?.value)) ? Number(scoreCard?.value) : null;
+  const confidenceMetric = inputCoverage.total > 0 ? inputCoverage.percent : null;
+  const activeProjectsMetric = projects.length > 0
+    ? projects.filter((item) => item.is_active !== false).length
+    : null;
+  const alertsMetric = Number.isFinite(Number(alertsCard?.value)) ? Number(alertsCard?.value) : null;
+  const lastSubmissionMetric = lastSyncedAt ? formatTimestamp(lastSyncedAt) : null;
+  const pendingEvidenceMetric = indicatorScores.filter((item) => !item.is_scored).length;
+  const stalePeriodMetric = selectedPeriod
+    ? String(selectedPeriod.status || "").toUpperCase() === "OPEN"
+      ? "Tidak ada"
+      : "Periode tidak OPEN"
+    : "—";
+  const hasTrendData = weeklyTrendCard !== null || monthlyTrendCard !== null;
 
   return (
     <>
@@ -659,126 +684,189 @@ export default function Home() {
         <title>BIM Scoring Dashboard</title>
       </Head>
 
-      <main className="task-shell landing-shell">
-        <header className="task-header landing-hero">
-          <div className="desktop-hero-layout">
-            <div className="desktop-hero-main">
-              <p className="task-kicker">BIM Scoring Platform</p>
-              <h1>Dashboard</h1>
-              <p className="task-subtitle">
-                Dashboard utama BIM Scoring untuk monitoring weekly score, perspektif P1-P5, dan readiness workflow.
-              </p>
-
-              <div className="landing-chip-row">
-                <span className={`status-chip ${backend?.status === "available" ? "status-open" : "status-lock"}`}>
-                  {backendStatusText}
-                </span>
-                <span className="status-chip status-na">Last sync: {formatTimestamp(lastSyncedAt)}</span>
-              </div>
+      <main className="task-shell landing-shell dashboard-corporate">
+        <section className="task-panel dashboard-corp-topbar">
+          <div className="dashboard-brand-cluster">
+            {showNkeLogo ? (
+              <Image
+                src="/logo_nke.png"
+                alt="PT Nusa Konstruksi Enjiniring"
+                className="dashboard-brand-logo dashboard-brand-logo-primary"
+                width={130}
+                height={40}
+                loading="eager"
+                onError={() => setShowNkeLogo(false)}
+                unoptimized
+              />
+            ) : (
+              <div className="dashboard-logo-fallback">NKE</div>
+            )}
+            <span className="dashboard-brand-separator" aria-hidden="true" />
+            <div className="dashboard-program-brand">
+              {showBimProgramLogo ? (
+                <Image
+                  src="/bim_nke_logo.gif"
+                  alt="BIM NKE Program"
+                  className="dashboard-brand-logo dashboard-brand-logo-secondary"
+                  width={68}
+                  height={32}
+                  loading="eager"
+                  onError={() => setShowBimProgramLogo(false)}
+                  unoptimized
+                />
+              ) : (
+                <div className="dashboard-logo-fallback dashboard-logo-fallback-secondary">BIM</div>
+              )}
+              <small>BIM NKE Program</small>
             </div>
-
-            <aside className="desktop-header-context">
-              <div className="field-grid desktop-filter-grid desktop-filter-grid-compact">
-                <label>
-                  Workspace Project
-                  <select
-                    value={selectedProjectId}
-                    onChange={(event) => handleProjectChange(event.target.value)}
-                    disabled={loading || projects.length === 0}
-                  >
-                    {projects.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {asText(item.name, "Workspace tanpa nama")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Periode Mingguan
-                  <select
-                    value={selectedPeriodId}
-                    onChange={(event) => setSelectedPeriodId(event.target.value)}
-                    disabled={loading || periods.length === 0}
-                  >
-                    {periods.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {formatWeekLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="desktop-context-chip-row">
-                <span className="desktop-context-chip">Code: <strong>{asText(selectedProject?.code, "N/A")}</strong></span>
-                <span className="desktop-context-chip">
-                  Phase: <strong>{asText(selectedProject?.phase, "N/A")}</strong>
-                </span>
-                <span className="desktop-context-chip">
-                  Project Status: <strong>{selectedProject?.is_active === false ? "Inactive" : "Active"}</strong>
-                </span>
-                <span className="desktop-context-chip">
-                  Active Period: <strong>{selectedPeriod ? formatWeekLabel(selectedPeriod) : (selectedProjectId ? "Loading..." : "N/A")}</strong>
-                </span>
-                <span className="desktop-context-chip">
-                  Period Status: <strong>{selectedPeriod ? asText(selectedPeriod?.status, "N/A") : (selectedProjectId ? "Loading..." : "N/A")}</strong>
-                </span>
-              </div>
-
-              {periods.length === 0 ? (
-                <p className="inline-note">
-                  Project ini belum memiliki scoring period. Tambahkan period lewat{" "}
-                  {canAccessAdmin ? <Link href="/admin">Admin Control Panel</Link> : "Admin Control Panel"}.
-                </p>
-              ) : null}
-            </aside>
           </div>
 
-        </header>
-
-        {error && <p className="error-box">{error}</p>}
-
-        <section className="task-panel">
-          <h2>Weekly KPI Summary</h2>
-          <div className="task-grid-3">
-            <article className="summary-card">
-              <span>Weekly BIM Score</span>
-              <strong>{scoreValue.toFixed(2)}</strong>
-              <small>{formatScoreLevel(scoreValue)}</small>
-            </article>
-            <article className="summary-card">
-              <span>Input Coverage</span>
-              <strong>{inputCoverage.percent}%</strong>
-              <small>{inputCoverage.scored}/{inputCoverage.total} indikator terisi</small>
-            </article>
-            <article className="summary-card">
-              <span>Trend Weekly</span>
-              <strong>{formatDelta(weeklyDelta)}</strong>
-            </article>
-            <article className="summary-card">
-              <span>Trend Monthly</span>
-              <strong>{formatDelta(monthlyDelta)}</strong>
-            </article>
-            <article className="summary-card">
-              <span>Open Alerts</span>
-              <strong>{alertsCount}</strong>
-            </article>
-            <article className="summary-card">
-              <span>Top Perspective</span>
-              <strong>{topPerspective ? `${topPerspective.perspectiveId} (${topPerspective.score.toFixed(2)})` : "N/A"}</strong>
-            </article>
-            <article className="summary-card">
-              <span>Lowest Perspective</span>
-              <strong>
-                {lowestPerspective ? `${lowestPerspective.perspectiveId} (${lowestPerspective.score.toFixed(2)})` : "N/A"}
-              </strong>
-            </article>
+          <div className="dashboard-meta-chip-row">
+            <span className="dashboard-meta-chip">
+              <b>Environment</b>
+              <em>{environmentLabel}</em>
+            </span>
+            <span className="dashboard-meta-chip">
+              <b>Active Role</b>
+              <em>{activeRoleLabel || "User"}</em>
+            </span>
+            {lastSyncedAt ? (
+              <span className="dashboard-meta-chip">
+                <b>Last Sync</b>
+                <em>{formatTimestamp(lastSyncedAt)}</em>
+              </span>
+            ) : null}
+            <span className={`status-chip ${backend?.status === "available" ? "status-open" : "status-lock"}`}>
+              {backendStatusText}
+            </span>
           </div>
         </section>
 
+        <header className="task-panel dashboard-hero-strip">
+          <div className="dashboard-hero-strip-grid">
+            <div className="dashboard-hero-main-copy">
+              <h1 className="dashboard-hero-title">BIM Scoring Platform</h1>
+              <p className="dashboard-hero-subtitle">
+                Enterprise Engineering Information Governance
+                <br />
+                PT Nusa Konstruksi Enjiniring Tbk
+              </p>
+              <p className="dashboard-hero-statement">
+                Evidence-Driven • Explainable • Audit-Safe • ISO 19650 Aligned (conceptual)
+              </p>
+            </div>
+
+            <aside className="dashboard-report-context">
+              <h2>Reporting Context</h2>
+              <dl>
+                <div>
+                  <dt>Period</dt>
+                  <dd>{selectedPeriod ? formatWeekLabel(selectedPeriod) : "—"}</dd>
+                </div>
+                <div>
+                  <dt>Active Projects</dt>
+                  <dd>{activeProjectsMetric ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>Submission Target</dt>
+                  <dd>Weekly</dd>
+                </div>
+              </dl>
+            </aside>
+          </div>
+        </header>
+
+        <section className="task-panel dashboard-filter-panel">
+          <div className="field-grid desktop-filter-grid desktop-filter-grid-compact">
+            <label>
+              Workspace Project
+              <select
+                value={selectedProjectId}
+                onChange={(event) => handleProjectChange(event.target.value)}
+                disabled={loading || projects.length === 0}
+              >
+                {projects.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {asText(item.name, "Workspace tanpa nama")}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Periode Mingguan
+              <select
+                value={selectedPeriodId}
+                onChange={(event) => setSelectedPeriodId(event.target.value)}
+                disabled={loading || periods.length === 0}
+              >
+                {periods.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {formatWeekLabel(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="desktop-context-chip-row">
+            <span className="desktop-context-chip">Code: <strong>{asText(selectedProject?.code, "N/A")}</strong></span>
+            <span className="desktop-context-chip">
+              Phase: <strong>{asText(selectedProject?.phase, "N/A")}</strong>
+            </span>
+            <span className="desktop-context-chip">
+              Project Status: <strong>{selectedProject?.is_active === false ? "Inactive" : "Active"}</strong>
+            </span>
+            <span className="desktop-context-chip">
+              Active Period: <strong>{selectedPeriod ? formatWeekLabel(selectedPeriod) : (selectedProjectId ? "Loading..." : "N/A")}</strong>
+            </span>
+            <span className="desktop-context-chip">
+              Period Status: <strong>{selectedPeriod ? asText(selectedPeriod?.status, "N/A") : (selectedProjectId ? "Loading..." : "N/A")}</strong>
+            </span>
+          </div>
+
+          {periods.length === 0 ? (
+            <p className="inline-note">
+              Project ini belum memiliki scoring period. Tambahkan period lewat{" "}
+              {canAccessAdmin ? <Link href="/admin">Admin Control Panel</Link> : "Admin Control Panel"}.
+            </p>
+          ) : null}
+        </section>
+
+        {error && <p className="error-box">{error}</p>}
+
+        <section className="dashboard-executive-kpi-row">
+          <article className="dashboard-kpi-card">
+            <span>BIM Score (Org Avg)</span>
+            <strong>{scoreMetric === null ? "—" : scoreMetric.toFixed(2)}</strong>
+            <small>{scoreMetric === null ? "Tidak tersedia" : formatScoreLevel(scoreMetric)}</small>
+          </article>
+          <article className="dashboard-kpi-card">
+            <span>Confidence (Org Avg)</span>
+            <strong>{confidenceMetric === null ? "—" : `${confidenceMetric}%`}</strong>
+            <small>{inputCoverage.scored}/{inputCoverage.total} indikator scored</small>
+          </article>
+          <article className="dashboard-kpi-card">
+            <span>Active Projects</span>
+            <strong>{activeProjectsMetric ?? "—"}</strong>
+            <small>Project aktif dalam scope dashboard</small>
+          </article>
+          <article className="dashboard-kpi-card">
+            <span>High-Risk Alerts</span>
+            <strong>{alertsMetric ?? "—"}</strong>
+            <small>Risk posture dari indikator prioritas</small>
+          </article>
+          <article className="dashboard-kpi-card">
+            <span>Last Submission</span>
+            <strong>{lastSubmissionMetric ?? "—"}</strong>
+            <small>Timestamp sinkronisasi terakhir</small>
+          </article>
+        </section>
+
+        <section className="dashboard-main-grid">
+          <div className="dashboard-main-left">
         <section className="task-panel">
-          <h2>Score Analytics</h2>
+          <h2>Project Performance Overview</h2>
           <p className="inline-note">Klik bar chart perspektif untuk membuka drawer insight detail.</p>
           <div className="desktop-analytics-grid">
             <div className="desktop-chart-list">
@@ -903,6 +991,26 @@ export default function Home() {
         </section>
 
         <section className="task-panel">
+          <h2>Weekly Trend</h2>
+          {hasTrendData ? (
+            <div className="dashboard-weekly-trend-grid">
+              <article className="dashboard-trend-card">
+                <span>Trend Weekly</span>
+                <strong>{formatDelta(weeklyDelta)}</strong>
+                <small>Perubahan mingguan terhadap periode aktif</small>
+              </article>
+              <article className="dashboard-trend-card">
+                <span>Trend Monthly</span>
+                <strong>{formatDelta(monthlyDelta)}</strong>
+                <small>Perubahan agregat bulanan dari bundle backend</small>
+              </article>
+            </div>
+          ) : (
+            <div className="dashboard-placeholder-box">Visualisasi trend mingguan belum tersedia.</div>
+          )}
+        </section>
+
+        <section className="task-panel">
           <h2>Perspective Performance (P1-P5)</h2>
           <div className="desktop-perspective-grid">
             {perspectiveAnalytics.map((item) => (
@@ -961,49 +1069,94 @@ export default function Home() {
           </div>
         </section>
 
+          </div>
+          <aside className="dashboard-main-right">
         <section className="task-panel">
-          <h2>Workflow Readiness</h2>
-          <div className="landing-grid">
-            <article className="landing-card">
-              <span>BIM Coordinator Project</span>
-              <strong>{workflowReadiness.role1}</strong>
-              {canAccessRole1 ? (
-                <Link href="/projects">{actionText.openWorkspace}</Link>
-              ) : (
-                <small>Read-only visibility only</small>
-              )}
-            </article>
-            <article className="landing-card">
-              <span>BIM Coordinator HO</span>
-              <strong>{workflowReadiness.role2}</strong>
-              {canAccessRole2 ? (
-                <Link href="/ho/review">{actionText.openWorkspace}</Link>
-              ) : (
-                <small>Read-only visibility only</small>
-              )}
-            </article>
-            <article className="landing-card">
-              <span>BIM Manager</span>
-              <strong>{workflowReadiness.role3}</strong>
-              {canAccessRole3 ? (
-                <Link href="/approve">{actionText.openWorkspace}</Link>
-              ) : (
-                <small>Read-only visibility only</small>
-              )}
-            </article>
+          <h2>Governance Health</h2>
+          <div className="dashboard-side-stat-list">
+            <div className="dashboard-side-stat">
+              <span>Coverage Indicators</span>
+              <strong>{inputCoverage.total > 0 ? `${inputCoverage.percent}%` : "—"}</strong>
+            </div>
+            <div className="dashboard-side-stat">
+              <span>Evidence Completeness</span>
+              <strong>{pendingEvidenceMetric > 0 ? `${pendingEvidenceMetric} pending` : "Lengkap"}</strong>
+            </div>
+            <div className="dashboard-side-stat">
+              <span>Strongest Perspective</span>
+              <strong>{topPerspective ? `${topPerspective.perspectiveId} (${topPerspective.score.toFixed(2)})` : "—"}</strong>
+            </div>
+            <div className="dashboard-side-stat">
+              <span>Needs Intervention</span>
+              <strong>{lowestPerspective ? `${lowestPerspective.perspectiveId} (${lowestPerspective.score.toFixed(2)})` : "—"}</strong>
+            </div>
           </div>
         </section>
 
         <section className="task-panel">
-          <h2>Governance Snapshot</h2>
+          <h2>Audit & Exceptions</h2>
+          <div className="dashboard-side-stat-list">
+            <div className="dashboard-side-stat">
+              <span>Pending Approvals</span>
+              <strong>{canAccessRole3 ? "Cek panel Approver" : "—"}</strong>
+            </div>
+            <div className="dashboard-side-stat">
+              <span>Missing Evidence</span>
+              <strong>{pendingEvidenceMetric > 0 ? pendingEvidenceMetric : "—"}</strong>
+            </div>
+            <div className="dashboard-side-stat">
+              <span>Stale Periods</span>
+              <strong>{stalePeriodMetric}</strong>
+            </div>
+            <div className="dashboard-side-stat">
+              <span>High-Risk Alerts</span>
+              <strong>{alertsMetric ?? "—"}</strong>
+            </div>
+          </div>
           <p className="inline-note">
-            Config lock dan audit detail berada pada domain Admin. Desktop ini hanya menampilkan read-only snapshot.
+            Config lock dan audit detail berada pada domain Admin. Desktop ini menampilkan read-only snapshot.
           </p>
           <div className="wizard-actions">
             {canAccessAdmin ? <Link href="/admin">{actionText.openAdminControl}</Link> : null}
             {canAccessAudit ? <Link href="/audit">{actionText.openAuditTrail}</Link> : <span>Audit read-only unavailable</span>}
           </div>
         </section>
+
+        <section className="task-panel">
+          <h2>Quick Actions</h2>
+          <div className="dashboard-quick-action-row">
+            <Link href="/projects" className="secondary-cta">Project Coordinator</Link>
+            <Link href="/audit" className="secondary-cta">Audit</Link>
+            <Link href="/me" className="secondary-cta">My Account</Link>
+          </div>
+          <div className="dashboard-workflow-readiness">
+            <article className="dashboard-readiness-item">
+              <span>BIM Coordinator Project</span>
+              <strong>{workflowReadiness.role1}</strong>
+              {canAccessRole1 ? <Link href="/projects">{actionText.openWorkspace}</Link> : <small>Read-only visibility only</small>}
+            </article>
+            <article className="dashboard-readiness-item">
+              <span>BIM Coordinator HO</span>
+              <strong>{workflowReadiness.role2}</strong>
+              {canAccessRole2 ? <Link href="/ho/review">{actionText.openWorkspace}</Link> : <small>Read-only visibility only</small>}
+            </article>
+            <article className="dashboard-readiness-item">
+              <span>BIM Manager</span>
+              <strong>{workflowReadiness.role3}</strong>
+              {canAccessRole3 ? <Link href="/approve">{actionText.openWorkspace}</Link> : <small>Read-only visibility only</small>}
+            </article>
+          </div>
+        </section>
+          </aside>
+        </section>
+
+        <footer className="task-panel dashboard-legal-footer">
+          <p>© 2026 PT Nusa Konstruksi Enjiniring Tbk — Divisi BIM, Engineering Department</p>
+          <p>
+            This platform supports information governance aligned with ISO 19650 (conceptual alignment; not an
+            automatic compliance claim).
+          </p>
+        </footer>
       </main>
 
       {activePerspective ? (
