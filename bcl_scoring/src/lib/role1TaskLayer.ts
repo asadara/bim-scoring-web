@@ -889,6 +889,16 @@ export async function fetchEvidenceListReadMode(
   projectId: string,
   periodId: string | null
 ): Promise<ReadResult<LocalEvidenceItem[]>> {
+  // In prototype mode, evidence lives in local storage and must be read consistently
+  // by Role 1/2/3 flows without forcing backend endpoints.
+  if (!isRealBackendWriteEnabled()) {
+    return {
+      data: listLocalEvidence(projectId, periodId),
+      mode: "prototype",
+      backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+    };
+  }
+
   const periodKey = normalizePrototypePeriodId(periodId);
 
   const query = periodKey ? `?period_id=${encodeURIComponent(periodKey)}` : "";
