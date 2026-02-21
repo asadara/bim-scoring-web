@@ -449,7 +449,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px 18px;
 }
 
@@ -458,13 +458,68 @@ a {
   min-width: 0;
 }
 
-.me-header-copy h1 {
-  margin: 0 0 8px;
+.me-page-title {
+  min-height: 40px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.me-title-skeleton {
+  width: min(320px, 72%);
+  max-width: 100%;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e8edf2 0%, #f1f5f8 52%, #e8edf2 100%);
+  background-size: 220% 100%;
+  animation: me-title-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes me-title-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.me-header-copy .task-subtitle {
+  margin-top: 2px;
+}
+
+.me-identity-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.me-identity-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--task-line);
+  border-radius: 999px;
+  background: #f8fbf9;
+  padding: 4px 10px;
+}
+
+.me-identity-chip b {
+  color: var(--task-muted);
+  font-size: 11px;
+}
+
+.me-identity-chip em {
+  color: var(--task-ink);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
 }
 
 .me-avatar-panel {
   display: grid;
-  justify-items: center;
+  justify-items: end;
   gap: 8px;
 }
 
@@ -474,8 +529,9 @@ a {
   height: 116px;
   border-radius: 999px;
   padding: 4px;
-  background: linear-gradient(145deg, #9dcab6 0%, #d9ece3 55%, #7fae98 100%);
-  box-shadow: 0 8px 20px rgba(11, 55, 38, 0.18);
+  background: #ecf2ef;
+  border: 1px solid #c8d7cf;
+  box-shadow: 0 8px 20px rgba(11, 55, 38, 0.12);
 }
 
 .me-avatar-image,
@@ -503,13 +559,13 @@ a {
 }
 
 .me-avatar-fallback.me-avatar-fallback-icon {
-  background: radial-gradient(circle at 32% 24%, #f4f6f5 0%, #dde3e0 60%, #c8d0cc 100%);
-  color: #8f9793;
+  background: radial-gradient(circle at 32% 24%, #f5f8f7 0%, #e0e8e4 60%, #d1dbd6 100%);
+  color: #7e8a84;
 }
 
 .me-avatar-fallback.me-avatar-fallback-icon svg {
-  width: 66px;
-  height: 66px;
+  width: 62px;
+  height: 62px;
   fill: currentColor;
 }
 
@@ -550,6 +606,36 @@ a {
   text-align: center;
   font-size: 12px;
   color: var(--task-muted);
+}
+
+.me-account-meta {
+  width: min(250px, 100%);
+  display: grid;
+  gap: 6px;
+}
+
+.me-account-meta-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--task-line);
+  border-radius: 8px;
+  background: #f9fcfa;
+  padding: 5px 9px;
+}
+
+.me-account-meta-item b {
+  color: var(--task-muted);
+  font-size: 11px;
+}
+
+.me-account-meta-item em {
+  color: var(--task-ink);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  text-align: right;
 }
 
 .auth-stack {
@@ -1762,6 +1848,11 @@ a {
 
   .me-avatar-panel {
     justify-items: start;
+    width: 100%;
+  }
+
+  .me-account-meta {
+    width: 100%;
   }
 
   .me-avatar-hint {

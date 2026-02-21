@@ -74,12 +74,35 @@ function formatDateTime(value?: string | null): string {
   return parsed.toLocaleString();
 }
 
+function formatDateTimeOrNull(value?: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleString();
+}
+
 function providerLabel(value?: string | null): string {
   const normalized = normalizeText(value);
   if (!normalized) return "-";
   if (normalized === "google") return "Google OAuth";
   if (normalized === "email") return "Email/Password";
+  if (normalized === "password") return "Email/Password";
   return normalized;
+}
+
+function readAccountRoleStatus(account: CurrentAuthAccount): string | null {
+  const raw = (account as unknown as Record<string, unknown>).role_status;
+  return normalizeText(raw);
+}
+
+function accountStatusLabel(roleStatus?: string | null): string {
+  const normalized = normalizeText(roleStatus)?.toLowerCase();
+  if (!normalized) return "Aktif";
+  if (normalized === "active" || normalized === "approved" || normalized === "enabled") return "Aktif";
+  if (normalized === "pending" || normalized === "waiting" || normalized === "requested") return "Menunggu Aktivasi";
+  if (normalized === "inactive" || normalized === "disabled") return "Nonaktif";
+  if (normalized === "suspended" || normalized === "blocked") return "Ditangguhkan";
+  return roleStatus || "Aktif";
 }
 
 function toRequestedRoleFromActiveRole(role: string): RequestedRole {
@@ -137,10 +160,8 @@ function EyeIcon({ visible }: { visible: boolean }) {
 function ProfilePlaceholderIcon() {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="22" cy="22" r="9" />
-      <path d="M8 47c0-8 6.5-14 14-14s14 6 14 14v3H8z" />
-      <circle cx="44" cy="24" r="8" />
-      <path d="M34 49c0-7 5.5-12.5 12-12.5S58 42 58 49v2H34z" />
+      <circle cx="32" cy="22" r="10.5" />
+      <path d="M13 53.5c0-10.4 8.4-18.8 19-18.8s19 8.4 19 18.8V56H13z" />
     </svg>
   );
 }
@@ -238,6 +259,14 @@ export default function MePage() {
     [credential.role]
   );
   const roleStatusText = credential.pending_role ? "Menunggu penetapan admin" : "Role aktif";
+  const resolvedFullName = normalizeText(account.full_name) || normalizeText(credential.full_name);
+  const pageTitleText = resolvedFullName ? `Akun ${resolvedFullName}` : "Akun Saya";
+  const showTitleSkeleton = loading && !resolvedFullName;
+  const providerLoginText = providerLabel(account.auth_provider || credential.auth_provider);
+  const employeeNumberText = account.employee_number || credential.employee_number || null;
+  const activeRoleText = getRoleLabel(credential.role);
+  const accountStatusText = accountStatusLabel(readAccountRoleStatus(account));
+  const lastLoginText = formatDateTimeOrNull(account.last_sign_in_at);
   const requestRequiresSingleScope = requestRoleDraft === "role1";
   const requestRequiresScope = requestRoleDraft === "role2";
   const currentScopeLabels = useMemo(() => {
@@ -429,13 +458,43 @@ export default function MePage() {
   return (
     <>
       <Head>
-        <title>Akun Saya - BIM Scoring</title>
+        <title>{pageTitleText} - BIM Scoring</title>
       </Head>
       <main className="task-shell me-shell">
         <section className="task-panel">
           <div className="me-header">
             <div className="me-header-copy">
-              <h1>Akun Saya</h1>
+              <h1 className="me-page-title">
+                {showTitleSkeleton ? (
+                  <>
+                    <span className="me-title-skeleton" aria-hidden="true" />
+                    <span className="sr-only">{pageTitleText}</span>
+                  </>
+                ) : (
+                  pageTitleText
+                )}
+              </h1>
+              <p className="task-subtitle">Profil pengguna dan kontrol akses sistem BIM Scoring</p>
+              <div className="me-identity-strip" aria-label="Ringkasan identitas akun">
+                <span className="me-identity-chip">
+                  <b>Role</b>
+                  <em>{activeRoleText}</em>
+                </span>
+                <span className="me-identity-chip">
+                  <b>Scope</b>
+                  <em>Project Level</em>
+                </span>
+                <span className="me-identity-chip">
+                  <b>Provider</b>
+                  <em>{providerLoginText}</em>
+                </span>
+                {employeeNumberText ? (
+                  <span className="me-identity-chip">
+                    <b>No. Pegawai</b>
+                    <em>{employeeNumberText}</em>
+                  </span>
+                ) : null}
+              </div>
             </div>
             <div className="me-avatar-panel">
               <div className="me-avatar-frame">
@@ -479,6 +538,18 @@ export default function MePage() {
                   onChange={onProfilePhotoSelected}
                 />
               </div>
+              <div className="me-account-meta" aria-label="Ringkasan status akun">
+                <span className="me-account-meta-item">
+                  <b>Status Akun</b>
+                  <em>{accountStatusText}</em>
+                </span>
+                {lastLoginText ? (
+                  <span className="me-account-meta-item">
+                    <b>Login Terakhir</b>
+                    <em>{lastLoginText}</em>
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
           {!isConfigured ? (
@@ -514,7 +585,7 @@ export default function MePage() {
               </div>
               <div className="context-card">
                 <span>Provider Login</span>
-                <strong>{providerLabel(account.auth_provider || credential.auth_provider)}</strong>
+                <strong>{providerLoginText}</strong>
               </div>
               <div className="context-card">
                 <span>User ID</span>
@@ -528,7 +599,7 @@ export default function MePage() {
             <div className="task-context-grid">
               <div className="context-card">
                 <span>Role Aktif</span>
-                <strong>{getRoleLabel(credential.role)}</strong>
+                <strong>{activeRoleText}</strong>
               </div>
               <div className="context-card">
                 <span>Status Role</span>
