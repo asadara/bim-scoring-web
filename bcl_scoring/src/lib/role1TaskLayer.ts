@@ -1041,8 +1041,10 @@ export async function fetchEvidenceListReadMode(
     }
 
     if (!recognizedShape) continue;
+    const sortedRows = mappedRows.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    upsertEvidenceReadRowsToStore(sortedRows);
     return {
-      data: mappedRows.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
+      data: sortedRows,
       mode: "backend",
       backend_message: null,
     };
@@ -1053,6 +1055,29 @@ export async function fetchEvidenceListReadMode(
     mode: "backend",
     backend_message: lastFailure ? toSafeErrorMessage(lastFailure) : "Backend not available",
   };
+}
+
+function upsertEvidenceReadRowsToStore(rows: LocalEvidenceItem[]): void {
+  if (!Array.isArray(rows) || rows.length === 0) return;
+
+  const existingRows = readAllEvidenceItems();
+  const byId = new Map(existingRows.map((row) => [row.id, row]));
+
+  for (const row of rows) {
+    const evidenceId = asString(row?.id).trim();
+    if (!evidenceId) continue;
+
+    const previous = byId.get(evidenceId);
+    byId.set(evidenceId, {
+      ...(previous || {}),
+      ...row,
+      id: evidenceId,
+      project_id: row.project_id || previous?.project_id || "",
+      period_id: row.period_id ?? previous?.period_id ?? null,
+    });
+  }
+
+  writeAllEvidenceItems([...byId.values()]);
 }
 
 function readAllEvidenceItems(): LocalEvidenceItem[] {

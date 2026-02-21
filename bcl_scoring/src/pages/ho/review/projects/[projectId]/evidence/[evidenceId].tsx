@@ -6,12 +6,15 @@ import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role2Layout from "@/components/Role2Layout";
 import { canWriteRole2Review } from "@/lib/accessControl";
 import {
+  fetchEvidenceListReadMode,
+  fetchProjectPeriodsReadMode,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
   ReviewOutcome,
   formatBimUseDisplay,
   getLocalEvidenceWithReviewById,
   isRealBackendWriteEnabled,
+  mapEvidenceRowsWithReview,
 } from "@/lib/role1TaskLayer";
 import { applyReviewWrite, fetchIndicatorsStrict, fetchRole2ProjectContext } from "@/lib/role2TaskLayer";
 import { useCredential } from "@/lib/useCredential";
@@ -172,13 +175,37 @@ export default function HoEvidenceReviewPage() {
         setLoading(true);
 
         const nextContext = await fetchRole2ProjectContext(projectId);
-        const nextEvidence = getLocalEvidenceWithReviewById(evidenceId);
+        let nextEvidence = getLocalEvidenceWithReviewById(evidenceId);
+        let readBackendMessage: string | null = null;
+
+        if (!nextEvidence) {
+          const candidatePeriodIds = new Set<string>();
+          if (nextContext.active_period?.id) candidatePeriodIds.add(nextContext.active_period.id);
+
+          const periodsResult = await fetchProjectPeriodsReadMode(projectId);
+          for (const period of periodsResult.data) {
+            if (period?.id) candidatePeriodIds.add(period.id);
+          }
+
+          for (const periodId of candidatePeriodIds) {
+            const readResult = await fetchEvidenceListReadMode(projectId, periodId);
+            if (!readBackendMessage && readResult.backend_message) {
+              readBackendMessage = readResult.backend_message;
+            }
+
+            nextEvidence =
+              mapEvidenceRowsWithReview(readResult.data).find((row) => row.id === evidenceId) ||
+              getLocalEvidenceWithReviewById(evidenceId);
+            if (nextEvidence) break;
+          }
+        }
 
         if (!mounted) return;
 
         setContext(nextContext);
         setEvidence(nextEvidence);
-        setError(null);
+        setError(nextEvidence ? null : "Evidence context not found.");
+        if (readBackendMessage) setBannerHint(readBackendMessage);
 
         try {
           const indicators = await fetchIndicatorsStrict(projectId);
