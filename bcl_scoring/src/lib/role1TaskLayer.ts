@@ -325,6 +325,8 @@ const BIM_USE_BY_INDICATOR_CODE: Record<string, string[]> = {
   "P3-06": [BIM_USE_ALL],
   "P3-07": [BIM_USE_ALL],
   "P3-08": ["Clash Detection"],
+  "P3-09": [BIM_USE_ALL],
+  "P3-10": [BIM_USE_ALL],
   "P4-01": [BIM_USE_ALL],
   "P4-02": [BIM_USE_ALL],
   "P4-03": [BIM_USE_ALL],

@@ -375,21 +375,21 @@ function isDrawerOpen() {
 
 const MOCK_INDICATORS = {
   P1: [
-    { code: 'P1-01', title: 'Governance baseline', score: 3 },
-    { code: 'P1-02', title: 'BEP approved', score: 4 }
+    { code: 'P1-01', title: 'Dokumen EIR/BEP tersedia, disetujui, dan memiliki version control', score: 3 },
+    { code: 'P1-02', title: 'Struktur dan aturan CDE governance terdokumentasi dan diterapkan', score: 4 }
   ],
   P2: [
-    { code: 'P2-01', title: 'Model coordination', score: 2 },
-    { code: 'P2-02', title: 'Clash resolution workflow', score: 3 }
+    { code: 'P2-01', title: 'Model terfederasi lintas disiplin dikelola berkala', score: 2 },
+    { code: 'P2-02', title: 'Clash detection berkala dengan issue lifecycle tracking', score: 3 }
   ],
   P3: [
-    { code: 'P3-01', title: 'LOD compliance', score: 3 }
+    { code: 'P3-01', title: 'Naming convention dan metadata sesuai standar proyek', score: 3 }
   ],
   P4: [
-    { code: 'P4-01', title: 'Team capability', score: 2 }
+    { code: 'P4-01', title: 'Kesesuaian kompetensi personel dengan peran BIM', score: 2 }
   ],
   P5: [
-    { code: 'P5-01', title: 'Value realization', score: 4 }
+    { code: 'P5-01', title: 'Tren penurunan rework berdasarkan data isu', score: 4 }
   ]
 };
 

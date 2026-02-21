@@ -6,14 +6,14 @@ export const GATE_C_ALIGNMENT_CONFIG = {
   compare_project_codes: ["PJU", "MRT", "HSP"],
   expected_alignment: [
     {
-      indicator_code: "P3-07",
+      indicator_code: "P3-09",
       expected_presence: ["HSP"],
-      note: "Expected difference: healthcare project requires extra information quality control.",
+      note: "Expected difference: healthcare project validates federation health more strictly.",
     },
     {
-      indicator_code: "P5-09",
+      indicator_code: "P5-05",
       expected_presence: ["MRT", "PJU"],
-      note: "Expected difference: transport and road projects track value realization by package.",
+      note: "Expected difference: transport and road projects emphasize 4D-based schedule risk tracking.",
     },
   ],
   global_notes: [
@@ -32,11 +32,11 @@ export const GATE_C_ALIGNMENT_CONFIG = {
       indicator_overrides: {
         "P1-01": { status: "core", perspective_id: "P1", title: "Governance baseline" },
         "P2-03": { status: "core", perspective_id: "P2", title: "Coordination workflow compliance" },
-        "P5-09": { status: "optional", perspective_id: "P5", title: "Package-level value tracking" },
-        "P3-07": {
+        "P5-05": { status: "optional", perspective_id: "P5", title: "4D-based schedule risk identification" },
+        "P3-09": {
           status: "excluded",
           perspective_id: "P3",
-          title: "Healthcare data quality control",
+          title: "Federation health verification",
           reason: "Excluded by design for non-healthcare project type.",
         },
       },
@@ -51,7 +51,7 @@ export const GATE_C_ALIGNMENT_CONFIG = {
       indicator_overrides: {
         "P1-01": { status: "core", perspective_id: "P1", title: "Governance baseline" },
         "P2-03": { status: "core", perspective_id: "P2", title: "Coordination workflow compliance" },
-        "P5-09": { status: "core", perspective_id: "P5", title: "Package-level value tracking" },
+        "P5-05": { status: "core", perspective_id: "P5", title: "4D-based schedule risk identification" },
       },
     },
     HSP: {
@@ -63,11 +63,11 @@ export const GATE_C_ALIGNMENT_CONFIG = {
       ],
       indicator_overrides: {
         "P1-01": { status: "core", perspective_id: "P1", title: "Governance baseline" },
-        "P3-07": { status: "core", perspective_id: "P3", title: "Healthcare data quality control" },
-        "P5-09": {
+        "P3-09": { status: "core", perspective_id: "P3", title: "Federation health verification" },
+        "P5-05": {
           status: "excluded",
           perspective_id: "P5",
-          title: "Package-level value tracking",
+          title: "4D-based schedule risk identification",
           reason: "Excluded by design for single-campus operational handover model.",
         },
       },
