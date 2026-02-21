@@ -1,19 +1,15 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getMainNavItemsForRole, normalizePath } from "@/lib/accessControl";
 import { isAuthConfigured, signOutAuth } from "@/lib/authClient";
 import {
-  APP_LANGUAGES,
-  DEFAULT_APP_LANGUAGE,
   getGlobalText,
   getRoleLabelLocalized,
-  isAppLanguage,
   localizeMainNavLabel,
-  persistAndApplyLanguage,
-  resolveStoredLanguage,
-  type AppLanguage,
+  localizeThemeLabel,
+  useAppLanguage,
 } from "@/lib/language";
 import {
   APP_THEMES,
@@ -45,15 +41,18 @@ const DEFAULT_CREDENTIAL: UserCredential = {
 export default function MainNav() {
   const router = useRouter();
   const [credential, setCredential] = useState<UserCredential>(DEFAULT_CREDENTIAL);
-  const [language, setLanguage] = useState<AppLanguage>(DEFAULT_APP_LANGUAGE);
+  const language = useAppLanguage();
   const [themeId, setThemeId] = useState<AppThemeId>(DEFAULT_APP_THEME);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [busySignOut, setBusySignOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const themeMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const sync = () => {
       setCredential(getStoredCredential());
-      setLanguage(resolveStoredLanguage());
       setThemeId(resolveStoredTheme());
     };
 
@@ -66,6 +65,37 @@ export default function MainNav() {
       window.removeEventListener("bim:credential-updated", sync as EventListener);
     };
   }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const targetNode = event.target as Node | null;
+      if (themeMenuRef.current && targetNode && !themeMenuRef.current.contains(targetNode)) {
+        setThemeMenuOpen(false);
+      }
+      if (accountMenuRef.current && targetNode && !accountMenuRef.current.contains(targetNode)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setThemeMenuOpen(false);
+      setAccountMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    window.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      window.removeEventListener("keydown", onEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    setThemeMenuOpen(false);
+    setAccountMenuOpen(false);
+  }, [router.asPath]);
 
   const navItems = useMemo(
     () =>
@@ -80,6 +110,7 @@ export default function MainNav() {
   async function handleSignOut() {
     setBusySignOut(true);
     setError(null);
+    setAccountMenuOpen(false);
     try {
       await signOutAuth();
       if (currentPath !== "/" && currentPath !== "/audit") {
@@ -92,16 +123,11 @@ export default function MainNav() {
     }
   }
 
-  function handleLanguageChange(nextValue: string) {
-    if (!isAppLanguage(nextValue)) return;
-    setLanguage(nextValue);
-    persistAndApplyLanguage(nextValue);
-  }
-
   function handleThemeChange(nextValue: string) {
     if (!isAppThemeId(nextValue)) return;
     setThemeId(nextValue);
     persistAndApplyTheme(nextValue);
+    setThemeMenuOpen(false);
   }
 
   return (
@@ -132,61 +158,110 @@ export default function MainNav() {
               </Link>
             );
           })}
+
+          <div className="main-nav-menu-wrap" ref={themeMenuRef}>
+            <button
+              type="button"
+              className="main-nav-menu-button"
+              aria-haspopup="menu"
+              aria-expanded={themeMenuOpen}
+              aria-label={text.themeMenuAria}
+              onClick={() => {
+                setThemeMenuOpen((prev) => {
+                  const next = !prev;
+                  if (next) setAccountMenuOpen(false);
+                  return next;
+                });
+              }}
+            >
+              {text.theme}
+            </button>
+            {themeMenuOpen ? (
+              <div className="main-nav-menu-panel" role="menu" aria-label={text.themeMenuAria}>
+                {APP_THEMES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={themeId === item.id}
+                    className={`main-nav-menu-item ${themeId === item.id ? "is-active" : ""}`}
+                    onClick={() => handleThemeChange(item.id)}
+                  >
+                    <span>{localizeThemeLabel(item.id, language)}</span>
+                    {themeId === item.id ? <small>{text.activeTheme}</small> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="main-nav-menu-wrap" ref={accountMenuRef}>
+            <button
+              type="button"
+              className="main-nav-menu-button"
+              aria-haspopup="menu"
+              aria-expanded={accountMenuOpen}
+              aria-label={text.accountMenuAria}
+              onClick={() => {
+                setAccountMenuOpen((prev) => {
+                  const next = !prev;
+                  if (next) setThemeMenuOpen(false);
+                  return next;
+                });
+              }}
+            >
+              {text.account}
+            </button>
+            {accountMenuOpen ? (
+              <div className="main-nav-menu-panel" role="menu" aria-label={text.accountMenuAria}>
+                {isAuthConfigured() ? (
+                  credential.user_id ? (
+                    <>
+                      <Link
+                        href="/me"
+                        className="main-nav-menu-item"
+                        role="menuitem"
+                        onClick={() => setAccountMenuOpen(false)}
+                      >
+                        {text.myAccount}
+                      </Link>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="main-nav-menu-item"
+                        onClick={() => void handleSignOut()}
+                        disabled={busySignOut}
+                      >
+                        {busySignOut ? text.signingOut : text.signOut}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/auth/sign-in"
+                        className="main-nav-menu-item"
+                        role="menuitem"
+                        onClick={() => setAccountMenuOpen(false)}
+                      >
+                        {text.signIn}
+                      </Link>
+                      <Link
+                        href="/auth/sign-up"
+                        className="main-nav-menu-item"
+                        role="menuitem"
+                        onClick={() => setAccountMenuOpen(false)}
+                      >
+                        {text.signUp}
+                      </Link>
+                    </>
+                  )
+                ) : (
+                  <span className="main-nav-menu-note">{text.authNotConfigured}</span>
+                )}
+              </div>
+            ) : null}
+          </div>
         </nav>
-
-        <div className="main-nav-switcher">
-          <label>
-            {text.language}
-            <select
-              value={language}
-              onChange={(event) => handleLanguageChange(event.target.value)}
-              aria-label="Language switcher"
-            >
-              {APP_LANGUAGES.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {text.theme}
-            <select
-              value={themeId}
-              onChange={(event) => handleThemeChange(event.target.value)}
-              aria-label="Theme switcher"
-            >
-              {APP_THEMES.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="main-nav-auth-actions">
-          {isAuthConfigured() ? (
-            credential.user_id ? (
-              <>
-                <button type="button" onClick={() => void handleSignOut()} disabled={busySignOut}>
-                  {busySignOut ? text.signingOut : text.signOut}
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/auth/sign-in" className="main-nav-auth-link">
-                  {text.signIn}
-                </Link>
-                <Link href="/auth/sign-up" className="main-nav-auth-link">
-                  {text.signUp}
-                </Link>
-              </>
-            )
-          ) : (
-            <span className="main-nav-auth-note">{text.authNotConfigured}</span>
-          )}
-        </div>
       </div>
       {error ? <div className="main-nav-auth-error">{error}</div> : null}
     </div>

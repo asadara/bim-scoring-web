@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
+import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
 import {
   DataMode,
   NA_TEXT,
@@ -21,6 +22,8 @@ export default function ProjectRole1HomePage() {
   const router = useRouter();
   const { projectId } = router.query;
   const credential = useCredential();
+  const language = useAppLanguage();
+  const actionText = useMemo(() => getPrimaryActionText(language), [language]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +112,7 @@ export default function ProjectRole1HomePage() {
           <h1>{typeof projectId === "string" ? `Evidence Tasks - ${projectId}` : "Evidence Tasks"}</h1>
           <p className="error-box">{error || "Project context not found."}</p>
           <p>
-            <Link href="/projects">Kembali ke Projects</Link>
+            <Link href="/projects">{actionText.backToProjects}</Link>
           </p>
         </section>
       </main>
@@ -160,10 +163,10 @@ export default function ProjectRole1HomePage() {
             onClick={() => router.push(`/projects/${projectId}/evidence/add`)}
             disabled={!canAddEvidence}
           >
-            Tambahkan Evidence untuk BIM Use
+            {actionText.addEvidenceForBimUse}
           </button>
           <Link href={`/projects/${projectId}/evidence`} className="secondary-link">
-            Lihat My Evidence List
+            {actionText.viewMyEvidenceList}
           </Link>
         </div>
       </section>
@@ -211,7 +214,7 @@ export default function ProjectRole1HomePage() {
               type="button"
               onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
             >
-              Switch Role Sekarang
+              {actionText.switchRoleNow}
             </button>
           </p>
         ) : null}

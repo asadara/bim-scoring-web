@@ -12,6 +12,7 @@ import {
   type BackendHandshakeResult,
   type SafeFetchFail,
 } from "@/lib/http";
+import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
 import { isTestWorkspaceProject } from "@/lib/testWorkspace";
 import { useCredential } from "@/lib/useCredential";
 
@@ -278,6 +279,8 @@ async function fetchIndicatorScoresForPerspective(
 
 export default function Home() {
   const credential = useCredential();
+  const language = useAppLanguage();
+  const actionText = useMemo(() => getPrimaryActionText(language), [language]);
   const [backend, setBackend] = useState<BackendHandshakeResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -916,7 +919,7 @@ export default function Home() {
                 </p>
                 <div className="item-actions">
                   <button type="button" onClick={() => setActivePerspectiveId(item.perspectiveId)}>
-                    Open Insight
+                    {actionText.openInsight}
                   </button>
                 </div>
                 <span className="status-chip status-na">{item.state}</span>
@@ -965,7 +968,7 @@ export default function Home() {
               <span>BIM Coordinator Project</span>
               <strong>{workflowReadiness.role1}</strong>
               {canAccessRole1 ? (
-                <Link href="/projects">Open Workspace</Link>
+                <Link href="/projects">{actionText.openWorkspace}</Link>
               ) : (
                 <small>Read-only visibility only</small>
               )}
@@ -974,7 +977,7 @@ export default function Home() {
               <span>BIM Coordinator HO</span>
               <strong>{workflowReadiness.role2}</strong>
               {canAccessRole2 ? (
-                <Link href="/ho/review">Open Workspace</Link>
+                <Link href="/ho/review">{actionText.openWorkspace}</Link>
               ) : (
                 <small>Read-only visibility only</small>
               )}
@@ -983,7 +986,7 @@ export default function Home() {
               <span>BIM Manager</span>
               <strong>{workflowReadiness.role3}</strong>
               {canAccessRole3 ? (
-                <Link href="/approve">Open Workspace</Link>
+                <Link href="/approve">{actionText.openWorkspace}</Link>
               ) : (
                 <small>Read-only visibility only</small>
               )}
@@ -997,8 +1000,8 @@ export default function Home() {
             Config lock dan audit detail berada pada domain Admin. Desktop ini hanya menampilkan read-only snapshot.
           </p>
           <div className="wizard-actions">
-            {canAccessAdmin ? <Link href="/admin">Open Admin Control</Link> : null}
-            {canAccessAudit ? <Link href="/audit">Open Audit Trail</Link> : <span>Audit read-only unavailable</span>}
+            {canAccessAdmin ? <Link href="/admin">{actionText.openAdminControl}</Link> : null}
+            {canAccessAudit ? <Link href="/audit">{actionText.openAuditTrail}</Link> : <span>Audit read-only unavailable</span>}
           </div>
         </section>
       </main>
@@ -1021,7 +1024,7 @@ export default function Home() {
                 </h2>
               </div>
               <button type="button" onClick={() => setActivePerspectiveId(null)} aria-label="Close drawer">
-                Close
+                {actionText.close}
               </button>
             </header>
 
@@ -1093,8 +1096,8 @@ export default function Home() {
               </section>
 
               <div className="wizard-actions">
-                {canAccessRole1 ? <Link href="/projects">Open Evidence Workspace</Link> : null}
-                {canAccessAudit ? <Link href="/audit">Open Audit Trail</Link> : null}
+                {canAccessRole1 ? <Link href="/projects">{actionText.openEvidenceWorkspace}</Link> : null}
+                {canAccessAudit ? <Link href="/audit">{actionText.openAuditTrail}</Link> : null}
               </div>
             </div>
           </aside>

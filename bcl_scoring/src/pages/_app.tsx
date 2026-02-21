@@ -14,7 +14,7 @@ import {
   applyLanguage,
   getGlobalText,
   getRoleLabelLocalized,
-  resolveStoredLanguage,
+  resolvePreferredLanguage,
   type AppLanguage,
 } from "@/lib/language";
 import { validatePublicRuntimeEnv } from "@/lib/runtimeEnv";
@@ -43,9 +43,9 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     applyTheme(resolveStoredTheme());
-    const storedLanguage = resolveStoredLanguage();
-    applyLanguage(storedLanguage);
-    setLanguage(storedLanguage);
+    const preferredLanguage = resolvePreferredLanguage();
+    applyLanguage(preferredLanguage);
+    setLanguage(preferredLanguage);
   }, []);
 
   useEffect(() => {
@@ -54,9 +54,9 @@ export default function App({ Component, pageProps }: AppProps) {
 
     const sync = () => {
       setCredential(getStoredCredential());
-      const storedLanguage = resolveStoredLanguage();
-      applyLanguage(storedLanguage);
-      setLanguage(storedLanguage);
+      const preferredLanguage = resolvePreferredLanguage();
+      applyLanguage(preferredLanguage);
+      setLanguage(preferredLanguage);
     };
 
     (async () => {
@@ -69,12 +69,14 @@ export default function App({ Component, pageProps }: AppProps) {
 
     window.addEventListener("storage", sync);
     window.addEventListener("bim:credential-updated", sync as EventListener);
+    window.addEventListener("languagechange", sync as EventListener);
 
     return () => {
       active = false;
       stopAuthSync();
       window.removeEventListener("storage", sync);
       window.removeEventListener("bim:credential-updated", sync as EventListener);
+      window.removeEventListener("languagechange", sync as EventListener);
     };
   }, []);
 

@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
+import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
 import {
   DataMode,
   NA_TEXT,
@@ -59,6 +60,8 @@ function toReadinessLabel(row: {
 export default function ProjectsIndexPage() {
   const router = useRouter();
   const credential = useCredential();
+  const language = useAppLanguage();
+  const actionText = useMemo(() => getPrimaryActionText(language), [language]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ProjectQueueRow[]>([]);
@@ -235,15 +238,15 @@ export default function ProjectsIndexPage() {
             <div className="wizard-actions">
               {primaryAddProjectId ? (
                 <Link href={`/projects/${primaryAddProjectId}/evidence/add`} className="primary-cta">
-                  Tambah Evidence Sekarang
+                  {actionText.addEvidenceNow}
                 </Link>
               ) : (
                 <a href="#project-list" className="primary-cta">
-                  Lihat Workspace
+                  {actionText.viewWorkspace}
                 </a>
               )}
-              <a href="#project-list">Lihat Semua Workspace</a>
-              <Link href="/projects">Refresh List</Link>
+              <a href="#project-list">{actionText.viewAllWorkspaces}</a>
+              <Link href="/projects">{actionText.refreshList}</Link>
             </div>
           </div>
 
