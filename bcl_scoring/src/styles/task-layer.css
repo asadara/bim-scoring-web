@@ -1,24 +1,102 @@
 :root {
-  --task-bg: #f3f6f5;
+  --task-bg: #f5f7fa;
+  --task-bg-glow: #dbe9ee;
   --task-surface: #ffffff;
-  --task-ink: #17231d;
-  --task-muted: #5b6d63;
-  --task-line: #d4ded8;
-  --task-primary: #0e6245;
+  --task-surface-soft: #f2f6f8;
+  --task-ink: #1f2937;
+  --task-muted: #526071;
+  --task-line: #d7dee6;
+  --task-primary: #0f4c5c;
+  --task-primary-rgb: 15, 76, 92;
   --task-primary-ink: #ffffff;
+  --task-focus-ring: rgba(15, 76, 92, 0.18);
+  --task-control-border: #86a7b1;
+  --task-control-border-hover: #5f8792;
+  --task-control-bg: #e8f1f4;
+  --task-control-bg-hover: #dce9ee;
+  --task-control-ink: #123844;
+  --task-input-border: #c7d4de;
+  --task-input-bg: #ffffff;
+  --task-nav-shell-bg: rgba(245, 247, 250, 0.9);
+  --task-header-from: #f7fafc;
+  --task-header-to: #ffffff;
+  --task-shadow: rgba(10, 22, 35, 0.06);
+  --task-disabled-border: #c9d5cf;
+  --task-disabled-bg: #eef2f0;
+  --task-disabled-ink: #8b9a92;
   --task-warn-bg: #fff4e2;
   --task-warn-ink: #8b4d00;
   --task-danger-bg: #ffe9e7;
   --task-danger-ink: #a3362d;
-  --task-info-bg: #e9f4ef;
-  --task-info-ink: #0d5a3f;
+  --task-info-bg: #e8f3f1;
+  --task-info-ink: #0f4c5c;
+}
+
+:root[data-theme="navy-sand"] {
+  --task-bg: #f7f5f0;
+  --task-bg-glow: #ece3d0;
+  --task-surface: #ffffff;
+  --task-surface-soft: #f7f2e8;
+  --task-ink: #1f2937;
+  --task-muted: #625b4e;
+  --task-line: #e3ddd2;
+  --task-primary: #1e3a5f;
+  --task-primary-rgb: 30, 58, 95;
+  --task-primary-ink: #ffffff;
+  --task-focus-ring: rgba(30, 58, 95, 0.18);
+  --task-control-border: #b5ab98;
+  --task-control-border-hover: #978d7d;
+  --task-control-bg: #f0ebe0;
+  --task-control-bg-hover: #e6decf;
+  --task-control-ink: #2f3f58;
+  --task-input-border: #d5ccbd;
+  --task-input-bg: #ffffff;
+  --task-nav-shell-bg: rgba(247, 245, 240, 0.92);
+  --task-header-from: #fbf9f3;
+  --task-header-to: #ffffff;
+  --task-shadow: rgba(38, 35, 25, 0.06);
+  --task-disabled-border: #d0ccc3;
+  --task-disabled-bg: #efece7;
+  --task-disabled-ink: #8e887e;
+  --task-info-bg: #eef1f7;
+  --task-info-ink: #1e3a5f;
+}
+
+:root[data-theme="charcoal-copper"] {
+  --task-bg: #f6f6f5;
+  --task-bg-glow: #ece7e0;
+  --task-surface: #ffffff;
+  --task-surface-soft: #f6f1ec;
+  --task-ink: #1f2328;
+  --task-muted: #635e58;
+  --task-line: #ddddda;
+  --task-primary: #8a4f24;
+  --task-primary-rgb: 138, 79, 36;
+  --task-primary-ink: #ffffff;
+  --task-focus-ring: rgba(138, 79, 36, 0.2);
+  --task-control-border: #c69a79;
+  --task-control-border-hover: #af805f;
+  --task-control-bg: #f7efe8;
+  --task-control-bg-hover: #f0e2d7;
+  --task-control-ink: #5f3519;
+  --task-input-border: #d8c5b7;
+  --task-input-bg: #ffffff;
+  --task-nav-shell-bg: rgba(246, 246, 245, 0.92);
+  --task-header-from: #faf6f2;
+  --task-header-to: #ffffff;
+  --task-shadow: rgba(46, 35, 28, 0.06);
+  --task-disabled-border: #d4ccc6;
+  --task-disabled-bg: #f0ece9;
+  --task-disabled-ink: #8f847b;
+  --task-info-bg: #f3ebe5;
+  --task-info-ink: #6e3e1d;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  background: radial-gradient(circle at top right, #deefe6 0%, var(--task-bg) 48%);
+  background: radial-gradient(circle at top right, var(--task-bg-glow) 0%, var(--task-bg) 48%);
   color: var(--task-ink);
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   -webkit-text-size-adjust: 100%;
@@ -46,7 +124,7 @@ a {
   top: 0;
   z-index: 30;
   backdrop-filter: blur(6px);
-  background: rgba(243, 246, 245, 0.9);
+  background: var(--task-nav-shell-bg);
   border-bottom: 1px solid var(--task-line);
 }
 
@@ -91,19 +169,19 @@ a {
 .main-nav-switcher select,
 .main-nav-switcher input {
   min-width: 150px;
-  border: 1px solid var(--task-line);
+  border: 1px solid var(--task-input-border);
   border-radius: 8px;
   padding: 5px 8px;
   font: inherit;
   color: var(--task-ink);
-  background: #ffffff;
+  background: var(--task-input-bg);
 }
 
 .main-nav-switcher button {
-  border: 1px solid #9ab8aa;
+  border: 1px solid var(--task-control-border);
   border-radius: 8px;
-  background: #eaf4ef;
-  color: #134633;
+  background: var(--task-control-bg);
+  color: var(--task-control-ink);
   padding: 6px 10px;
   font-size: 13px;
   font-weight: 600;
@@ -112,12 +190,11 @@ a {
 
 .main-nav-switcher button:hover,
 .main-nav-switcher button:focus-visible {
-  background: #dfeee6;
-  border-color: #84a493;
+  background: var(--task-control-bg-hover);
+  border-color: var(--task-control-border-hover);
 }
 
 .main-nav-auth-actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -126,10 +203,10 @@ a {
 .main-nav-auth-actions button,
 .main-nav-auth-link {
   display: inline-block;
-  border: 1px solid #9ab8aa;
+  border: 1px solid var(--task-control-border);
   border-radius: 8px;
-  background: #eaf4ef;
-  color: #134633;
+  background: var(--task-control-bg);
+  color: var(--task-control-ink);
   padding: 6px 10px;
   font-size: 13px;
   font-weight: 600;
@@ -141,8 +218,8 @@ a {
 .main-nav-auth-actions button:focus-visible,
 .main-nav-auth-link:hover,
 .main-nav-auth-link:focus-visible {
-  background: #dfeee6;
-  border-color: #84a493;
+  background: var(--task-control-bg-hover);
+  border-color: var(--task-control-border-hover);
 }
 
 .main-nav-auth-actions button[disabled] {
@@ -190,11 +267,11 @@ a {
 }
 
 .task-header {
-  background: linear-gradient(140deg, #f9fcfb 0%, #ffffff 68%);
+  background: linear-gradient(140deg, var(--task-header-from) 0%, var(--task-header-to) 68%);
   border: 1px solid var(--task-line);
   border-radius: 14px;
   padding: 18px;
-  box-shadow: 0 10px 28px rgba(10, 38, 27, 0.05);
+  box-shadow: 0 10px 28px var(--task-shadow);
 }
 
 .task-kicker {
@@ -315,7 +392,7 @@ a {
 .summary-card.summary-card-action:hover,
 .summary-card.summary-card-action:focus-visible {
   border-color: var(--task-primary);
-  box-shadow: 0 0 0 2px rgba(14, 98, 69, 0.12);
+  box-shadow: 0 0 0 2px var(--task-focus-ring);
 }
 
 .summary-card span {
@@ -1068,10 +1145,10 @@ a {
 
 .wizard-actions button,
 .wizard-actions a {
-  border: 1px solid #a8c4b7;
+  border: 1px solid var(--task-control-border);
   border-radius: 8px;
-  background: #eff7f3;
-  color: #144b37;
+  background: var(--task-control-bg);
+  color: var(--task-control-ink);
   padding: 8px 12px;
   text-decoration: none;
   font-size: 14px;
@@ -1084,9 +1161,9 @@ a {
 .wizard-actions a:hover,
 .wizard-actions button:focus-visible,
 .wizard-actions a:focus-visible {
-  background: #e5f3ec;
-  border-color: #7ea995;
-  color: #0d3f2f;
+  background: var(--task-control-bg-hover);
+  border-color: var(--task-control-border-hover);
+  color: var(--task-control-ink);
 }
 
 .wizard-actions .action-primary {
@@ -1098,17 +1175,17 @@ a {
 .wizard-actions button:disabled {
   cursor: not-allowed;
   opacity: 1;
-  border-color: #c9d5cf;
-  background: #eef2f0;
-  color: #8b9a92;
+  border-color: var(--task-disabled-border);
+  background: var(--task-disabled-bg);
+  color: var(--task-disabled-ink);
 }
 
 .wizard-actions a.disabled-link,
 .wizard-actions a[aria-disabled="true"] {
   pointer-events: none;
-  border-color: #c9d5cf;
-  background: #eef2f0;
-  color: #8b9a92;
+  border-color: var(--task-disabled-border);
+  background: var(--task-disabled-bg);
+  color: var(--task-disabled-ink);
 }
 
 .group-section {
@@ -1152,10 +1229,10 @@ a {
 
 .item-actions a,
 .item-actions button {
-  border: 1px solid #a8c4b7;
+  border: 1px solid var(--task-control-border);
   border-radius: 8px;
-  background: #f3f9f6;
-  color: #144b37;
+  background: var(--task-control-bg);
+  color: var(--task-control-ink);
   padding: 6px 10px;
   text-decoration: none;
   font-size: 13px;
@@ -1167,9 +1244,9 @@ a {
 .item-actions button:hover,
 .item-actions a:focus-visible,
 .item-actions button:focus-visible {
-  background: #e8f4ee;
-  border-color: #7ea995;
-  color: #0d3f2f;
+  background: var(--task-control-bg-hover);
+  border-color: var(--task-control-border-hover);
+  color: var(--task-control-ink);
 }
 
 .item-actions .revisi {
@@ -1180,9 +1257,9 @@ a {
 .disabled-link {
   pointer-events: none;
   opacity: 1;
-  border-color: #c9d5cf;
-  background: #eef2f0;
-  color: #8b9a92;
+  border-color: var(--task-disabled-border);
+  background: var(--task-disabled-bg);
+  color: var(--task-disabled-ink);
 }
 
 .empty-state {
@@ -1268,6 +1345,21 @@ a {
   vertical-align: top;
 }
 
+.audit-table .table-row-clickable {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.audit-table .table-row-clickable:hover {
+  background: #f4faf7;
+}
+
+.audit-table .table-row-clickable:focus-visible {
+  outline: 2px solid var(--task-primary);
+  outline-offset: -2px;
+  background: #eef8f3;
+}
+
 .admin-table-wrap {
   overflow-x: auto;
 }
@@ -1317,16 +1409,16 @@ a {
   -webkit-appearance: none;
   -moz-appearance: none;
   width: 100%;
-  border: 1px solid #b7cec2;
+  border: 1px solid var(--task-input-border);
   border-radius: 10px;
   padding: 9px 34px 9px 11px;
   font: inherit;
   color: var(--task-ink);
-  background-color: #ffffff;
+  background-color: var(--task-input-bg);
   background-image:
-    linear-gradient(45deg, transparent 50%, #5f7f72 50%),
-    linear-gradient(135deg, #5f7f72 50%, transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, #f5faf7 100%);
+    linear-gradient(45deg, transparent 50%, var(--task-control-border-hover) 50%),
+    linear-gradient(135deg, var(--task-control-border-hover) 50%, transparent 50%),
+    linear-gradient(180deg, var(--task-input-bg) 0%, var(--task-surface-soft) 100%);
   background-position:
     calc(100% - 17px) calc(50% - 2px),
     calc(100% - 12px) calc(50% - 2px),
@@ -1341,12 +1433,12 @@ a {
 .admin-control-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .admin-control-panel textarea {
   width: 100%;
-  border: 1px solid #b7cec2;
+  border: 1px solid var(--task-input-border);
   border-radius: 10px;
   padding: 9px 11px;
   font: inherit;
   color: var(--task-ink);
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbf9 100%);
+  background: linear-gradient(180deg, var(--task-input-bg) 0%, var(--task-surface-soft) 100%);
   box-sizing: border-box;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.82) inset;
   transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
@@ -1354,51 +1446,51 @@ a {
 
 .admin-control-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover:not(:disabled),
 .admin-control-panel textarea:hover:not(:disabled) {
-  border-color: #8ab49e;
+  border-color: var(--task-control-border-hover);
 }
 
 .admin-control-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus-visible,
 .admin-control-panel textarea:focus-visible {
   outline: none;
   border-color: var(--task-primary);
-  box-shadow: 0 0 0 3px rgba(14, 98, 69, 0.16);
-  background: #ffffff;
+  box-shadow: 0 0 0 3px var(--task-focus-ring);
+  background: var(--task-input-bg);
 }
 
 .admin-control-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):disabled,
 .admin-control-panel textarea:disabled {
   cursor: not-allowed;
-  border-color: #c9d5cf;
-  color: #8b9a92;
-  background: linear-gradient(180deg, #f6f8f7 0%, #edf1ef 100%);
+  border-color: var(--task-disabled-border);
+  color: var(--task-disabled-ink);
+  background: linear-gradient(180deg, var(--task-disabled-bg) 0%, var(--task-surface-soft) 100%);
 }
 
 .admin-control-panel select:hover:not(:disabled) {
-  border-color: #8ab49e;
+  border-color: var(--task-control-border-hover);
 }
 
 .admin-control-panel select:focus-visible {
   outline: none;
   border-color: var(--task-primary);
-  box-shadow: 0 0 0 3px rgba(14, 98, 69, 0.16);
+  box-shadow: 0 0 0 3px var(--task-focus-ring);
 }
 
 .admin-control-panel select:disabled {
   cursor: not-allowed;
-  border-color: #c9d5cf;
-  color: #8b9a92;
-  background-color: #f0f4f2;
+  border-color: var(--task-disabled-border);
+  color: var(--task-disabled-ink);
+  background-color: var(--task-disabled-bg);
   background-image:
-    linear-gradient(45deg, transparent 50%, #9eb0a7 50%),
-    linear-gradient(135deg, #9eb0a7 50%, transparent 50%),
-    linear-gradient(180deg, #f6f8f7 0%, #edf1ef 100%);
+    linear-gradient(45deg, transparent 50%, var(--task-disabled-ink) 50%),
+    linear-gradient(135deg, var(--task-disabled-ink) 50%, transparent 50%),
+    linear-gradient(180deg, var(--task-disabled-bg) 0%, var(--task-surface-soft) 100%);
 }
 
 .admin-control-panel button {
-  border: 1px solid #a5c2b4;
+  border: 1px solid var(--task-control-border);
   border-radius: 10px;
-  background: linear-gradient(180deg, #f4faf7 0%, #eaf4ef 100%);
-  color: #124533;
+  background: linear-gradient(180deg, var(--task-control-bg) 0%, var(--task-control-bg-hover) 100%);
+  color: var(--task-control-ink);
   padding: 8px 12px;
   font: inherit;
   font-size: 13px;
@@ -1409,26 +1501,26 @@ a {
 
 .admin-control-panel button:hover:not(:disabled),
 .admin-control-panel button:focus-visible:not(:disabled) {
-  border-color: #7ea995;
-  background: linear-gradient(180deg, #eef7f2 0%, #e0efe7 100%);
-  color: #0d3f2f;
+  border-color: var(--task-control-border-hover);
+  background: linear-gradient(180deg, var(--task-control-bg-hover) 0%, var(--task-control-bg) 100%);
+  color: var(--task-control-ink);
 }
 
 .admin-control-panel button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(14, 98, 69, 0.16);
+  box-shadow: 0 0 0 3px var(--task-focus-ring);
 }
 
 .admin-control-panel button.action-primary {
   border-color: transparent;
-  background: linear-gradient(180deg, #0f6b4b 0%, #0c5a40 100%);
-  color: #ffffff;
+  background: linear-gradient(180deg, var(--task-primary) 0%, var(--task-primary) 100%);
+  color: var(--task-primary-ink);
 }
 
 .admin-control-panel button.action-primary:hover:not(:disabled),
 .admin-control-panel button.action-primary:focus-visible:not(:disabled) {
-  background: linear-gradient(180deg, #118056 0%, #0e6245 100%);
-  color: #ffffff;
+  filter: brightness(1.08);
+  color: var(--task-primary-ink);
 }
 
 .admin-control-panel button.action-danger {
@@ -1445,9 +1537,9 @@ a {
 
 .admin-control-panel button:disabled {
   cursor: not-allowed;
-  border-color: #c9d5cf;
-  background: #eef2f0;
-  color: #8b9a92;
+  border-color: var(--task-disabled-border);
+  background: var(--task-disabled-bg);
+  color: var(--task-disabled-ink);
   box-shadow: none;
 }
 
@@ -1693,7 +1785,11 @@ a {
   width: 220px;
   height: 220px;
   border-radius: 999px;
-  background: radial-gradient(circle at center, rgba(14, 98, 69, 0.2), rgba(14, 98, 69, 0.04));
+  background: radial-gradient(
+    circle at center,
+    rgba(var(--task-primary-rgb), 0.2),
+    rgba(var(--task-primary-rgb), 0.04)
+  );
   pointer-events: none;
 }
 
@@ -1771,7 +1867,11 @@ a {
 }
 
 .role-hero-role1::after {
-  background: radial-gradient(circle at center, rgba(14, 98, 69, 0.18), rgba(14, 98, 69, 0.03));
+  background: radial-gradient(
+    circle at center,
+    rgba(var(--task-primary-rgb), 0.18),
+    rgba(var(--task-primary-rgb), 0.03)
+  );
 }
 
 .role-hero-role2::after {
@@ -1997,8 +2097,8 @@ a {
 .desktop-chart-row:hover,
 .desktop-chart-row:focus-visible,
 .desktop-chart-row.is-active {
-  border-color: #7ea995;
-  background: #f6fbf8;
+  border-color: var(--task-control-border-hover);
+  background: var(--task-surface-soft);
 }
 
 .desktop-chart-label {
@@ -2141,10 +2241,10 @@ a {
 }
 
 .desktop-drawer-head button {
-  border: 1px solid #a8c4b7;
+  border: 1px solid var(--task-control-border);
   border-radius: 8px;
-  background: #ffffff;
-  color: #144b37;
+  background: var(--task-input-bg);
+  color: var(--task-control-ink);
   padding: 6px 10px;
   font-size: 13px;
   cursor: pointer;
@@ -2152,8 +2252,8 @@ a {
 
 .desktop-drawer-head button:hover,
 .desktop-drawer-head button:focus-visible {
-  background: #e5f3ec;
-  border-color: #7ea995;
+  background: var(--task-control-bg-hover);
+  border-color: var(--task-control-border-hover);
 }
 
 .desktop-drawer-body {
@@ -2290,8 +2390,8 @@ a {
 .desktop-coverage-row:hover,
 .desktop-coverage-row:focus-visible,
 .desktop-coverage-row.is-active {
-  border-color: #7ea995;
-  background: #f6fbf8;
+  border-color: var(--task-control-border-hover);
+  background: var(--task-surface-soft);
 }
 
 .desktop-coverage-label {

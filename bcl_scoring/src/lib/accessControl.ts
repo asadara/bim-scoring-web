@@ -15,7 +15,7 @@ const ROUTE_ACCESS_RULES: Array<{ prefix: string; roles: AppRole[] }> = [
 ];
 
 export const MAIN_NAV_ITEMS: MainNavItem[] = [
-  { href: "/", label: "Desktop" },
+  { href: "/", label: "Dashboard" },
   { href: "/me", label: "Akun Saya" },
   { href: "/projects", label: "BIM Coordinator Project" },
   { href: "/ho/review", label: "BIM Coordinator HO" },

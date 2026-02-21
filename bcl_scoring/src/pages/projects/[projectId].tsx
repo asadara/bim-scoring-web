@@ -106,7 +106,7 @@ export default function ProjectRole1HomePage() {
     return (
       <main className="task-shell">
         <section className="task-panel">
-          <h1>Evidence Tasks - Proyek</h1>
+          <h1>{typeof projectId === "string" ? `Evidence Tasks - ${projectId}` : "Evidence Tasks"}</h1>
           <p className="error-box">{error || "Project context not found."}</p>
           <p>
             <Link href="/projects">Kembali ke Projects</Link>
@@ -127,11 +127,13 @@ export default function ProjectRole1HomePage() {
   const canWriteEvidence = canWriteRole1Evidence(credential.role) && !role1OutOfScopeReadOnly;
   const hasActivePeriod = Boolean(context.active_period?.id);
   const canAddEvidence = canWriteEvidence && !context.period_locked && hasActivePeriod;
+  const projectDisplayName = context.project?.name || context.project?.code || projectId;
+  const headerTitle = `Evidence Tasks - ${projectDisplayName}`;
 
   return (
     <Role1Layout
       projectId={projectId}
-      title="Evidence Tasks - Proyek"
+      title={headerTitle}
       subtitle="Task-first panel untuk menyiapkan evidence berdasarkan BIM Use dan indikator."
       project={context.project}
       activePeriod={context.active_period}

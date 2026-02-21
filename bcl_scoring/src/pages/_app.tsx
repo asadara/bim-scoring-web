@@ -9,8 +9,17 @@ import "@/styles/task-layer.css";
 import MainNav from "@/components/MainNav";
 import { canRoleAccessPath, normalizePath } from "@/lib/accessControl";
 import { startAuthCredentialSync, syncCredentialFromAuth } from "@/lib/authClient";
+import {
+  DEFAULT_APP_LANGUAGE,
+  applyLanguage,
+  getGlobalText,
+  getRoleLabelLocalized,
+  resolveStoredLanguage,
+  type AppLanguage,
+} from "@/lib/language";
 import { validatePublicRuntimeEnv } from "@/lib/runtimeEnv";
-import { UserCredential, getRoleLabel, getStoredCredential } from "@/lib/userCredential";
+import { applyTheme, resolveStoredTheme } from "@/lib/theme";
+import { UserCredential, getStoredCredential } from "@/lib/userCredential";
 
 validatePublicRuntimeEnv();
 
@@ -28,7 +37,16 @@ const DEFAULT_CREDENTIAL: UserCredential = {
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [credential, setCredential] = useState<UserCredential>(DEFAULT_CREDENTIAL);
+  const [language, setLanguage] = useState<AppLanguage>(DEFAULT_APP_LANGUAGE);
   const [ready, setReady] = useState(false);
+  const text = useMemo(() => getGlobalText(language), [language]);
+
+  useEffect(() => {
+    applyTheme(resolveStoredTheme());
+    const storedLanguage = resolveStoredLanguage();
+    applyLanguage(storedLanguage);
+    setLanguage(storedLanguage);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -36,6 +54,9 @@ export default function App({ Component, pageProps }: AppProps) {
 
     const sync = () => {
       setCredential(getStoredCredential());
+      const storedLanguage = resolveStoredLanguage();
+      applyLanguage(storedLanguage);
+      setLanguage(storedLanguage);
     };
 
     (async () => {
@@ -90,8 +111,8 @@ export default function App({ Component, pageProps }: AppProps) {
     return renderShell(
       <main className="task-shell">
         <section className="task-panel">
-          <h1>Memeriksa Akses</h1>
-          <p className="task-subtitle">Memuat credential aktif...</p>
+          <h1>{text.checkingAccessTitle}</h1>
+          <p className="task-subtitle">{text.checkingAccessSubtitle}</p>
         </section>
       </main>
     );
@@ -101,15 +122,13 @@ export default function App({ Component, pageProps }: AppProps) {
     return renderShell(
       <main className="task-shell">
         <section className="task-panel">
-          <h1>Perlu Masuk</h1>
-          <p className="task-subtitle">
-            Halaman ini hanya untuk pengguna terautentikasi. Silakan masuk terlebih dahulu.
-          </p>
+          <h1>{text.needsSignInTitle}</h1>
+          <p className="task-subtitle">{text.needsSignInSubtitle}</p>
           <div className="wizard-actions">
             <Link href="/auth/sign-in" className="action-primary">
-              Masuk
+              {text.signIn}
             </Link>
-            <Link href="/auth/sign-up">Buat Akun</Link>
+            <Link href="/auth/sign-up">{text.signUp}</Link>
           </div>
         </section>
       </main>
@@ -120,17 +139,14 @@ export default function App({ Component, pageProps }: AppProps) {
     return renderShell(
       <main className="task-shell">
         <section className="task-panel">
-          <h1>Akses Terbatas</h1>
+          <h1>{text.restrictedAccessTitle}</h1>
           <p className="task-subtitle">
-            Role aktif Anda <strong>{getRoleLabel(credential.role)}</strong> tidak memiliki akses ke halaman ini.
+            {text.restrictedAccessSubtitle(getRoleLabelLocalized(credential.role, language))}
           </p>
-          <p className="inline-note">
-            Untuk hak akses lain, gunakan credential sesuai role yang berwenang (review/approval/audit bersifat
-            role-based).
-          </p>
+          <p className="inline-note">{text.restrictedAccessNote}</p>
           <div className="wizard-actions">
             <Link href="/" className="action-primary">
-              Kembali ke Desktop
+              {text.backToDashboard}
             </Link>
           </div>
         </section>

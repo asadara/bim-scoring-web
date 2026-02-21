@@ -12,7 +12,7 @@ export default function StartRedirectPage() {
     <main className="task-shell">
       <section className="task-panel">
         <h1>Redirecting</h1>
-        <p className="task-subtitle">Halaman Start dihapus. Mengarahkan ke Desktop...</p>
+        <p className="task-subtitle">Halaman Start dihapus. Mengarahkan ke Dashboard...</p>
       </section>
     </main>
   );

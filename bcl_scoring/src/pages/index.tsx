@@ -200,6 +200,15 @@ function classifyIndicator(item: IndicatorScoreRow): AttentionItem {
 }
 
 function formatScoreLevel(score: number): string {
+  if (!Number.isFinite(score)) return "N/A";
+  // Dashboard total score can come as 0-5 or 0-100, depending on backend payload card.
+  if (score > 5) {
+    if (score < 40) return "Symbolic BIM";
+    if (score < 60) return "Partial BIM";
+    if (score < 75) return "Functional BIM";
+    if (score < 90) return "Integrated BIM";
+    return "BIM-Driven Project";
+  }
   if (score < 2.5) return "Critical";
   if (score < 3.5) return "Needs Improvement";
   if (score < 4.5) return "Good";

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
@@ -56,6 +57,7 @@ function toReadinessLabel(row: {
 }
 
 export default function ProjectsIndexPage() {
+  const router = useRouter();
   const credential = useCredential();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,6 +213,9 @@ export default function ProjectsIndexPage() {
     return firstRow.project.name || firstRow.project.code || firstRow.project.id;
   }, [credential.role, rows, scopedProjectId]);
   const headerTitle = role1WorkspaceLabel ? `Projects - ${role1WorkspaceLabel}` : "Projects";
+  const openProjectTask = (targetProjectId: string) => {
+    void router.push(`/projects/${targetProjectId}`);
+  };
 
   return (
     <main className="task-shell">
@@ -322,6 +327,7 @@ export default function ProjectsIndexPage() {
 
         {!loading && !error && rows.length > 0 && (
           <div className="admin-table-wrap">
+            <p className="inline-note">Klik satu baris project/workspace untuk membuka halaman Evidence Tasks.</p>
             <table className="audit-table">
               <thead>
                 <tr>
@@ -329,12 +335,24 @@ export default function ProjectsIndexPage() {
                   <th>Active Period</th>
                   <th>Queue</th>
                   <th>Readiness</th>
-                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.project.id}>
+                  <tr
+                    key={row.project.id}
+                    className="table-row-clickable"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => openProjectTask(row.project.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openProjectTask(row.project.id);
+                      }
+                    }}
+                    aria-label={`Open Evidence Tasks for ${row.project.name || row.project.code || row.project.id}`}
+                  >
                     <td>
                       <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
                       <br />
@@ -360,19 +378,6 @@ export default function ProjectsIndexPage() {
                       <strong>{row.readinessLabel}</strong>
                       <br />
                       <small>{row.nextAction}</small>
-                    </td>
-                    <td>
-                      <div className="item-actions">
-                        {credential.role === "role1" && scopedProjectId === row.project.id ? (
-                          <Link href={`/projects/${row.project.id}/evidence/add`} className="action-primary">
-                            Tambah Evidence
-                          </Link>
-                        ) : null}
-                        <Link href={`/projects/${row.project.id}`} className="revisi">
-                          Open Evidence Tasks
-                        </Link>
-                        <Link href={`/projects/${row.project.id}/indicators`}>Indicators</Link>
-                      </div>
                     </td>
                   </tr>
                 ))}
