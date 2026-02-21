@@ -82,16 +82,6 @@ function providerLabel(value?: string | null): string {
   return normalized;
 }
 
-function toInitials(value: string): string {
-  const clean = value
-    .replace(/[^A-Za-z0-9 ]+/g, " ")
-    .trim();
-  if (!clean) return "U";
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
-}
-
 function toRequestedRoleFromActiveRole(role: string): RequestedRole {
   if (role === "role1") return "role1";
   if (role === "role2") return "role2";
@@ -140,6 +130,17 @@ function EyeIcon({ visible }: { visible: boolean }) {
         strokeWidth="1.8"
       />
       <path d="M3 3l18 18" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function ProfilePlaceholderIcon() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="22" cy="22" r="9" />
+      <path d="M8 47c0-8 6.5-14 14-14s14 6 14 14v3H8z" />
+      <circle cx="44" cy="24" r="8" />
+      <path d="M34 49c0-7 5.5-12.5 12-12.5S58 42 58 49v2H34z" />
     </svg>
   );
 }
@@ -243,22 +244,10 @@ export default function MePage() {
     const ids = Array.isArray(credential.scoped_project_ids) ? credential.scoped_project_ids : [];
     return ids.map((projectId) => projectNameById.get(projectId) || projectId);
   }, [credential.scoped_project_ids, projectNameById]);
-  const profileAvatarInitials = useMemo(() => {
-    const base =
-      account.full_name ||
-      credential.full_name ||
-      account.employee_number ||
-      credential.employee_number ||
-      account.email ||
-      "User";
-    return toInitials(base);
-  }, [
-    account.email,
-    account.employee_number,
-    account.full_name,
-    credential.employee_number,
-    credential.full_name,
-  ]);
+  const showRoleScopeRequest = credential.role !== "admin";
+  const accessSectionLabel = showRoleScopeRequest ? "5. Akses Saya Saat Ini" : "4. Akses Saya Saat Ini";
+  const settingsSectionLabel = showRoleScopeRequest ? "6. Pengaturan Akun Dasar" : "5. Pengaturan Akun Dasar";
+  const helpSectionLabel = showRoleScopeRequest ? "7. Bantuan" : "6. Bantuan";
 
   useEffect(() => {
     const preferredRole = account.requested_role || toRequestedRoleFromActiveRole(credential.role);
@@ -447,9 +436,6 @@ export default function MePage() {
           <div className="me-header">
             <div className="me-header-copy">
               <h1>Akun Saya</h1>
-              <p className="task-subtitle">
-                Halaman ini merangkum profil user, status role, detail pengajuan, akses halaman, dan pengaturan akun.
-              </p>
             </div>
             <div className="me-avatar-panel">
               <div className="me-avatar-frame">
@@ -463,7 +449,9 @@ export default function MePage() {
                     unoptimized
                   />
                 ) : (
-                  <span className="me-avatar-fallback">{profileAvatarInitials}</span>
+                  <span className="me-avatar-fallback me-avatar-fallback-icon">
+                    <ProfilePlaceholderIcon />
+                  </span>
                 )}
                 <button
                   type="button"
@@ -491,7 +479,6 @@ export default function MePage() {
                   onChange={onProfilePhotoSelected}
                 />
               </div>
-              <p className="me-avatar-hint">Dummy foto bisa diganti (maks. 1 MB).</p>
             </div>
           </div>
           {!isConfigured ? (
@@ -505,7 +492,7 @@ export default function MePage() {
             </p>
           ) : null}
           {error ? <p className="error-box">{error}</p> : null}
-          {info ? <p className="auth-status">{info}</p> : null}
+          {info ? <p className="auth-status action-feedback">{info}</p> : null}
           {loading ? <p className="inline-note">Memuat ringkasan akun...</p> : null}
         </section>
 
@@ -581,67 +568,69 @@ export default function MePage() {
             {projectLoadError ? <p className="inline-note">{projectLoadError}</p> : null}
           </section>
 
-          <section className="task-panel">
-            <h2>4. Ajukan Perubahan Role / Scope</h2>
-            <p className="task-subtitle">
-              Jika Anda mendapat tugas review workspace lain, ajukan perubahan scope di sini. Perubahan baru berlaku setelah
-              disetujui Admin.
-            </p>
-            <form className="auth-stack" onSubmit={onSubmitRoleScopeRequest}>
-              <label className="auth-field">
-                Role Diajukan
-                <select
-                  value={requestRoleDraft}
-                  onChange={(event) => setRequestRoleDraft(event.target.value as RequestedRole)}
-                  disabled={!isSignedIn || Boolean(busyAction)}
-                >
-                  <option value="role1">BIM Coordinator Project</option>
-                  <option value="role2">BIM Coordinator HO</option>
-                  <option value="role3">BIM Manager</option>
-                  <option value="viewer">Viewer / Auditor</option>
-                </select>
-              </label>
-              <fieldset className="auth-fieldset">
-                <legend>Scope Workspace Diajukan</legend>
-                <p className="auth-hint">
-                  {requestRequiresSingleScope
-                    ? "Role 1 wajib 1 workspace."
-                    : requestRequiresScope
-                      ? "Role 2 wajib minimal 1 workspace. Tambahkan workspace baru sesuai tugas review."
-                      : "Opsional. Admin akan menetapkan scope final."}
-                </p>
-                {activeProjectOptions.length === 0 ? (
-                  <p className="auth-hint">Belum ada workspace aktif.</p>
-                ) : (
-                  <div className="auth-checkbox-grid">
-                    {activeProjectOptions.map((project) => (
-                      <label key={`request-scope-${project.id}`} className="auth-checkbox-item">
-                        <input
-                          type={requestRequiresSingleScope ? "radio" : "checkbox"}
-                          name={requestRequiresSingleScope ? "request-role1-workspace" : undefined}
-                          checked={requestProjectIdsDraft.includes(project.id)}
-                          onChange={() => toggleRequestProjectScope(project.id)}
-                          disabled={!isSignedIn || Boolean(busyAction)}
-                        />
-                        <span className="auth-checkbox-label" title={projectLabel(project)}>
-                          {projectLabel(project)}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </fieldset>
-              <p className="inline-note">
-                Scope aktif saat ini: <strong>{currentScopeLabels.length > 0 ? currentScopeLabels.join(", ") : "-"}</strong>
+          {showRoleScopeRequest ? (
+            <section className="task-panel">
+              <h2>4. Ajukan Perubahan Role / Scope</h2>
+              <p className="task-subtitle">
+                Jika Anda mendapat tugas review workspace lain, ajukan perubahan scope di sini. Perubahan baru berlaku setelah
+                disetujui Admin.
               </p>
-              <button type="submit" className="primary-cta" disabled={!isSignedIn || Boolean(busyAction)}>
-                {busyAction === "role-request" ? "Mengirim pengajuan..." : "Ajukan Perubahan ke Admin"}
-              </button>
-            </form>
-          </section>
+              <form className="auth-stack" onSubmit={onSubmitRoleScopeRequest}>
+                <label className="auth-field">
+                  Role Diajukan
+                  <select
+                    value={requestRoleDraft}
+                    onChange={(event) => setRequestRoleDraft(event.target.value as RequestedRole)}
+                    disabled={!isSignedIn || Boolean(busyAction)}
+                  >
+                    <option value="role1">BIM Coordinator Project</option>
+                    <option value="role2">BIM Coordinator HO</option>
+                    <option value="role3">BIM Manager</option>
+                    <option value="viewer">Viewer / Auditor</option>
+                  </select>
+                </label>
+                <fieldset className="auth-fieldset">
+                  <legend>Scope Workspace Diajukan</legend>
+                  <p className="auth-hint">
+                    {requestRequiresSingleScope
+                      ? "Role 1 wajib 1 workspace."
+                      : requestRequiresScope
+                        ? "Role 2 wajib minimal 1 workspace. Tambahkan workspace baru sesuai tugas review."
+                        : "Opsional. Admin akan menetapkan scope final."}
+                  </p>
+                  {activeProjectOptions.length === 0 ? (
+                    <p className="auth-hint">Belum ada workspace aktif.</p>
+                  ) : (
+                    <div className="auth-checkbox-grid">
+                      {activeProjectOptions.map((project) => (
+                        <label key={`request-scope-${project.id}`} className="auth-checkbox-item">
+                          <input
+                            type={requestRequiresSingleScope ? "radio" : "checkbox"}
+                            name={requestRequiresSingleScope ? "request-role1-workspace" : undefined}
+                            checked={requestProjectIdsDraft.includes(project.id)}
+                            onChange={() => toggleRequestProjectScope(project.id)}
+                            disabled={!isSignedIn || Boolean(busyAction)}
+                          />
+                          <span className="auth-checkbox-label" title={projectLabel(project)}>
+                            {projectLabel(project)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
+                <p className="inline-note">
+                  Scope aktif saat ini: <strong>{currentScopeLabels.length > 0 ? currentScopeLabels.join(", ") : "-"}</strong>
+                </p>
+                <button type="submit" className="primary-cta" disabled={!isSignedIn || Boolean(busyAction)}>
+                  {busyAction === "role-request" ? "Mengirim pengajuan..." : "Ajukan Perubahan ke Admin"}
+                </button>
+              </form>
+            </section>
+          ) : null}
 
           <section className="task-panel">
-            <h2>5. Akses Saya Saat Ini</h2>
+            <h2>{accessSectionLabel}</h2>
             <p className="task-subtitle">
               Halaman berikut dapat diakses oleh role aktif Anda: <strong>{getRoleLabel(credential.role)}</strong>.
             </p>
@@ -655,7 +644,7 @@ export default function MePage() {
           </section>
 
           <section className="task-panel me-panel-wide">
-            <h2>6. Pengaturan Akun Dasar</h2>
+            <h2>{settingsSectionLabel}</h2>
             <div className="auth-stack">
             <form className="auth-stack" onSubmit={onSaveProfile}>
               <h3>Perbarui Profil</h3>
@@ -760,14 +749,16 @@ export default function MePage() {
           </section>
 
           <section className="task-panel me-panel-wide">
-            <h2>7. Bantuan</h2>
+            <h2>{helpSectionLabel}</h2>
             <p className="inline-note">
               Perubahan role, scope project, atau kebutuhan akses tambahan diproses oleh Admin melalui panel Admin.
             </p>
-            <p className="inline-note">
-              Jika role belum sesuai kebutuhan kerja Anda, kirim pengajuan dari bagian &quot;Ajukan Perubahan Role / Scope&quot; di atas
-              atau hubungi Admin BIM internal.
-            </p>
+            {showRoleScopeRequest ? (
+              <p className="inline-note">
+                Jika role belum sesuai kebutuhan kerja Anda, kirim pengajuan dari bagian &quot;Ajukan Perubahan Role / Scope&quot; di atas
+                atau hubungi Admin BIM internal.
+              </p>
+            ) : null}
           </section>
         </div>
       </main>

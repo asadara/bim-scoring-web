@@ -419,7 +419,7 @@ export default function HoEvidenceReviewPage() {
         </div>
 
         {formError ? <p className="error-box">{formError}</p> : null}
-        {formInfo ? <p className="task-note">{formInfo}</p> : null}
+        {formInfo ? <p className="task-note action-feedback">{formInfo}</p> : null}
 
         {evidence.latest_review_outcome ? (
           <div className="review-result">

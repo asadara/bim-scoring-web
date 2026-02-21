@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
@@ -316,7 +316,7 @@ export default function ApprovalDecisionPage() {
         </div>
 
         {formError ? <p className="error-box">{formError}</p> : null}
-        {formInfo ? <p className="task-note">{formInfo}</p> : null}
+        {formInfo ? <p className="task-note action-feedback">{formInfo}</p> : null}
       </section>
 
       <section className="task-panel" key={historyVersion}>

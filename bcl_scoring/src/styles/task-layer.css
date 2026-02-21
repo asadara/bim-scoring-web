@@ -21,6 +21,8 @@ body {
   background: radial-gradient(circle at top right, #deefe6 0%, var(--task-bg) 48%);
   color: var(--task-ink);
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 a {
@@ -184,6 +186,7 @@ a {
   max-width: 1120px;
   margin: 0 auto;
   padding: 28px 18px 36px;
+  min-width: 0;
 }
 
 .task-header {
@@ -333,6 +336,7 @@ a {
   border-radius: 12px;
   padding: 14px;
   margin-top: 12px;
+  min-width: 0;
 }
 
 .task-panel h2,
@@ -419,6 +423,17 @@ a {
   color: #0f4f38;
   background: radial-gradient(circle at 32% 24%, #f6fbf8 0%, #dbece4 60%, #c3ddd0 100%);
   letter-spacing: 0.02em;
+}
+
+.me-avatar-fallback.me-avatar-fallback-icon {
+  background: radial-gradient(circle at 32% 24%, #f4f6f5 0%, #dde3e0 60%, #c8d0cc 100%);
+  color: #8f9793;
+}
+
+.me-avatar-fallback.me-avatar-fallback-icon svg {
+  width: 66px;
+  height: 66px;
+  fill: currentColor;
 }
 
 .me-avatar-camera-btn {
@@ -621,6 +636,39 @@ a {
 
 .inline-note {
   margin-top: 10px;
+}
+
+.action-feedback {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 66px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  width: min(920px, calc(100vw - 20px));
+  margin: 0;
+  box-shadow: 0 12px 28px rgba(7, 30, 21, 0.18);
+  animation: action-feedback-fade 5.8s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes action-feedback-fade {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  8% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  78% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+    visibility: hidden;
+  }
 }
 
 .backend-status-banner {
@@ -1253,6 +1301,11 @@ a {
   margin-top: 8px;
 }
 
+.audit-filter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: end;
+}
+
 .admin-filter-row label {
   display: grid;
   gap: 5px;
@@ -1581,6 +1634,12 @@ a {
     margin-left: 0;
   }
 
+  .main-nav-switcher select,
+  .main-nav-switcher input {
+    min-width: 0;
+    width: 100%;
+  }
+
   .task-shell {
     padding: 20px 12px 28px;
   }
@@ -1609,6 +1668,11 @@ a {
 
   .me-avatar-hint {
     text-align: left;
+  }
+
+  .action-feedback {
+    top: calc(env(safe-area-inset-top) + 94px);
+    width: calc(100vw - 16px);
   }
 }
 
@@ -1835,6 +1899,16 @@ a {
 .desktop-context-chip strong {
   color: var(--task-ink);
 }
+
+.desktop-priority-wrap table {
+  min-width: 0;
+}
+
+.desktop-priority-table td:nth-child(1) { --cell-label: "Perspective"; }
+.desktop-priority-table td:nth-child(2) { --cell-label: "Indikator"; }
+.desktop-priority-table td:nth-child(3) { --cell-label: "Status"; }
+.desktop-priority-table td:nth-child(4) { --cell-label: "Skor"; }
+.desktop-priority-table td:nth-child(5) { --cell-label: "Keterangan"; }
 
 .desktop-context-block {
   border: 1px solid var(--task-line);
@@ -2310,7 +2384,19 @@ a {
   }
 
   .desktop-context-chip-row {
-    grid-template-columns: 1fr;
+    display: flex;
+    grid-template-columns: none;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .desktop-context-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .desktop-chart-row,

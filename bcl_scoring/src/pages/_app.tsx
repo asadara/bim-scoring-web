@@ -2,6 +2,7 @@ import type { AppProps } from "next/app";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import "@/styles/task-layer.css";
@@ -75,75 +76,67 @@ export default function App({ Component, pageProps }: AppProps) {
     () => canRoleAccessPath(credential.role, currentPath),
     [credential.role, currentPath]
   );
-
-  if (!ready) {
-    return (
-      <>
-        <MainNav />
-        <main className="task-shell">
-          <section className="task-panel">
-            <h1>Memeriksa Akses</h1>
-            <p className="task-subtitle">Memuat credential aktif...</p>
-          </section>
-        </main>
-      </>
-    );
-  }
-
-  if (needsAuthentication && !credential.user_id) {
-    return (
-      <>
-        <MainNav />
-        <main className="task-shell">
-          <section className="task-panel">
-            <h1>Perlu Masuk</h1>
-            <p className="task-subtitle">
-              Halaman ini hanya untuk pengguna terautentikasi. Silakan masuk terlebih dahulu.
-            </p>
-            <div className="wizard-actions">
-              <Link href="/auth/sign-in" className="action-primary">
-                Masuk
-              </Link>
-              <Link href="/auth/sign-up">Buat Akun</Link>
-            </div>
-          </section>
-        </main>
-      </>
-    );
-  }
-
-  if (!isAllowed) {
-    return (
-      <>
-        <MainNav />
-        <main className="task-shell">
-          <section className="task-panel">
-            <h1>Akses Terbatas</h1>
-            <p className="task-subtitle">
-              Role aktif Anda <strong>{getRoleLabel(credential.role)}</strong> tidak memiliki akses ke halaman ini.
-            </p>
-            <p className="inline-note">
-              Untuk hak akses lain, gunakan credential sesuai role yang berwenang (review/approval/audit bersifat
-              role-based).
-            </p>
-            <div className="wizard-actions">
-              <Link href="/" className="action-primary">
-                Kembali ke Desktop
-              </Link>
-            </div>
-          </section>
-        </main>
-      </>
-    );
-  }
-
-  return (
+  const renderShell = (content: ReactNode) => (
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <MainNav />
-      <Component {...pageProps} />
+      {content}
     </>
   );
+
+  if (!ready) {
+    return renderShell(
+      <main className="task-shell">
+        <section className="task-panel">
+          <h1>Memeriksa Akses</h1>
+          <p className="task-subtitle">Memuat credential aktif...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (needsAuthentication && !credential.user_id) {
+    return renderShell(
+      <main className="task-shell">
+        <section className="task-panel">
+          <h1>Perlu Masuk</h1>
+          <p className="task-subtitle">
+            Halaman ini hanya untuk pengguna terautentikasi. Silakan masuk terlebih dahulu.
+          </p>
+          <div className="wizard-actions">
+            <Link href="/auth/sign-in" className="action-primary">
+              Masuk
+            </Link>
+            <Link href="/auth/sign-up">Buat Akun</Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isAllowed) {
+    return renderShell(
+      <main className="task-shell">
+        <section className="task-panel">
+          <h1>Akses Terbatas</h1>
+          <p className="task-subtitle">
+            Role aktif Anda <strong>{getRoleLabel(credential.role)}</strong> tidak memiliki akses ke halaman ini.
+          </p>
+          <p className="inline-note">
+            Untuk hak akses lain, gunakan credential sesuai role yang berwenang (review/approval/audit bersifat
+            role-based).
+          </p>
+          <div className="wizard-actions">
+            <Link href="/" className="action-primary">
+              Kembali ke Desktop
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return renderShell(<Component {...pageProps} />);
 }

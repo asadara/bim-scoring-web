@@ -644,7 +644,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>BIM Scoring Desktop</title>
+        <title>BIM Scoring Dashboard</title>
       </Head>
 
       <main className="task-shell landing-shell">
@@ -652,7 +652,7 @@ export default function Home() {
           <div className="desktop-hero-layout">
             <div className="desktop-hero-main">
               <p className="task-kicker">BIM Scoring Platform</p>
-              <h1>Desktop</h1>
+              <h1>Dashboard</h1>
               <p className="task-subtitle">
                 Dashboard utama BIM Scoring untuk monitoring weekly score, perspektif P1-P5, dan readiness workflow.
               </p>
@@ -918,8 +918,8 @@ export default function Home() {
 
         <section className="task-panel">
           <h2>Priority Indicators</h2>
-          <div className="admin-table-wrap">
-            <table className="audit-table">
+          <div className="admin-table-wrap desktop-priority-wrap">
+            <table className="audit-table responsive-stack-table desktop-priority-table">
               <thead>
                 <tr>
                   <th>Perspective</th>

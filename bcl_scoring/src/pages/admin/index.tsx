@@ -965,7 +965,7 @@ export default function AdminControlPanelPage() {
       </header>
 
       {error && <p className="error-box">{error}</p>}
-      {notice && <p className="task-note">{notice}</p>}
+      {notice && <p className="task-note action-feedback">{notice}</p>}
 
       <section className="task-panel">
         <h2>Sesi Admin</h2>
@@ -977,12 +977,6 @@ export default function AdminControlPanelPage() {
 
       <section className="task-panel">
         <h2>Manajemen Role Pengguna</h2>
-        <p className="task-subtitle">
-          Atur role global pengguna dari panel admin, termasuk menyetujui pengajuan role saat pendaftaran.
-          Role 2 dan Role 3 yang mengajukan scope project akan ditambahkan ke workspace (append), termasuk akses workspace ujicoba untuk trial.
-          Role 1 tetap single workspace sesuai pengajuan; untuk user Role 1 yang sudah aktif, pergantian workspace diarahkan ke workspace ujicoba.
-          Perubahan berlaku setelah pengguna sign out dan sign in ulang.
-        </p>
         <div className="admin-table-wrap">
           <table className="audit-table responsive-stack-table admin-user-table">
             <caption className="sr-only">Daftar user dan manajemen role</caption>

@@ -329,7 +329,7 @@ export default function AuditHomePage() {
 
   return (
     <AuditorLayout
-      title="Read-only Auditor View"
+      title="Auditor View"
       subtitle="Snapshot list untuk pemeriksaan jejak proses Evidence -> Review -> Approval -> Snapshot."
       projectLabel="All projects (snapshot list)"
       periodLabel="All periods"
@@ -382,9 +382,9 @@ export default function AuditHomePage() {
         <p className="inline-note">
           Mulai dari snapshot list -&gt; baca narrative trail &amp; reference ISO mapping.
         </p>
-        <div className="wizard-actions admin-filter-row">
+        <div className="field-grid admin-filter-row audit-filter-grid">
           <label>
-            Project filter
+            Workspace Project
             <select
               value={snapshotProjectFilter}
               onChange={(event) => setSnapshotProjectFilter(event.target.value)}

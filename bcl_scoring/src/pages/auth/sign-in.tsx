@@ -125,7 +125,7 @@ export default function SignInPage() {
             </p>
           ) : null}
           {error ? <p className="error-box">{error}</p> : null}
-          {info ? <p className="auth-status">{info}</p> : null}
+          {info ? <p className="auth-status action-feedback">{info}</p> : null}
 
           {isSignedIn ? (
             <div className="auth-stack">

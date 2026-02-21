@@ -401,7 +401,7 @@ export default function AuditSnapshotDetailPage() {
             Export PDF
           </button>
         </div>
-        {exportInfo ? <p className="task-note">{exportInfo}</p> : null}
+        {exportInfo ? <p className="task-note action-feedback">{exportInfo}</p> : null}
       </section>
 
       <section className="task-panel">

@@ -198,6 +198,19 @@ export default function ProjectsIndexPage() {
     if (credential.role === "role1") return scopedProjectId;
     return firstActionProjectId || rows[0]?.project.id || null;
   }, [credential.role, firstActionProjectId, rows, scopedProjectId]);
+  const role1WorkspaceLabel = useMemo(() => {
+    if (credential.role !== "role1") return null;
+
+    if (scopedProjectId) {
+      const scopedRow = rows.find((row) => row.project.id === scopedProjectId);
+      return scopedRow?.project.name || scopedRow?.project.code || scopedProjectId;
+    }
+
+    const firstRow = rows[0];
+    if (!firstRow) return null;
+    return firstRow.project.name || firstRow.project.code || firstRow.project.id;
+  }, [credential.role, rows, scopedProjectId]);
+  const headerTitle = role1WorkspaceLabel ? `Projects - ${role1WorkspaceLabel}` : "Projects";
 
   return (
     <main className="task-shell">
@@ -205,11 +218,8 @@ export default function ProjectsIndexPage() {
         <div className="role-hero-grid">
           <div className="role-hero-main">
             <p className="task-kicker">BIM Coordinator Project</p>
-            <h1>Projects</h1>
+            <h1>{headerTitle}</h1>
             <p className="task-subtitle">Prioritas utama: tambah evidence pada workspace Anda, lalu monitor queue lintas project.</p>
-            {credential.role === "role1" ? (
-              <p className="inline-note">Role 1 dapat melihat semua workspace (read-only), tetapi hanya 1 workspace yang bisa diinput.</p>
-            ) : null}
             {credential.role === "role1" && !scopedProjectId ? (
               <p className="warning-box">Workspace input Role 1 Anda belum ditetapkan admin. Saat ini mode hanya read-only.</p>
             ) : null}
@@ -217,9 +227,6 @@ export default function ProjectsIndexPage() {
               <span className="status-chip status-na">Total projects: {totalProjects}</span>
               <span className="status-chip status-na">Need action: {projectsNeedAction}</span>
             </div>
-            <p className="inline-note">
-              Mulai dari proyek -&gt; pilih BIM Use -&gt; submit evidence untuk indikator terkait.
-            </p>
             <div className="wizard-actions">
               {primaryAddProjectId ? (
                 <Link href={`/projects/${primaryAddProjectId}/evidence/add`} className="primary-cta">
@@ -244,10 +251,6 @@ export default function ProjectsIndexPage() {
               <div className="context-card role-context-card">
                 <span>Needs Revision</span>
                 <strong>{totalNeedsRevision}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Data mode</span>
-                <strong>{dataMode === "backend" ? "Backend (Supabase)" : "Backend (partial)"}</strong>
               </div>
             </div>
           </aside>

@@ -715,7 +715,7 @@ export default function AddEvidencePage() {
                 </form>
               ) : null}
               {gapError ? <p className="error-box">{gapError}</p> : null}
-              {gapInfo ? <p className="task-note">{gapInfo}</p> : null}
+              {gapInfo ? <p className="task-note action-feedback">{gapInfo}</p> : null}
             </div>
           </div>
         ) : null}
@@ -924,7 +924,7 @@ export default function AddEvidencePage() {
         <p className="prototype-badge">Local draft (prototype, not used in scoring)</p>
 
         {submitError ? <p className="error-box">{submitError}</p> : null}
-        {submitInfo ? <p className="task-note">{submitInfo}</p> : null}
+        {submitInfo ? <p className="task-note action-feedback">{submitInfo}</p> : null}
       </section>
     </Role1Layout>
   );

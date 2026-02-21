@@ -555,7 +555,7 @@ export default function Role2ProposalPage() {
           Guardrail aktif: Role 2 tidak dapat menambah indikator/perspektif secara langsung. Semua perubahan melalui proposal queue.
         </p>
         {error ? <p className="error-box">{error}</p> : null}
-        {notice ? <p className="task-note">{notice}</p> : null}
+        {notice ? <p className="task-note action-feedback">{notice}</p> : null}
         {loading ? <p>Loading...</p> : null}
 
         {!loading ? (

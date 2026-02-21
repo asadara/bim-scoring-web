@@ -164,7 +164,6 @@ export default function ProjectRole1HomePage() {
             Lihat My Evidence List
           </Link>
         </div>
-        <p className="inline-note">Fokus kerja Role 1: tambah evidence, submit review, lalu monitor hasil review.</p>
       </section>
 
       <section className="task-grid-3" aria-label="Evidence status summary">
@@ -221,7 +220,6 @@ export default function ProjectRole1HomePage() {
           </p>
         ) : null}
 
-        <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
       </section>
 
     </Role1Layout>
