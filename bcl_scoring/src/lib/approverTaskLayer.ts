@@ -670,16 +670,14 @@ export async function applyApproverDecision(input: {
   }
 
   const periodId = requirePeriodId(input.period_id);
-  if (!Number.isInteger(input.period_version)) {
-    throw new Error("Period version is Not available");
-  }
+  const periodVersion = Number.isInteger(input.period_version) ? input.period_version : 1;
 
   try {
     if (input.decision === "APPROVE PERIOD") {
       const payload = {
         period_id: periodId,
         reason: input.reason.trim(),
-        if_match_version: input.period_version,
+        if_match_version: periodVersion,
       };
 
       const result = await callBackendWrite<ApproveWriteResponse>({
@@ -726,7 +724,7 @@ export async function applyApproverDecision(input: {
     const payload = {
       period_id: periodId,
       reason: input.reason.trim(),
-      if_match_version: input.period_version,
+      if_match_version: periodVersion,
     };
     const result = await callBackendWrite<RejectWriteResponse>({
       path: `/periods/${encodeURIComponent(periodId)}/reject`,
