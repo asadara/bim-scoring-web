@@ -14,6 +14,7 @@ import {
   isAuthConfigured,
   signOutAllAuthSessions,
   signOutAuth,
+  submitAuthRoleScopeRequest,
   syncCredentialFromAuth,
   uploadAuthProfilePhoto,
   updateAuthPassword,
@@ -91,6 +92,13 @@ function toInitials(value: string): string {
   return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
 }
 
+function toRequestedRoleFromActiveRole(role: string): RequestedRole {
+  if (role === "role1") return "role1";
+  if (role === "role2") return "role2";
+  if (role === "role3") return "role3";
+  return "viewer";
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -143,7 +151,7 @@ export default function MePage() {
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [projectLoadError, setProjectLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busyAction, setBusyAction] = useState<"profile" | "password" | "signout" | "signout-all" | null>(null);
+  const [busyAction, setBusyAction] = useState<"profile" | "password" | "role-request" | "signout" | "signout-all" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -154,6 +162,8 @@ export default function MePage() {
   const [newPasswordVisible, setNewPasswordVisible] = useState(false);
   const [confirmNewPasswordVisible, setConfirmNewPasswordVisible] = useState(false);
   const [profilePhotoDataUrl, setProfilePhotoDataUrl] = useState<string | null>(null);
+  const [requestRoleDraft, setRequestRoleDraft] = useState<RequestedRole>("viewer");
+  const [requestProjectIdsDraft, setRequestProjectIdsDraft] = useState<string[]>([]);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -207,6 +217,11 @@ export default function MePage() {
   const isConfigured = isAuthConfigured();
   const isSignedIn = Boolean(credential.user_id);
   const requestedRoleLabel = account.requested_role ? REQUESTED_ROLE_LABEL[account.requested_role] : "-";
+  const activeProjectOptions = useMemo(() => {
+    return projectOptions
+      .filter((item) => item.is_active !== false)
+      .sort((a, b) => String(a.name || a.code || a.id).localeCompare(String(b.name || b.code || b.id)));
+  }, [projectOptions]);
   const projectNameById = useMemo(() => {
     const map = new Map<string, string>();
     projectOptions.forEach((item) => {
@@ -222,6 +237,12 @@ export default function MePage() {
     [credential.role]
   );
   const roleStatusText = credential.pending_role ? "Menunggu penetapan admin" : "Role aktif";
+  const requestRequiresSingleScope = requestRoleDraft === "role1";
+  const requestRequiresScope = requestRoleDraft === "role2";
+  const currentScopeLabels = useMemo(() => {
+    const ids = Array.isArray(credential.scoped_project_ids) ? credential.scoped_project_ids : [];
+    return ids.map((projectId) => projectNameById.get(projectId) || projectId);
+  }, [credential.scoped_project_ids, projectNameById]);
   const profileAvatarInitials = useMemo(() => {
     const base =
       account.full_name ||
@@ -238,6 +259,33 @@ export default function MePage() {
     credential.employee_number,
     credential.full_name,
   ]);
+
+  useEffect(() => {
+    const preferredRole = account.requested_role || toRequestedRoleFromActiveRole(credential.role);
+    const seededProjectIds =
+      account.requested_project_ids.length > 0
+        ? account.requested_project_ids
+        : Array.isArray(credential.scoped_project_ids)
+          ? credential.scoped_project_ids
+          : [];
+    const normalizedProjectIds = [
+      ...new Set(seededProjectIds.map((item) => normalizeText(item)).filter(Boolean) as string[]),
+    ];
+    setRequestRoleDraft(preferredRole);
+    if (preferredRole === "role1") {
+      setRequestProjectIdsDraft(normalizedProjectIds.slice(0, 1));
+      return;
+    }
+    setRequestProjectIdsDraft(normalizedProjectIds);
+  }, [account.requested_project_ids, account.requested_role, credential.role, credential.scoped_project_ids]);
+
+  useEffect(() => {
+    if (!requestRequiresSingleScope) return;
+    setRequestProjectIdsDraft((prev) => {
+      if (prev.length <= 1) return prev;
+      return [prev[0]];
+    });
+  }, [requestRequiresSingleScope]);
 
   async function reloadAccountSnapshot(): Promise<void> {
     const snapshot = await getCurrentAuthAccount();
@@ -344,6 +392,48 @@ export default function MePage() {
       setInfo("Foto profil berhasil diperbarui.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memperbarui foto profil.");
+    }
+  }
+
+  function toggleRequestProjectScope(projectId: string): void {
+    if (requestRequiresSingleScope) {
+      setRequestProjectIdsDraft([projectId]);
+      return;
+    }
+    setRequestProjectIdsDraft((prev) => {
+      if (prev.includes(projectId)) return prev.filter((item) => item !== projectId);
+      return [...prev, projectId];
+    });
+  }
+
+  async function onSubmitRoleScopeRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busyAction) return;
+    if (requestRequiresSingleScope && requestProjectIdsDraft.length !== 1) {
+      setError("Untuk pengajuan Role 1, pilih tepat 1 workspace project.");
+      return;
+    }
+    if (requestRequiresScope && requestProjectIdsDraft.length === 0) {
+      setError("Untuk pengajuan Role 2, pilih minimal 1 scope workspace.");
+      return;
+    }
+
+    setBusyAction("role-request");
+    setError(null);
+    setInfo(null);
+    try {
+      await submitAuthRoleScopeRequest({
+        requested_role: requestRoleDraft,
+        requested_project_ids: requestProjectIdsDraft,
+        name: profileName || account.full_name,
+        employee_number: profileEmployeeNumber || account.employee_number,
+      });
+      await reloadAccountSnapshot();
+      setInfo("Pengajuan perubahan role/scope berhasil dikirim. Menunggu persetujuan Admin.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mengirim pengajuan perubahan role/scope.");
+    } finally {
+      setBusyAction(null);
     }
   }
 
@@ -492,7 +582,66 @@ export default function MePage() {
           </section>
 
           <section className="task-panel">
-            <h2>4. Akses Saya Saat Ini</h2>
+            <h2>4. Ajukan Perubahan Role / Scope</h2>
+            <p className="task-subtitle">
+              Jika Anda mendapat tugas review workspace lain, ajukan perubahan scope di sini. Perubahan baru berlaku setelah
+              disetujui Admin.
+            </p>
+            <form className="auth-stack" onSubmit={onSubmitRoleScopeRequest}>
+              <label className="auth-field">
+                Role Diajukan
+                <select
+                  value={requestRoleDraft}
+                  onChange={(event) => setRequestRoleDraft(event.target.value as RequestedRole)}
+                  disabled={!isSignedIn || Boolean(busyAction)}
+                >
+                  <option value="role1">BIM Coordinator Project</option>
+                  <option value="role2">BIM Coordinator HO</option>
+                  <option value="role3">BIM Manager</option>
+                  <option value="viewer">Viewer / Auditor</option>
+                </select>
+              </label>
+              <fieldset className="auth-fieldset">
+                <legend>Scope Workspace Diajukan</legend>
+                <p className="auth-hint">
+                  {requestRequiresSingleScope
+                    ? "Role 1 wajib 1 workspace."
+                    : requestRequiresScope
+                      ? "Role 2 wajib minimal 1 workspace. Tambahkan workspace baru sesuai tugas review."
+                      : "Opsional. Admin akan menetapkan scope final."}
+                </p>
+                {activeProjectOptions.length === 0 ? (
+                  <p className="auth-hint">Belum ada workspace aktif.</p>
+                ) : (
+                  <div className="auth-checkbox-grid">
+                    {activeProjectOptions.map((project) => (
+                      <label key={`request-scope-${project.id}`} className="auth-checkbox-item">
+                        <input
+                          type={requestRequiresSingleScope ? "radio" : "checkbox"}
+                          name={requestRequiresSingleScope ? "request-role1-workspace" : undefined}
+                          checked={requestProjectIdsDraft.includes(project.id)}
+                          onChange={() => toggleRequestProjectScope(project.id)}
+                          disabled={!isSignedIn || Boolean(busyAction)}
+                        />
+                        <span className="auth-checkbox-label" title={projectLabel(project)}>
+                          {projectLabel(project)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+              <p className="inline-note">
+                Scope aktif saat ini: <strong>{currentScopeLabels.length > 0 ? currentScopeLabels.join(", ") : "-"}</strong>
+              </p>
+              <button type="submit" className="primary-cta" disabled={!isSignedIn || Boolean(busyAction)}>
+                {busyAction === "role-request" ? "Mengirim pengajuan..." : "Ajukan Perubahan ke Admin"}
+              </button>
+            </form>
+          </section>
+
+          <section className="task-panel">
+            <h2>5. Akses Saya Saat Ini</h2>
             <p className="task-subtitle">
               Halaman berikut dapat diakses oleh role aktif Anda: <strong>{getRoleLabel(credential.role)}</strong>.
             </p>
@@ -506,7 +655,7 @@ export default function MePage() {
           </section>
 
           <section className="task-panel me-panel-wide">
-            <h2>5. Pengaturan Akun Dasar</h2>
+            <h2>6. Pengaturan Akun Dasar</h2>
             <div className="auth-stack">
             <form className="auth-stack" onSubmit={onSaveProfile}>
               <h3>Perbarui Profil</h3>
@@ -611,12 +760,13 @@ export default function MePage() {
           </section>
 
           <section className="task-panel me-panel-wide">
-            <h2>6. Bantuan</h2>
+            <h2>7. Bantuan</h2>
             <p className="inline-note">
               Perubahan role, scope project, atau kebutuhan akses tambahan diproses oleh Admin melalui panel Admin.
             </p>
             <p className="inline-note">
-              Jika role belum sesuai kebutuhan kerja Anda, ajukan ulang dari form pendaftaran atau hubungi Admin BIM internal.
+              Jika role belum sesuai kebutuhan kerja Anda, kirim pengajuan dari bagian &quot;Ajukan Perubahan Role / Scope&quot; di atas
+              atau hubungi Admin BIM internal.
             </p>
           </section>
         </div>

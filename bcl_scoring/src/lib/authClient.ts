@@ -525,6 +525,61 @@ export async function updateAuthPassword(input: { new_password: string }): Promi
   await syncCredentialFromAuth();
 }
 
+export async function submitAuthRoleScopeRequest(input: {
+  requested_role: RequestedRole;
+  requested_project_ids?: string[];
+  name?: string | null;
+  employee_number?: string | null;
+}): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const requestedRole = normalizeRequestedRole(input.requested_role);
+  if (!requestedRole) {
+    throw new Error("Role pengajuan tidak valid.");
+  }
+  const requestedProjectIds = normalizeRequestedProjectIds(input.requested_project_ids);
+  if (requestedRole === "role1" && requestedProjectIds.length !== 1) {
+    throw new Error("Pengajuan Role 1 wajib memilih tepat 1 workspace project.");
+  }
+  if (requestedRole === "role2" && requestedProjectIds.length === 0) {
+    throw new Error("Pengajuan Role 2 wajib memilih minimal 1 workspace project.");
+  }
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw new Error(error.message || "Gagal memuat sesi auth.");
+  const user = data.user;
+  if (!user?.id) throw new Error("Sesi login tidak ditemukan.");
+
+  const { error: updateError } = await supabase.auth.updateUser({
+    data: {
+      requested_role: requestedRole,
+      requested_project_ids: requestedProjectIds,
+      requested_role_submitted_at: new Date().toISOString(),
+    },
+  });
+  if (updateError) {
+    throw new Error(updateError.message || "Gagal menyimpan pengajuan role/scope.");
+  }
+
+  setPendingRequestedRole(requestedRole);
+  setPendingRequestedProjectIds(requestedProjectIds);
+
+  try {
+    await callAccountRequest({
+      user_id: user.id,
+      email: normalizeText(user.email),
+      name: normalizeText(input.name) || readUserName(user),
+      employee_number: normalizeEmployeeNumber(String(input.employee_number || readEmployeeNumber(user) || "")),
+      provider: readProvider(user),
+      requested_role: requestedRole,
+      requested_project_ids: requestedProjectIds,
+    });
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : "Gagal mengirim pengajuan ke antrean admin.");
+  }
+
+  await syncCredentialFromAuth();
+}
+
 export async function getAuthProfilePhoto(input: { user_id: string }): Promise<AuthProfilePhoto> {
   const user_id = normalizeText(input.user_id);
   if (!user_id) {
