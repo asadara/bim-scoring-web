@@ -72,7 +72,7 @@ export default function BackendStatusBanner(props: BackendStatusBannerProps) {
     }
     return (
       <p className="backend-status-banner backend-status-neutral" role="status">
-        Backend read endpoint is partially available
+        Prototype mode active: evidence/review data sync only within the same browser profile.
       </p>
     );
   }
