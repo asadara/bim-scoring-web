@@ -8,6 +8,8 @@ import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
   canRole1WriteProject,
   EvidenceType,
+  fetchEvidenceListReadMode,
+  fetchProjectPeriodsReadMode,
   getRole1ScopedProjectId,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
@@ -187,6 +189,7 @@ export default function AddEvidencePage() {
     if (!context || typeof projectId !== "string") return;
 
     if (typeof evidenceId !== "string") {
+      setSubmitError(null);
       setForm((prev) => {
         if (prev.bim_use_id) return prev;
         return {
@@ -197,27 +200,57 @@ export default function AddEvidencePage() {
       return;
     }
 
-    const hit = getLocalEvidenceById(evidenceId);
-    if (!hit || hit.project_id !== projectId) {
-      setSubmitError("Evidence yang akan direvisi tidak ditemukan di local prototype storage.");
-      return;
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let hit = getLocalEvidenceById(evidenceId);
+        if (!hit || hit.project_id !== projectId) {
+          const periodCandidates = new Set<string>();
+          if (context.active_period?.id) periodCandidates.add(context.active_period.id);
 
-    setForm({
-      evidence_id: hit.id,
-      bim_use_id: hit.bim_use_id || NO_BIM_USE_ID,
-      indicator_ids: hit.indicator_ids.slice(0, 1),
-      type: hit.type,
-      file_type: hit.type === "FILE" ? inferFileTypeFromEvidence(hit) : "",
-      title: hit.title,
-      description: hit.description,
-      external_url: hit.external_url || "",
-      text_content: hit.text_content || "",
-      file_view_url: hit.file_view_url || "",
-      file_download_url: hit.file_download_url || "",
-      file_reference_url: hit.file_reference_url || "",
-    });
-    setLocalFileMeta(null);
+          const periodsResult = await fetchProjectPeriodsReadMode(projectId);
+          for (const period of periodsResult.data) {
+            if (period?.id) periodCandidates.add(period.id);
+          }
+
+          for (const periodId of periodCandidates) {
+            await fetchEvidenceListReadMode(projectId, periodId);
+            hit = getLocalEvidenceById(evidenceId);
+            if (hit && hit.project_id === projectId) break;
+          }
+        }
+
+        if (cancelled) return;
+        if (!hit || hit.project_id !== projectId) {
+          setSubmitError("Evidence yang akan direvisi tidak ditemukan di backend/local storage.");
+          return;
+        }
+
+        setSubmitError(null);
+        setForm({
+          evidence_id: hit.id,
+          bim_use_id: hit.bim_use_id || NO_BIM_USE_ID,
+          indicator_ids: hit.indicator_ids.slice(0, 1),
+          type: hit.type,
+          file_type: hit.type === "FILE" ? inferFileTypeFromEvidence(hit) : "",
+          title: hit.title,
+          description: hit.description,
+          external_url: hit.external_url || "",
+          text_content: hit.text_content || "",
+          file_view_url: hit.file_view_url || "",
+          file_download_url: hit.file_download_url || "",
+          file_reference_url: hit.file_reference_url || "",
+        });
+        setLocalFileMeta(null);
+      } catch (fetchErr) {
+        if (cancelled) return;
+        setSubmitError(fetchErr instanceof Error ? fetchErr.message : "Gagal memuat evidence dari backend.");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [context, evidenceId, projectId]);
 
   const selectedBimUse = useMemo(() => {

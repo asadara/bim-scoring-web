@@ -333,6 +333,8 @@ export default function HoEvidenceReviewPage() {
         evidence_id: evidence.id,
         review_outcome: outcome,
         review_reason: reason,
+        period_id: evidence.period_id || context?.active_period?.id || null,
+        if_match_version: evidence.version,
         reviewed_by: "BIM Coordinator HO",
       });
     } catch (e) {

@@ -160,10 +160,12 @@ export async function applyReviewWrite(input: {
   evidence_id: string;
   review_outcome: ReviewOutcome;
   review_reason: string;
+  period_id?: string | null;
+  if_match_version?: number | null;
   reviewed_by?: string;
 }): Promise<LocalEvidenceItem | null> {
   const evidence = getLocalEvidenceById(input.evidence_id);
-  if (!evidence) {
+  if (!isRealBackendWriteEnabled() && !evidence) {
     throw new Error("Evidence context not found.");
   }
 
@@ -172,8 +174,10 @@ export async function applyReviewWrite(input: {
     return getLocalEvidenceById(input.evidence_id);
   }
 
-  const periodId = normalizePeriodId(evidence.period_id);
-  const ifMatchVersion = asNumber(evidence.version);
+  const periodId = normalizePeriodId(
+    asString(input.period_id || "").trim() || evidence?.period_id || null
+  );
+  const ifMatchVersion = asNumber(input.if_match_version) ?? asNumber(evidence?.version);
   if (ifMatchVersion === null) {
     throw new Error("Evidence version is Not available");
   }
