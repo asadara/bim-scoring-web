@@ -29,6 +29,7 @@ import {
   formatPeriodLabel,
   formatProjectLabel,
 } from "@/lib/role1TaskLayer";
+import { isTestWorkspaceProject } from "@/lib/testWorkspace";
 
 const PERSPECTIVES = ["P1", "P2", "P3", "P4", "P5"];
 
@@ -100,10 +101,14 @@ export default function AuditSnapshotDetailPage() {
             id: hit.snapshot.project_id,
             name: null,
             code: null,
+            config_key: null,
             phase: null,
             is_active: null,
           };
           pageBackendMessage = pageBackendMessage || "Backend not available";
+        }
+        if (isTestWorkspaceProject(projectInfo)) {
+          throw new Error("Snapshot workspace ujicoba tidak ditampilkan pada halaman Audit.");
         }
 
         const periodId = hit.snapshot.period_id;

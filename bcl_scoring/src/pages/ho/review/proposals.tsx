@@ -66,12 +66,30 @@ const ORGANIZATION_PERSPECTIVE_WEIGHTS = [
 ] as const;
 
 const INDICATOR_SCORE_SCALE = [
-  { score: "0", meaning: "Tidak ada" },
-  { score: "1", meaning: "Ada tapi tidak dipakai" },
-  { score: "2", meaning: "Dipakai sporadis" },
-  { score: "3", meaning: "Dipakai rutin terbatas" },
-  { score: "4", meaning: "Dipakai konsisten" },
-  { score: "5", meaning: "Dipakai optimal dan berdampak" },
+  {
+    score: "0",
+    meaning: "Tidak ada implementasi, tidak tersedia dokumen, atau tidak terdapat bukti pendukung",
+  },
+  {
+    score: "1",
+    meaning: "Terdapat inisiasi awal atau praktik informal tanpa dokumentasi memadai",
+  },
+  {
+    score: "2",
+    meaning: "Implementasi sebagian, belum konsisten, bukti terbatas",
+  },
+  {
+    score: "3",
+    meaning: "Implementasi cukup konsisten, namun belum sepenuhnya sistematis atau belum terdokumentasi lengkap",
+  },
+  {
+    score: "4",
+    meaning: "Implementasi berjalan baik, terdokumentasi, dan dapat diverifikasi",
+  },
+  {
+    score: "5",
+    meaning: "Implementasi sistematis, terukur, terdokumentasi lengkap, serta dikendalikan secara berkelanjutan",
+  },
 ] as const;
 
 function normalizeTextKey(value: string): string {
@@ -404,7 +422,7 @@ export default function Role2ProposalPage() {
   return (
     <Role2Layout
       title="Proposal BIM Use & Indicator Mapping"
-      subtitle="Role 2 hanya mengajukan proposal. Perubahan master tetap diputuskan Admin."
+      subtitle="Role 2 memproses gap dari Role 1 dan mengajukan proposal ke Admin untuk perubahan master."
       projectId={selectedProjectId || null}
       project={selectedProject}
       periodStatusLabel="OPEN"
@@ -615,12 +633,13 @@ export default function Role2ProposalPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Riwayat Proposal Saya</h2>
+        <h2>Queue Proposal BIM Use</h2>
         <div className="admin-table-wrap">
           <table className="audit-table">
             <thead>
               <tr>
                 <th>Dibuat</th>
+                <th>Pemohon</th>
                 <th>Project</th>
                 <th>Tipe</th>
                 <th>BIM Use</th>
@@ -632,15 +651,18 @@ export default function Role2ProposalPage() {
             <tbody>
               {proposals.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>Belum ada proposal.</td>
+                  <td colSpan={8}>Belum ada proposal.</td>
                 </tr>
               ) : (
                 proposals.map((item) => {
                   const projectName = projects.find((project) => project.id === item.project_id)?.name || item.project_id || "N/A";
                   const indicatorList = Array.isArray(item.indicator_ids) ? item.indicator_ids : [];
+                  const requesterRole = item.requester_role || "N/A";
+                  const requesterUser = item.requester_user_id || "N/A";
                   return (
                     <tr key={item.id}>
                       <td>{item.created_at ? new Date(item.created_at).toLocaleString() : "N/A"}</td>
+                      <td>{requesterRole} ({requesterUser})</td>
                       <td>{projectName}</td>
                       <td>{item.proposal_type || "N/A"}</td>
                       <td>{item.proposed_bim_use || "N/A"}</td>
@@ -663,8 +685,9 @@ export default function Role2ProposalPage() {
           </summary>
           <div className="collapsible-content">
             <p className="auth-hint">
-              Referensi ini merujuk baseline <code>doc/skema define.md</code>. Istilah perspektif tetap menggunakan
-              istilah asli (English), dengan penjelasan singkat Bahasa Indonesia untuk kemudahan pemahaman.
+              Referensi ini merujuk baseline <code>doc/perspectives and indicators r1.md</code>. Istilah perspektif
+              tetap menggunakan istilah asli (English), dengan penjelasan singkat Bahasa Indonesia untuk kemudahan
+              pemahaman.
             </p>
 
             <h3>Tujuan Penilaian</h3>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
@@ -18,6 +18,7 @@ import {
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
 } from "@/lib/role1TaskLayer";
+import { submitRole2BimUseProposal } from "@/lib/role2ProposalClient";
 import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
 
@@ -150,6 +151,12 @@ export default function AddEvidencePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [context, setContext] = useState<Awaited<ReturnType<typeof fetchRole1Context>> | null>(null);
   const [localFileMeta, setLocalFileMeta] = useState<{ name: string; size: number } | null>(null);
+  const [showGapProposalForm, setShowGapProposalForm] = useState(false);
+  const [gapProposedBimUse, setGapProposedBimUse] = useState("");
+  const [gapReason, setGapReason] = useState("");
+  const [gapSubmitting, setGapSubmitting] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
+  const [gapInfo, setGapInfo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string") return;
@@ -231,6 +238,17 @@ export default function AddEvidencePage() {
   const selectedEvidenceTypeLabel = form.type || "Belum dipilih";
   const selectedFileTypeLabel =
     form.type === "FILE" ? form.file_type || "Belum dipilih" : "N/A (bukan tipe FILE)";
+  const proposalActor = useMemo(() => {
+    if (!credential.user_id) return null;
+    return { actorId: credential.user_id, actorRole: credential.role };
+  }, [credential.user_id, credential.role]);
+
+  useEffect(() => {
+    if (!showGapProposalForm) return;
+    if (gapProposedBimUse.trim()) return;
+    if (!selectedBimUse?.label) return;
+    setGapProposedBimUse(selectedBimUse.label);
+  }, [showGapProposalForm, gapProposedBimUse, selectedBimUse?.label]);
 
   function setField<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -350,6 +368,61 @@ export default function AddEvidencePage() {
     }));
     setSubmitError(null);
     setSubmitInfo(null);
+  }
+
+  async function onSubmitGapProposal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (typeof projectId !== "string" || !projectId.trim()) {
+      setGapError("Project context tidak valid.");
+      return;
+    }
+    if (credential.role !== "role1") {
+      setGapError("Fitur ini khusus Role 1.");
+      return;
+    }
+    if (!proposalActor) {
+      setGapError("Sesi user tidak valid. Silakan sign in ulang.");
+      return;
+    }
+    const proposedBimUse = gapProposedBimUse.trim();
+    const reason = gapReason.trim();
+    if (!proposedBimUse) {
+      setGapError("Usulan BIM Use wajib diisi.");
+      return;
+    }
+    if (!reason) {
+      setGapError("Alasan pengajuan wajib diisi.");
+      return;
+    }
+
+    const contextLines = [
+      "[ROLE1_EVIDENCE_GAP]",
+      `project_id=${projectId}`,
+      `selected_bim_use=${selectedBimUseLabel}`,
+      `selected_indicator=${selectedIndicatorLabel}`,
+      `draft_type=${selectedEvidenceTypeLabel}`,
+      `draft_title=${form.title.trim() || NA_TEXT}`,
+    ];
+    const mergedReason = `${reason}\n\nContext:\n${contextLines.join("\n")}`;
+
+    setGapSubmitting(true);
+    setGapError(null);
+    setGapInfo(null);
+    try {
+      await submitRole2BimUseProposal(proposalActor, {
+        project_id: projectId,
+        proposal_type: "BIM_USE_CREATE",
+        proposed_bim_use: proposedBimUse,
+        reason: mergedReason,
+      });
+      setGapReason("");
+      setShowGapProposalForm(false);
+      setGapInfo("Pengajuan berhasil dikirim ke antrean Role 2. Lanjutkan input evidence setelah mapping tersedia.");
+    } catch (err) {
+      setGapError(err instanceof Error ? err.message : "Gagal mengirim pengajuan ke Role 2.");
+    } finally {
+      setGapSubmitting(false);
+    }
   }
 
   async function saveByStatus(status: "DRAFT" | "SUBMITTED") {
@@ -592,6 +665,58 @@ export default function AddEvidencePage() {
             {form.bim_use_id && indicators.length === 0 ? (
               <p className="warning-box">Indicator untuk BIM Use ini Not available.</p>
             ) : null}
+
+            <div className="task-note">
+              <p>
+                <strong>Tidak menemukan BIM Use/Indicator yang cocok?</strong>
+              </p>
+              <p className="inline-note">
+                Ajukan kebutuhan mapping ke Role 2. Role 1 tidak dapat menambah indikator secara langsung.
+              </p>
+              <div className="wizard-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGapProposalForm((prev) => !prev);
+                    setGapError(null);
+                    setGapInfo(null);
+                  }}
+                  disabled={credential.role !== "role1" || !proposalActor || gapSubmitting}
+                >
+                  {showGapProposalForm ? "Tutup Form Pengajuan" : "Ajukan ke Role 2"}
+                </button>
+              </div>
+              {showGapProposalForm ? (
+                <form className="field-grid" onSubmit={(event) => void onSubmitGapProposal(event)}>
+                  <label>
+                    Usulan BIM Use
+                    <input
+                      value={gapProposedBimUse}
+                      onChange={(event) => setGapProposedBimUse(event.target.value)}
+                      placeholder="Contoh: Clash Coordination - Structural"
+                      disabled={gapSubmitting}
+                    />
+                  </label>
+                  <label>
+                    Alasan Pengajuan
+                    <textarea
+                      value={gapReason}
+                      onChange={(event) => setGapReason(event.target.value)}
+                      placeholder="Jelaskan kenapa evidence tidak cocok dengan BIM Use/Indicator yang tersedia."
+                      rows={4}
+                      disabled={gapSubmitting}
+                    />
+                  </label>
+                  <div className="wizard-actions">
+                    <button type="submit" className="action-primary" disabled={gapSubmitting}>
+                      {gapSubmitting ? "Mengirim..." : "Kirim Pengajuan"}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+              {gapError ? <p className="error-box">{gapError}</p> : null}
+              {gapInfo ? <p className="task-note">{gapInfo}</p> : null}
+            </div>
           </div>
         ) : null}
 

@@ -12,12 +12,14 @@ import {
   type BackendHandshakeResult,
   type SafeFetchFail,
 } from "@/lib/http";
+import { isTestWorkspaceProject } from "@/lib/testWorkspace";
 import { useCredential } from "@/lib/useCredential";
 
 type ProjectRow = {
   id: string;
   code?: string | null;
   name?: string | null;
+  config_key?: string | null;
   phase?: string | null;
   is_active?: boolean | null;
 };
@@ -507,9 +509,10 @@ export default function Home() {
         if (cancelled) return;
 
         const safeRows = Array.isArray(projectRows) ? projectRows : [];
-        setProjects(safeRows);
+        const visibleRows = safeRows.filter((row) => !isTestWorkspaceProject(row));
+        setProjects(visibleRows);
 
-        if (safeRows.length === 0) {
+        if (visibleRows.length === 0) {
           setSelectedProjectId("");
           setPeriods([]);
           setSelectedPeriodId("");
@@ -518,7 +521,10 @@ export default function Home() {
           return;
         }
 
-        setSelectedProjectId((prev) => prev || safeRows[0].id);
+        setSelectedProjectId((prev) => {
+          if (prev && visibleRows.some((item) => item.id === prev)) return prev;
+          return visibleRows[0].id;
+        });
       } catch (e) {
         if (cancelled) return;
         setError(toUserFacingErrorMessage(e, "Gagal memuat dashboard desktop."));

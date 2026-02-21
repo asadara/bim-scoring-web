@@ -19,6 +19,7 @@ import {
   fetchProjectPeriodsReadMode,
   fetchProjectsReadMode,
 } from "@/lib/role1TaskLayer";
+import { isTestWorkspaceProject } from "@/lib/testWorkspace";
 import { useCredential } from "@/lib/useCredential";
 
 function formatDateText(value: string | null | undefined): string {
@@ -115,9 +116,16 @@ export default function AuditHomePage() {
         const snapshotResult = await fetchAuditSnapshotsReadMode();
         const projectsResult = await fetchProjectsReadMode();
         const projectRows = projectsResult.data;
+        const visibleProjectRows = projectRows.filter((project) => !isTestWorkspaceProject(project));
+        const hiddenProjectIds = new Set(
+          projectRows.filter((project) => isTestWorkspaceProject(project)).map((project) => project.id)
+        );
+        const visibleSnapshots = snapshotResult.data.filter(
+          (entry) => !hiddenProjectIds.has(entry.snapshot.project_id)
+        );
 
         const periodPairs = await Promise.all(
-          projectRows.map(async (project) => ({
+          visibleProjectRows.map(async (project) => ({
             projectId: project.id,
             result: await fetchProjectPeriodsReadMode(project.id),
           }))
@@ -155,8 +163,8 @@ export default function AuditHomePage() {
           (includeAdminAuditLog && auditLogResult.mode === "prototype");
 
         if (!mounted) return;
-        setSnapshots(snapshotResult.data);
-        setProjects(projectRows);
+        setSnapshots(visibleSnapshots);
+        setProjects(visibleProjectRows);
         setPeriodsByProjectId(periodMap);
         setEvents(auditLogResult.data);
         setDataMode(hasPrototypeFallback ? "prototype" : "backend");

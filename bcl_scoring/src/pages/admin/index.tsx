@@ -29,6 +29,7 @@ import {
   updateAdminRoleMapping,
   updateAdminProject,
 } from "@/lib/adminTaskLayer";
+import { resolveTestWorkspaceProject } from "@/lib/testWorkspace";
 import { AppRole, getRoleLabel } from "@/lib/userCredential";
 
 const ADMIN_SESSION_KEY = "bim_admin_session_v1";
@@ -67,13 +68,6 @@ const TEST_WORKSPACE_NAME = "Workspace Ujicoba";
 function toNonEmptyString(value: string): string | null {
   const out = value.trim();
   return out ? out : null;
-}
-
-function normalizeWorkspaceName(value: string | null | undefined): string {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
 }
 
 function asBooleanLabel(value: boolean | null): string {
@@ -323,9 +317,7 @@ export default function AdminControlPanelPage() {
     return projects.find((item) => item.id === periodProjectFilter) || null;
   }, [projects, periodProjectFilter]);
   const testWorkspaceProject = useMemo(() => {
-    return (
-      projects.find((item) => normalizeWorkspaceName(item.name) === normalizeWorkspaceName(TEST_WORKSPACE_NAME)) || null
-    );
+    return resolveTestWorkspaceProject(projects);
   }, [projects]);
   const hasActivePeriodProject = Boolean(
     selectedPeriodProject && selectedPeriodProject.is_active !== false
@@ -625,9 +617,7 @@ export default function AdminControlPanelPage() {
   }
 
   async function handleEnsureTestWorkspace() {
-    const existing = projects.find(
-      (item) => normalizeWorkspaceName(item.name) === normalizeWorkspaceName(TEST_WORKSPACE_NAME)
-    );
+    const existing = resolveTestWorkspaceProject(projects);
     if (existing) {
       setCleanupProjectFilter(existing.id);
       setPeriodProjectFilter(existing.id);
@@ -785,28 +775,25 @@ export default function AdminControlPanelPage() {
     }
   }
 
-  async function applyRole2ScopedUserRole(userId: string, requestedProjectIds: string[]) {
+  async function applyScopedUserRoleAppend(
+    userId: string,
+    role: "role2" | "role3",
+    requestedProjectIds: string[]
+  ) {
     const scopedProjectIds = [...new Set(requestedProjectIds.map((item) => item.trim()).filter(Boolean))];
     if (scopedProjectIds.length === 0) {
-      await applyGlobalUserRole(userId, "role2");
+      await applyGlobalUserRole(userId, role);
       return;
     }
 
-    const allRole2Mappings = roleMappings.filter(
+    const allRoleMappings = roleMappings.filter(
       (item) =>
         item.user_id === userId &&
-        String(item.role || "").trim().toLowerCase() === "role2"
+        String(item.role || "").trim().toLowerCase() === role
     );
-    const activeRole2Mappings = allRole2Mappings.filter((item) => item.is_active !== false);
-
-    for (const mapping of activeRole2Mappings) {
-      const mappingProjectId = toNonEmptyString(mapping.project_id || "");
-      if (mappingProjectId && scopedProjectIds.includes(mappingProjectId)) continue;
-      await updateAdminRoleMapping(session, mapping.id, { is_active: false });
-    }
 
     for (const projectId of scopedProjectIds) {
-      const sameProject = allRole2Mappings.find((item) => toNonEmptyString(item.project_id || "") === projectId);
+      const sameProject = allRoleMappings.find((item) => toNonEmptyString(item.project_id || "") === projectId);
       if (sameProject) {
         if (sameProject.is_active === false) {
           await updateAdminRoleMapping(session, sameProject.id, { is_active: true });
@@ -814,7 +801,7 @@ export default function AdminControlPanelPage() {
       } else {
         await createAdminRoleMapping(session, {
           user_id: userId,
-          role: "role2",
+          role,
           project_id: projectId,
           is_active: true,
         });
@@ -822,10 +809,16 @@ export default function AdminControlPanelPage() {
     }
   }
 
-  async function applyRole1ScopedUserRole(userId: string, requestedProjectIds: string[]) {
-    const scopedProjectIds = [...new Set(requestedProjectIds.map((item) => item.trim()).filter(Boolean))];
-    const scopedProjectId = scopedProjectIds[0] || null;
+  async function applyRole2ScopedUserRole(userId: string, requestedProjectIds: string[]) {
+    await applyScopedUserRoleAppend(userId, "role2", requestedProjectIds);
+  }
 
+  async function applyRole3ScopedUserRole(userId: string, requestedProjectIds: string[]) {
+    await applyScopedUserRoleAppend(userId, "role3", requestedProjectIds);
+  }
+
+  async function applyRole1ScopedUserRole(userId: string, targetProjectId: string | null) {
+    const scopedProjectId = toNonEmptyString(targetProjectId || "");
     await applyGlobalUserRole(userId, "role1");
 
     const allRole1Mappings = roleMappings.filter(
@@ -882,16 +875,44 @@ export default function AdminControlPanelPage() {
       return;
     }
     const requestedProjectIds = normalizeRequestedProjectIds(user.requested_project_ids);
+    const currentRole = userCurrentRoleById.get(user.id) || resolveUserAssignedRole(user.id, roleMappings);
+    const isRole1WorkspaceSwitchToTest = requestedRole === "role1" && currentRole === "role1";
+    const testWorkspaceId = toNonEmptyString(testWorkspaceProject?.id || "");
+    const requestedRole2Or3ScopeWithTrial =
+      (requestedRole === "role2" || requestedRole === "role3") && requestedProjectIds.length > 0 && testWorkspaceId
+        ? [...new Set([...requestedProjectIds, testWorkspaceId])]
+        : requestedProjectIds;
+    const requestedRole1ProjectId = requestedProjectIds[0] || null;
+    if (requestedRole === "role1" && isRole1WorkspaceSwitchToTest && !testWorkspaceId) {
+      setError("Workspace ujicoba belum tersedia. Buat workspace ujicoba terlebih dahulu.");
+      return;
+    }
+    const targetRole1ProjectId = isRole1WorkspaceSwitchToTest ? testWorkspaceId : requestedRole1ProjectId;
+    if (requestedRole === "role1" && !targetRole1ProjectId) {
+      setError("Pengajuan Role 1 belum memiliki target workspace yang valid.");
+      return;
+    }
+    const userLabel = user.name || user.email || user.id;
+    const successMessage =
+      requestedRole === "role1" && isRole1WorkspaceSwitchToTest
+        ? `Pengajuan role disetujui: ${userLabel} -> ${getRoleLabel(requestedRole)} (workspace ujicoba).`
+        : (requestedRole === "role2" || requestedRole === "role3") &&
+            requestedProjectIds.length > 0 &&
+            testWorkspaceId
+          ? `Pengajuan role disetujui: ${userLabel} -> ${getRoleLabel(requestedRole)} (termasuk workspace ujicoba untuk trial).`
+        : `Pengajuan role disetujui: ${userLabel} -> ${getRoleLabel(requestedRole)}.`;
     await runAction(async () => {
       if (requestedRole === "role2") {
-        await applyRole2ScopedUserRole(user.id, requestedProjectIds);
+        await applyRole2ScopedUserRole(user.id, requestedRole2Or3ScopeWithTrial);
+      } else if (requestedRole === "role3") {
+        await applyRole3ScopedUserRole(user.id, requestedRole2Or3ScopeWithTrial);
       } else if (requestedRole === "role1") {
-        await applyRole1ScopedUserRole(user.id, requestedProjectIds);
+        await applyRole1ScopedUserRole(user.id, targetRole1ProjectId);
       } else {
         await applyGlobalUserRole(user.id, requestedRole);
       }
       await reloadAll(session);
-    }, `Pengajuan role disetujui: ${user.name || user.email || user.id} -> ${getRoleLabel(requestedRole)}.`);
+    }, successMessage);
   }
 
   async function handleSetProjectActive(projectId: string, nextActive: boolean) {
@@ -958,7 +979,8 @@ export default function AdminControlPanelPage() {
         <h2>Manajemen Role Pengguna</h2>
         <p className="task-subtitle">
           Atur role global pengguna dari panel admin, termasuk menyetujui pengajuan role saat pendaftaran.
-          Role 1 dan Role 2 yang mengajukan scope project akan dipetakan ke workspace saat disetujui.
+          Role 2 dan Role 3 yang mengajukan scope project akan ditambahkan ke workspace (append), termasuk akses workspace ujicoba untuk trial.
+          Role 1 tetap single workspace sesuai pengajuan; untuk user Role 1 yang sudah aktif, pergantian workspace diarahkan ke workspace ujicoba.
           Perubahan berlaku setelah pengguna sign out dan sign in ulang.
         </p>
         <div className="admin-table-wrap">
@@ -988,9 +1010,25 @@ export default function AdminControlPanelPage() {
                 const draftRole = userRoleDraftById[item.id] || currentRole;
                 const requestedRole = normalizeRequestedRole(item.requested_role);
                 const requestedProjectIds = normalizeRequestedProjectIds(item.requested_project_ids);
+                const isRole1WorkspaceSwitchToTest = requestedRole === "role1" && currentRole === "role1";
+                const testWorkspaceId = toNonEmptyString(testWorkspaceProject?.id || "");
+                const requestedRole2Or3ScopeWithTrial =
+                  (requestedRole === "role2" || requestedRole === "role3") &&
+                    requestedProjectIds.length > 0 &&
+                    testWorkspaceId
+                    ? [...new Set([...requestedProjectIds, testWorkspaceId])]
+                    : requestedProjectIds;
                 const requestedScopeLabel =
-                  requestedProjectIds.length > 0
-                    ? requestedProjectIds.map((id) => projectNameById.get(id) || id).join(", ")
+                  requestedRole === "role1"
+                    ? isRole1WorkspaceSwitchToTest
+                      ? testWorkspaceProject
+                        ? `${testWorkspaceProject.name || TEST_WORKSPACE_NAME} (ujicoba)`
+                        : "Workspace ujicoba belum tersedia"
+                      : requestedProjectIds.length > 0
+                        ? requestedProjectIds.map((id) => projectNameById.get(id) || id).join(", ")
+                        : "-"
+                    : requestedRole2Or3ScopeWithTrial.length > 0
+                    ? requestedRole2Or3ScopeWithTrial.map((id) => projectNameById.get(id) || id).join(", ")
                     : "-";
                 const activeRole2Scopes = roleMappings
                   .filter(
@@ -998,6 +1036,15 @@ export default function AdminControlPanelPage() {
                       mapping.user_id === item.id &&
                       mapping.is_active !== false &&
                       String(mapping.role || "").trim().toLowerCase() === "role2"
+                  )
+                  .map((mapping) => toNonEmptyString(mapping.project_id || ""))
+                  .filter(Boolean) as string[];
+                const activeRole3Scopes = roleMappings
+                  .filter(
+                    (mapping) =>
+                      mapping.user_id === item.id &&
+                      mapping.is_active !== false &&
+                      String(mapping.role || "").trim().toLowerCase() === "role3"
                   )
                   .map((mapping) => toNonEmptyString(mapping.project_id || ""))
                   .filter(Boolean) as string[];
@@ -1010,19 +1057,33 @@ export default function AdminControlPanelPage() {
                   )
                   .map((mapping) => toNonEmptyString(mapping.project_id || ""))
                   .filter(Boolean) as string[];
+                const normalizedRole1Scopes = [...new Set(activeRole1Scopes)];
+                const normalizedRole2Scopes = [...new Set(activeRole2Scopes)];
+                const normalizedRole3Scopes = [...new Set(activeRole3Scopes)];
                 const isRequestAlreadyApplied = (() => {
                   if (!requestedRole) return false;
                   if (requestedRole === "role1") {
                     if (currentRole !== "role1") return false;
-                    if (requestedProjectIds.length === 0) return activeRole1Scopes.length === 0;
-                    return requestedProjectIds.every((projectId) => activeRole1Scopes.includes(projectId));
+                    const expectedRole1Scope = isRole1WorkspaceSwitchToTest
+                      ? testWorkspaceId
+                      : requestedProjectIds[0] || null;
+                    if (!expectedRole1Scope) return normalizedRole1Scopes.length === 0;
+                    return normalizedRole1Scopes.length === 1 && normalizedRole1Scopes[0] === expectedRole1Scope;
                   }
-                  if (requestedRole !== "role2") return requestedRole === currentRole;
-                  if (requestedProjectIds.length === 0) {
-                    return currentRole === "role2" && activeRole2Scopes.length === 0;
+                  if (requestedRole === "role2") {
+                    if (currentRole !== "role2") return false;
+                    if (requestedRole2Or3ScopeWithTrial.length === 0) return true;
+                    return requestedRole2Or3ScopeWithTrial.every((projectId) => normalizedRole2Scopes.includes(projectId));
                   }
-                  return currentRole === "role2" && requestedProjectIds.every((projectId) => activeRole2Scopes.includes(projectId));
+                  if (requestedRole === "role3") {
+                    if (currentRole !== "role3") return false;
+                    if (requestedRole2Or3ScopeWithTrial.length === 0) return true;
+                    return requestedRole2Or3ScopeWithTrial.every((projectId) => normalizedRole3Scopes.includes(projectId));
+                  }
+                  return requestedRole === currentRole;
                 })();
+                const cannotApproveRole1WithoutTestWorkspace =
+                  requestedRole === "role1" && isRole1WorkspaceSwitchToTest && !testWorkspaceProject;
                 const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
                 return (
                   <tr key={item.id}>
@@ -1065,10 +1126,14 @@ export default function AdminControlPanelPage() {
                     <td>
                       <button
                         type="button"
-                        disabled={working || !requestedRole || isRequestAlreadyApplied}
+                        disabled={working || !requestedRole || isRequestAlreadyApplied || cannotApproveRole1WithoutTestWorkspace}
                         onClick={() => void handleApproveRequestedRole(item)}
                       >
-                        {isRequestAlreadyApplied ? "Sudah Disetujui" : "Setujui Sesuai Pengajuan"}
+                        {isRequestAlreadyApplied
+                          ? "Sudah Disetujui"
+                          : cannotApproveRole1WithoutTestWorkspace
+                            ? "Butuh Workspace Ujicoba"
+                            : "Setujui Sesuai Pengajuan"}
                       </button>
                     </td>
                     <td>

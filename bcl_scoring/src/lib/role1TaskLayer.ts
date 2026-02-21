@@ -58,6 +58,7 @@ export type ProjectRecord = {
   id: string;
   code: string | null;
   name: string | null;
+  config_key?: string | null;
   phase: string | null;
   is_active: boolean | null;
 };
@@ -564,6 +565,7 @@ export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[
         id: asString(item.id || item.project_id),
         code: asNullableString(item.code || item.project_code),
         name: asNullableString(item.name || item.project_name),
+        config_key: asNullableString(item.config_key),
         phase: asNullableString(item.phase),
         is_active: typeof item.is_active === "boolean" ? item.is_active : null,
       };
@@ -624,6 +626,7 @@ export async function fetchProjectReadMode(projectId: string): Promise<ReadResul
     id: asString(row.id || row.project_id || projectId),
     code: asNullableString(row.code || row.project_code),
     name: asNullableString(row.name || row.project_name),
+    config_key: asNullableString(row.config_key),
     phase: asNullableString(row.phase),
     is_active: typeof row.is_active === "boolean" ? row.is_active : null,
   };
