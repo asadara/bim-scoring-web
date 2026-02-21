@@ -74,6 +74,14 @@ export type ScoringPeriod = {
   version: number | null;
 };
 
+export type ProjectQueueSummaryRecord = {
+  project: ProjectRecord;
+  active_period: ScoringPeriod | null;
+  period_status: PeriodStatus | null;
+  evidence_counts: Record<EvidenceStatus, number>;
+  total_evidence: number;
+};
+
 export type IndicatorRecord = {
   id: string;
   code: string;
@@ -592,6 +600,86 @@ export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[
 export async function fetchProjects(): Promise<ProjectRecord[]> {
   const result = await fetchProjectsReadMode();
   return result.data;
+}
+
+export async function fetchProjectQueueSummaryReadMode(): Promise<ReadResult<ProjectQueueSummaryRecord[]>> {
+  const response = await safeFetchJson<unknown>(buildApiUrl("/projects/queue-summary"));
+  if (!response.ok) {
+    return backendReadResult([], toSafeErrorMessage(response));
+  }
+
+  const unwrapped = unwrapPayload(response.data);
+  if (!unwrapped.ok) {
+    return backendReadResult([], unwrapped.error);
+  }
+
+  const rows = Array.isArray(unwrapped.data) ? unwrapped.data : [];
+  const mapped = rows.map((row) => {
+    const item = row as Record<string, unknown>;
+    const projectRaw = (item.project && typeof item.project === "object")
+      ? (item.project as Record<string, unknown>)
+      : {};
+    const activePeriodRaw = (item.active_period && typeof item.active_period === "object")
+      ? (item.active_period as Record<string, unknown>)
+      : null;
+    const countsRaw = (item.evidence_counts && typeof item.evidence_counts === "object")
+      ? (item.evidence_counts as Record<string, unknown>)
+      : {};
+
+    const project: ProjectRecord = {
+      id: asString(projectRaw.id || projectRaw.project_id),
+      code: asNullableString(projectRaw.code || projectRaw.project_code),
+      name: asNullableString(projectRaw.name || projectRaw.project_name),
+      config_key: asNullableString(projectRaw.config_key),
+      phase: asNullableString(projectRaw.phase),
+      is_active: typeof projectRaw.is_active === "boolean" ? projectRaw.is_active : null,
+    };
+
+    const active_period: ScoringPeriod | null = activePeriodRaw
+      ? {
+        id: asString(activePeriodRaw.id || activePeriodRaw.period_id),
+        project_id: asNullableString(activePeriodRaw.project_id || project.id),
+        year: asNumber(activePeriodRaw.year),
+        week: asNumber(activePeriodRaw.week),
+        start_date: asNullableString(activePeriodRaw.start_date),
+        end_date: asNullableString(activePeriodRaw.end_date),
+        status: resolvePeriodStatus(activePeriodRaw),
+        version: asNumber(activePeriodRaw.version),
+      }
+      : null;
+
+    const evidence_counts: Record<EvidenceStatus, number> = {
+      DRAFT: Math.max(0, asNumber(countsRaw.DRAFT) || 0),
+      SUBMITTED: Math.max(0, asNumber(countsRaw.SUBMITTED) || 0),
+      NEEDS_REVISION: Math.max(0, asNumber(countsRaw.NEEDS_REVISION) || 0),
+    };
+
+    if (project.id) {
+      rememberPrototypeProjectMetaInStore({
+        project_id: project.id,
+        project_name: project.name,
+        project_code: project.code,
+      });
+    }
+    if (project.id && active_period?.id) {
+      const label = `${active_period.year ?? NA_TEXT} W${active_period.week ?? NA_TEXT}`;
+      rememberPrototypePeriodMetaInStore({
+        project_id: project.id,
+        period_id: active_period.id,
+        period_label: label,
+      });
+    }
+
+    return {
+      project,
+      active_period: active_period?.id ? active_period : null,
+      period_status: normalizePeriodStatusModel(item.period_status) || active_period?.status || null,
+      evidence_counts,
+      total_evidence: Math.max(0, asNumber(item.total_evidence) || 0),
+    } satisfies ProjectQueueSummaryRecord;
+  }).filter((row) => row.project.id);
+
+  return backendReadResult(mapped, null);
 }
 
 export async function fetchProjectReadMode(projectId: string): Promise<ReadResult<ProjectRecord>> {

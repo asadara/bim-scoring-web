@@ -8,9 +8,11 @@ import {
   DataMode,
   NA_TEXT,
   ProjectRecord,
+  ProjectQueueSummaryRecord,
   ScoringPeriod,
   buildEvidenceCounts,
   fetchEvidenceListReadMode,
+  fetchProjectQueueSummaryReadMode,
   fetchProjectPeriodsReadMode,
   fetchProjectsReadMode,
   formatPeriodLabel,
@@ -75,15 +77,79 @@ export default function ProjectsIndexPage() {
     return scopedIds[0] || null;
   }, [credential.role, credential.scoped_project_ids]);
 
+  const sortQueueRows = (items: ProjectQueueRow[]): ProjectQueueRow[] => {
+    const out = [...items];
+    out.sort((a, b) => {
+      if (credential.role === "role1" && scopedProjectId) {
+        const aOwned = a.project.id === scopedProjectId ? 0 : 1;
+        const bOwned = b.project.id === scopedProjectId ? 0 : 1;
+        if (aOwned !== bOwned) return aOwned - bOwned;
+      }
+      if (a.evidenceCounts.NEEDS_REVISION !== b.evidenceCounts.NEEDS_REVISION) {
+        return b.evidenceCounts.NEEDS_REVISION - a.evidenceCounts.NEEDS_REVISION;
+      }
+      if (a.evidenceCounts.DRAFT !== b.evidenceCounts.DRAFT) {
+        return b.evidenceCounts.DRAFT - a.evidenceCounts.DRAFT;
+      }
+      return String(a.project.name || a.project.code || a.project.id).localeCompare(
+        String(b.project.name || b.project.code || b.project.id)
+      );
+    });
+    return out;
+  };
+
+  const toQueueRowFromSummary = (
+    item: ProjectQueueSummaryRecord,
+    mode: DataMode,
+    backendMessage: string | null
+  ): ProjectQueueRow => {
+    const periodStatus = resolvePeriodStatusLabelWithPrototype(
+      item.project.id,
+      item.active_period?.id ?? null,
+      item.period_status ?? item.active_period?.status ?? null
+    );
+    const base = {
+      activePeriod: item.active_period,
+      periodStatus,
+      evidenceCounts: item.evidence_counts,
+    };
+    return {
+      project: item.project,
+      activePeriod: item.active_period,
+      periodStatus,
+      evidenceCounts: item.evidence_counts,
+      totalEvidence: Math.max(0, item.total_evidence || 0),
+      nextAction: toNextAction(base),
+      readinessLabel: toReadinessLabel(base),
+      dataMode: mode,
+      backendMessage,
+    };
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
+        const queueSummaryResult = await fetchProjectQueueSummaryReadMode();
+        if (queueSummaryResult.backend_message === null) {
+          const queueRows = sortQueueRows(
+            queueSummaryResult.data.map((item) =>
+              toQueueRowFromSummary(item, queueSummaryResult.mode, queueSummaryResult.backend_message)
+            )
+          );
+          if (!mounted) return;
+          setRows(queueRows);
+          setDataMode(queueSummaryResult.mode);
+          setBackendMessage(queueSummaryResult.backend_message);
+          setError(null);
+          return;
+        }
+
         const projectsResult = await fetchProjectsReadMode();
         const projectRows = projectsResult.data;
 
-        const queueRows = await Promise.all(
+        const fallbackRows = await Promise.all(
           projectRows.map(async (project) => {
             const periodsResult = await fetchProjectPeriodsReadMode(project.id);
             const activePeriod = selectActivePeriod(periodsResult.data);
@@ -126,22 +192,7 @@ export default function ProjectsIndexPage() {
         );
 
         if (!mounted) return;
-        queueRows.sort((a, b) => {
-          if (credential.role === "role1" && scopedProjectId) {
-            const aOwned = a.project.id === scopedProjectId ? 0 : 1;
-            const bOwned = b.project.id === scopedProjectId ? 0 : 1;
-            if (aOwned !== bOwned) return aOwned - bOwned;
-          }
-          if (a.evidenceCounts.NEEDS_REVISION !== b.evidenceCounts.NEEDS_REVISION) {
-            return b.evidenceCounts.NEEDS_REVISION - a.evidenceCounts.NEEDS_REVISION;
-          }
-          if (a.evidenceCounts.DRAFT !== b.evidenceCounts.DRAFT) {
-            return b.evidenceCounts.DRAFT - a.evidenceCounts.DRAFT;
-          }
-          return String(a.project.name || a.project.code || a.project.id).localeCompare(
-            String(b.project.name || b.project.code || b.project.id)
-          );
-        });
+        const queueRows = sortQueueRows(fallbackRows);
 
         setRows(queueRows);
         setDataMode(
