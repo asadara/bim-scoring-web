@@ -900,15 +900,23 @@ export async function fetchEvidenceListReadMode(
   }
 
   const periodKey = normalizePrototypePeriodId(periodId);
+  if (!periodKey || periodKey === UNKNOWN_ACTIVE_PERIOD_KEY) {
+    return {
+      data: [],
+      mode: "backend",
+      backend_message: null,
+    };
+  }
 
-  const query = periodKey ? `?period_id=${encodeURIComponent(periodKey)}` : "";
+  const periodQuery = `?period_id=${encodeURIComponent(periodKey)}`;
+  const projectQuery = `?project_id=${encodeURIComponent(projectId)}`;
   const candidates = [
-    buildApiUrl(`/periods/${encodeURIComponent(periodKey)}/evidences`),
-    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/periods/${encodeURIComponent(periodKey)}/evidence`),
+    buildApiUrl(`/periods/${encodeURIComponent(periodKey)}/evidences${projectQuery}`),
     buildApiUrl(
       `/projects/${encodeURIComponent(projectId)}/periods/${encodeURIComponent(periodKey)}/indicator-evidence`
     ),
-    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/evidence${query}`),
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/periods/${encodeURIComponent(periodKey)}/evidence`),
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/evidence${periodQuery}`),
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/evidence`),
   ];
 
@@ -927,18 +935,24 @@ export async function fetchEvidenceListReadMode(
 
     const payload = unwrapped.data;
     let mappedRows: LocalEvidenceItem[] = [];
+    let recognizedShape = false;
     if (Array.isArray(payload)) {
+      recognizedShape = true;
       mappedRows = mapFlatEvidenceRows(payload, { projectId, periodId: periodKey });
     } else {
+      const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+      const embeddedData = Array.isArray(root.data) ? root.data : [];
+      if (embeddedData.length > 0 || Object.prototype.hasOwnProperty.call(root, "data")) {
+        recognizedShape = true;
+      }
+
       mappedRows = mapIndicatorEvidencePayload(payload, { projectId, periodId: periodKey });
       if (mappedRows.length === 0) {
-        const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
-        const embeddedData = Array.isArray(root.data) ? root.data : [];
         mappedRows = mapFlatEvidenceRows(embeddedData, { projectId, periodId: periodKey });
       }
     }
 
-    if (mappedRows.length === 0) continue;
+    if (!recognizedShape) continue;
     return {
       data: mappedRows.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
       mode: "backend",

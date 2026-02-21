@@ -780,6 +780,7 @@ a {
   font-weight: 700;
   text-decoration: none;
   display: inline-block;
+  cursor: pointer;
 }
 
 .primary-cta[aria-disabled="true"],
@@ -798,6 +799,7 @@ a {
   font-weight: 700;
   text-decoration: none;
   display: inline-block;
+  cursor: pointer;
 }
 
 .secondary-cta:hover,

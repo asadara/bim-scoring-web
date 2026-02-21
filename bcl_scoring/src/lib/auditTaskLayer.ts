@@ -130,11 +130,7 @@ async function fetchBackendSnapshots(): Promise<{
   mode: DataMode;
   backend_message: string | null;
 }> {
-  const candidates = [
-    buildApiUrl("/summary_snapshots"),
-    buildApiUrl("/summary-snapshots"),
-    buildApiUrl("/snapshots"),
-  ];
+  const candidates = [buildApiUrl("/summary_snapshots")];
 
   let lastMessage: string | null = null;
   for (const url of candidates) {
@@ -150,11 +146,20 @@ async function fetchBackendSnapshots(): Promise<{
       continue;
     }
 
-    const rows = Array.isArray(unwrapped.data)
-      ? (unwrapped.data as unknown[])
-      : Array.isArray((unwrapped.data as Record<string, unknown>)?.data)
-        ? (((unwrapped.data as Record<string, unknown>).data || []) as unknown[])
-        : [];
+    const payload = unwrapped.data;
+    const payloadObject =
+      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+    const rows = Array.isArray(payload)
+      ? (payload as unknown[])
+      : Array.isArray(payloadObject?.data)
+        ? ((payloadObject.data || []) as unknown[])
+        : null;
+
+    // If endpoint responded with unknown shape, try next candidate (if any).
+    if (!rows) {
+      lastMessage = "Snapshot data endpoint returned invalid payload";
+      continue;
+    }
 
     const mapped = rows
       .map((entry) => {
@@ -167,11 +172,6 @@ async function fetchBackendSnapshots(): Promise<{
         snapshot,
       }))
       .sort((a, b) => String(b.snapshot.approved_at).localeCompare(String(a.snapshot.approved_at)));
-
-    if (mapped.length === 0) {
-      lastMessage = "Snapshot data endpoint returned empty payload";
-      continue;
-    }
 
     return {
       data: mapped,
