@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
 import QuickAccessNav from "@/components/QuickAccessNav";
@@ -18,7 +17,7 @@ type AuditorLayoutProps = {
 };
 
 export default function AuditorLayout(props: AuditorLayoutProps) {
-  const { title, subtitle, projectLabel, periodLabel, snapshotId, backendMode, backendMessage, children } = props;
+  const { title, subtitle, projectLabel, periodLabel, snapshotId, backendMode, children } = props;
   const connectionLabel =
     backendMode === "backend"
       ? "Connected (live data)"
@@ -31,12 +30,6 @@ export default function AuditorLayout(props: AuditorLayoutProps) {
     { label: "Period", value: periodLabel || NA_TEXT },
     { label: "Mode", value: "Read-only Auditor View" },
   ];
-  if (backendMode) {
-    contextItems.push({
-      label: "Backend",
-      value: <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />,
-    });
-  }
 
   return (
     <main className="task-shell page-corporate-shell">

@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
 import QuickAccessNav from "@/components/QuickAccessNav";
@@ -27,7 +26,6 @@ export default function Role1Layout(props: Role1LayoutProps) {
     activePeriod,
     periodStatusLabel,
     backendMode,
-    backendMessage,
     children,
   } = props;
   const periodChipClass =
@@ -48,12 +46,6 @@ export default function Role1Layout(props: Role1LayoutProps) {
     { label: "Active period", value: formatPeriodLabel(activePeriod) },
     { label: "Period status", value: periodStatusLabel || NA_TEXT },
   ];
-  if (backendMode) {
-    contextItems.push({
-      label: "Backend",
-      value: <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />,
-    });
-  }
 
   return (
     <main className="task-shell page-corporate-shell">

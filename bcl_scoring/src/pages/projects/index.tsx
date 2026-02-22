@@ -2,7 +2,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
 import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
@@ -269,15 +268,16 @@ export default function ProjectsIndexPage() {
     return firstRow.project.name || firstRow.project.code || firstRow.project.id;
   }, [credential.role, rows, scopedProjectId]);
   const headerTitle = role1WorkspaceLabel ? `Projects - ${role1WorkspaceLabel}` : "Projects";
-  const connectionLabel = dataMode === "backend" ? "Connected (live data)" : "Read mode fallback";
+  const connectionLabel =
+    dataMode === "backend"
+      ? "Connected (live data)"
+      : backendMessage
+        ? "Read mode fallback"
+        : "Read mode fallback";
   const contextItems = [
     { label: "Workspace scope", value: role1WorkspaceLabel || "All workspaces" },
     { label: "Need action", value: String(projectsNeedAction) },
     { label: "Submitted evidence", value: String(totalSubmitted) },
-    {
-      label: "Backend",
-      value: <BackendStatusBanner mode={dataMode} message={backendMessage} variant="compact" />,
-    },
   ];
   const openProjectTask = (targetProjectId: string) => {
     void router.push(`/projects/${targetProjectId}`);

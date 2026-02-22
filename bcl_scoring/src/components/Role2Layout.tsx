@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
 import QuickAccessNav from "@/components/QuickAccessNav";
@@ -37,7 +36,6 @@ export default function Role2Layout(props: Role2LayoutProps) {
     projectLabel,
     activePeriodLabel,
     backendMode,
-    backendMessage,
     children,
   } = props;
   const periodText = periodStatusLabel || NA_TEXT;
@@ -59,12 +57,6 @@ export default function Role2Layout(props: Role2LayoutProps) {
     { label: "Active period", value: activePeriodLabel || formatPeriodLabel(activePeriod || null) },
     { label: "Period status", value: periodText },
   ];
-  if (backendMode) {
-    contextItems.push({
-      label: "Backend",
-      value: <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />,
-    });
-  }
 
   return (
     <main className="task-shell page-corporate-shell">
