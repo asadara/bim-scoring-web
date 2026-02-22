@@ -975,6 +975,13 @@ a {
   cursor: pointer;
 }
 
+.primary-cta:hover,
+.primary-cta:focus-visible {
+  border-color: var(--task-control-border-hover);
+  background: var(--task-control-bg-hover);
+  color: var(--task-control-ink);
+}
+
 .primary-cta[aria-disabled="true"],
 .primary-cta:disabled {
   cursor: not-allowed;
@@ -1366,6 +1373,15 @@ a {
   border-color: transparent;
 }
 
+.wizard-actions button.action-primary:hover,
+.wizard-actions a.action-primary:hover,
+.wizard-actions button.action-primary:focus-visible,
+.wizard-actions a.action-primary:focus-visible {
+  background: var(--task-control-bg-hover);
+  border-color: var(--task-control-border-hover);
+  color: var(--task-control-ink);
+}
+
 .wizard-actions button:disabled {
   cursor: not-allowed;
   opacity: 1;
@@ -1723,8 +1739,9 @@ table td.table-col-long {
 
 .admin-control-panel button.action-primary:hover:not(:disabled),
 .admin-control-panel button.action-primary:focus-visible:not(:disabled) {
-  filter: brightness(1.08);
-  color: var(--task-primary-ink);
+  border-color: var(--task-control-border-hover);
+  background: linear-gradient(180deg, var(--task-control-bg-hover) 0%, var(--task-control-bg-hover) 100%);
+  color: var(--task-control-ink);
 }
 
 .admin-control-panel button.action-danger {
