@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import BackendStatusBanner from "@/components/BackendStatusBanner";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 
@@ -10,11 +11,23 @@ type ApproverLayoutProps = {
   projectName?: string | null;
   periodLabel?: string | null;
   periodStatusLabel?: string | null;
+  backendMode?: "backend" | "prototype";
+  backendMessage?: string | null;
   children: ReactNode;
 };
 
 export default function ApproverLayout(props: ApproverLayoutProps) {
-  const { title, subtitle, projectId, projectName, periodLabel, periodStatusLabel, children } = props;
+  const {
+    title,
+    subtitle,
+    projectId,
+    projectName,
+    periodLabel,
+    periodStatusLabel,
+    backendMode,
+    backendMessage,
+    children,
+  } = props;
   const periodText = periodStatusLabel || NA_TEXT;
   const periodChipClass =
     periodText === "LOCKED"
@@ -51,6 +64,12 @@ export default function ApproverLayout(props: ApproverLayoutProps) {
                 <span>Period status</span>
                 <strong>{periodText}</strong>
               </div>
+              {backendMode ? (
+                <div className="context-card role-context-card">
+                  <span>Backend</span>
+                  <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
+                </div>
+              ) : null}
             </div>
           </aside>
         </div>

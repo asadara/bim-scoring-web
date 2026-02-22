@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import { DataMode } from "@/lib/role1TaskLayer";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 import {
@@ -21,6 +22,7 @@ type ApproverInsightRow = {
 };
 
 export default function ApproverHomePage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ApproverProjectRow[]>([]);
@@ -174,6 +176,9 @@ export default function ApproverHomePage() {
     () => insightRows.find((row) => row.readinessLabel === "Blocked")?.row.project.id || null,
     [insightRows]
   );
+  const openProjectApproval = (targetProjectId: string) => {
+    void router.push(`/approve/projects/${targetProjectId}`);
+  };
 
   return (
     <ApproverLayout
@@ -182,9 +187,9 @@ export default function ApproverHomePage() {
       projectName={headerProjectLabel}
       periodLabel={headerPeriodLabel}
       periodStatusLabel={headerPeriodStatus}
+      backendMode={dataMode}
+      backendMessage={backendMessage}
     >
-      <BackendStatusBanner mode={dataMode} message={backendMessage} />
-
       <section className="task-grid-3" aria-label="Approver operational summary">
         {firstProjectId ? (
           <Link className="summary-card summary-card-action" href={`/approve/projects/${firstProjectId}`}>
@@ -242,10 +247,17 @@ export default function ApproverHomePage() {
       </section>
 
       <section className="task-panel">
-        <p className="inline-note">
-          Mulai setelah review selesai -&gt; approve/reject period dengan reason.
-        </p>
-        <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="role3-home-approval-info"
+            label="Informasi alur approval Role 3"
+            lines={[
+              "BIM Manager memproses approve/reject period setelah review evidence selesai.",
+              "Review tidak mengubah skor dan bukan approval period.",
+              "Sumber data approval/summary: database backend.",
+            ]}
+          />
+        </div>
         {loading ? <p>Loading...</p> : null}
         {error ? <p className="error-box">{error}</p> : null}
 
@@ -263,12 +275,26 @@ export default function ApproverHomePage() {
                   <th>Gate Evidence</th>
                   <th>Score</th>
                   <th>Approval Readiness</th>
-                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {insightRows.map((insight) => (
-                  <tr key={insight.row.project.id}>
+                  <tr
+                    key={insight.row.project.id}
+                    className="table-row-clickable"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => openProjectApproval(insight.row.project.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openProjectApproval(insight.row.project.id);
+                      }
+                    }}
+                    aria-label={`Open approval context for ${
+                      insight.row.project.name || insight.row.project.code || insight.row.project.id
+                    }`}
+                  >
                     <td>
                       <strong>{insight.row.project.name || insight.row.project.code || NA_TEXT}</strong>
                       <br />
@@ -289,13 +315,6 @@ export default function ApproverHomePage() {
                       <strong>{insight.readinessLabel}</strong>
                       <br />
                       <small>{insight.readinessNote}</small>
-                    </td>
-                    <td>
-                      <div className="item-actions">
-                        <Link className="revisi" href={`/approve/projects/${insight.row.project.id}`}>
-                          Buka Approval
-                        </Link>
-                      </div>
                     </td>
                   </tr>
                 ))}

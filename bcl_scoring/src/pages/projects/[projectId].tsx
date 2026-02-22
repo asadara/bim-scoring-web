@@ -2,7 +2,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
 import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
@@ -141,12 +140,10 @@ export default function ProjectRole1HomePage() {
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
+      backendMessage={context.backend_message || evidenceMessage}
     >
       {error ? <p className="error-box">{error}</p> : null}
-      <BackendStatusBanner
-        mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
-        message={context.backend_message || evidenceMessage}
-      />
 
       <section className="task-panel">
         <h2>Aksi Utama</h2>

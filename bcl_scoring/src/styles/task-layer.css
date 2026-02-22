@@ -830,6 +830,73 @@ a {
   margin-top: 10px;
 }
 
+.task-panel-inline-help {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.info-tooltip-trigger {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--task-control-border);
+  background: var(--task-control-bg);
+  color: var(--task-control-ink);
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  padding: 0;
+}
+
+.info-tooltip-trigger:hover,
+.info-tooltip-trigger:focus-visible {
+  border-color: var(--task-control-border-hover);
+  background: var(--task-control-bg-hover);
+}
+
+.info-tooltip-content {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 25;
+  width: min(420px, calc(100vw - 44px));
+  border: 1px solid var(--task-line);
+  border-radius: 10px;
+  background: var(--task-surface);
+  color: var(--task-ink);
+  padding: 10px;
+  box-shadow: 0 10px 24px var(--task-shadow);
+  display: grid;
+  gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+  pointer-events: none;
+}
+
+.info-tooltip-line {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.info-tooltip:hover .info-tooltip-content,
+.info-tooltip:focus-within .info-tooltip-content {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
 .action-feedback {
   position: fixed;
   top: calc(env(safe-area-inset-top) + 66px);
@@ -880,6 +947,33 @@ a {
 }
 
 .backend-status-banner.backend-status-neutral {
+  border-color: var(--task-line);
+  background: #f7fbf9;
+  color: var(--task-muted);
+}
+
+.backend-status-inline {
+  display: inline-block;
+  margin-top: 6px;
+  border: 1px solid #f2cf94;
+  background: var(--task-warn-bg);
+  color: var(--task-warn-ink);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.backend-status-inline.backend-status-ok {
+  border-color: #cce3d8;
+  background: var(--task-info-bg);
+  color: var(--task-info-ink);
+}
+
+.backend-status-inline.backend-status-neutral {
   border-color: var(--task-line);
   background: #f7fbf9;
   color: var(--task-muted);
@@ -1703,10 +1797,12 @@ table td.table-col-long {
 .admin-role2-proposal-table td:nth-child(8) { --cell-label: "Aksi"; }
 
 .admin-project-table td:nth-child(1) { --cell-label: "Workspace"; }
-.admin-project-table td:nth-child(2) { --cell-label: "Status"; }
-.admin-project-table td:nth-child(3) { --cell-label: "Dibuat"; }
-.admin-project-table td:nth-child(4) { --cell-label: "Diperbarui"; }
-.admin-project-table td:nth-child(5) { --cell-label: "Aksi"; }
+.admin-project-table td:nth-child(2) { --cell-label: "Code"; }
+.admin-project-table td:nth-child(3) { --cell-label: "Phase"; }
+.admin-project-table td:nth-child(4) { --cell-label: "Status"; }
+.admin-project-table td:nth-child(5) { --cell-label: "Dibuat"; }
+.admin-project-table td:nth-child(6) { --cell-label: "Diperbarui"; }
+.admin-project-table td:nth-child(7) { --cell-label: "Aksi"; }
 
 .admin-period-table td:nth-child(1) { --cell-label: "Periode"; }
 .admin-period-table td:nth-child(2) { --cell-label: "Rentang"; }
@@ -2047,7 +2143,7 @@ table td.table-col-long {
 
 .role-context-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
 }
 

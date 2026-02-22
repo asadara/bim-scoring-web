@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import {
   DataMode,
   LocalEvidenceWithReview,
@@ -118,19 +118,24 @@ export default function AwaitingReviewQueuePage() {
       projectName={formatProjectLabel(context.project)}
       periodLabel={context.period_label}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
+      backendMessage={context.backend_message || evidenceMessage}
     >
-      <BackendStatusBanner
-        mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
-        message={context.backend_message || evidenceMessage}
-      />
-
       <section className="task-panel">
         <div className="wizard-actions">
           <Link href={`/approve/projects/${projectId}`}>Kembali ke Period Approval Context</Link>
         </div>
-        <p className="inline-note">
-          Queue ini bersifat monitoring untuk BIM Manager. Proses review detail tetap dilakukan oleh BIM Coordinator HO.
-        </p>
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="role3-awaiting-review-info"
+            label="Informasi queue awaiting review Role 3"
+            lines={[
+              "Queue ini bersifat monitoring untuk BIM Manager.",
+              "Proses review detail tetap dilakukan oleh BIM Coordinator HO.",
+              "Sumber data queue: database backend.",
+            ]}
+          />
+        </div>
       </section>
 
       <section className="task-grid-3" aria-label="Awaiting review summary">

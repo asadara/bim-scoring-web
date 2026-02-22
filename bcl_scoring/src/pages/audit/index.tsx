@@ -1,13 +1,15 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import AuditorLayout from "@/components/AuditorLayout";
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import {
   AuditGovernanceEvent,
   AuditSnapshotView,
   fetchAdminAuditLogsReadMode,
   fetchAuditSnapshotsReadMode,
+  getSnapshotLockStatus,
 } from "@/lib/auditTaskLayer";
 import { toUserFacingErrorMessage } from "@/lib/http";
 import {
@@ -94,7 +96,15 @@ function formatEntityLabel(entityType: string, entityId: string | null): string 
   return shortId ? `${entity} (${shortId})` : entity;
 }
 
+function resolveEventSnapshotId(event: AuditGovernanceEvent): string | null {
+  const entityType = event.entity_type.trim().toLowerCase();
+  if (entityType !== "snapshot") return null;
+  const entityId = (event.entity_id || "").trim();
+  return entityId || null;
+}
+
 export default function AuditHomePage() {
+  const router = useRouter();
   const credential = useCredential();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -327,38 +337,94 @@ export default function AuditHomePage() {
     } satisfies AuditGovernanceEvent));
   }, [events, snapshots]);
 
+  const openSnapshotDetail = (snapshotId: string) => {
+    void router.push(`/audit/snapshots/${encodeURIComponent(snapshotId)}`);
+  };
+
   return (
     <AuditorLayout
       title="Auditor View"
       subtitle="Snapshot list untuk pemeriksaan jejak proses Evidence -> Review -> Approval -> Snapshot."
       projectLabel="All projects (snapshot list)"
       periodLabel="All periods"
+      backendMode={dataMode}
+      backendMessage={backendMessage}
     >
-      <BackendStatusBanner mode={dataMode} message={backendMessage} />
-
       <section className="task-panel">
         <h2>Audit Coverage Summary</h2>
         <div className="task-grid-3">
-          <article className="summary-card">
-            <span>Projects in scope</span>
-            <strong>{snapshotMetrics.total_projects}</strong>
-          </article>
-          <article className="summary-card">
-            <span>Periods tracked</span>
-            <strong>{snapshotMetrics.total_periods}</strong>
-          </article>
-          <article className="summary-card">
-            <span>Periods locked</span>
-            <strong>{snapshotMetrics.locked_periods}</strong>
-          </article>
-          <article className="summary-card">
-            <span>Periods open</span>
-            <strong>{snapshotMetrics.open_periods}</strong>
-          </article>
-          <article className="summary-card">
-            <span>Snapshots available</span>
-            <strong>{snapshotMetrics.total_snapshots}</strong>
-          </article>
+          {snapshotMetrics.total_projects > 0 ? (
+            <a className="summary-card summary-card-action" href="#coverage-matrix">
+              <span>Projects in scope</span>
+              <strong>{snapshotMetrics.total_projects}</strong>
+              <small>Open project coverage matrix</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Projects in scope</span>
+              <strong>{snapshotMetrics.total_projects}</strong>
+            </article>
+          )}
+          {snapshotMetrics.total_periods > 0 ? (
+            <a className="summary-card summary-card-action" href="#coverage-matrix">
+              <span>Periods tracked</span>
+              <strong>{snapshotMetrics.total_periods}</strong>
+              <small>Trace period coverage by project</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Periods tracked</span>
+              <strong>{snapshotMetrics.total_periods}</strong>
+            </article>
+          )}
+          {snapshotMetrics.locked_periods > 0 ? (
+            <a className="summary-card summary-card-action" href="#coverage-matrix">
+              <span>Periods locked</span>
+              <strong>{snapshotMetrics.locked_periods}</strong>
+              <small>Review lock trace per project</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Periods locked</span>
+              <strong>{snapshotMetrics.locked_periods}</strong>
+            </article>
+          )}
+          {snapshotMetrics.open_periods > 0 ? (
+            <a className="summary-card summary-card-action" href="#coverage-matrix">
+              <span>Periods open</span>
+              <strong>{snapshotMetrics.open_periods}</strong>
+              <small>Inspect open governance state</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Periods open</span>
+              <strong>{snapshotMetrics.open_periods}</strong>
+            </article>
+          )}
+          {snapshotMetrics.total_snapshots > 0 ? (
+            <a className="summary-card summary-card-action" href="#snapshot-ledger">
+              <span>Snapshots available</span>
+              <strong>{snapshotMetrics.total_snapshots}</strong>
+              <small>Open snapshot trace ledger</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Snapshots available</span>
+              <strong>{snapshotMetrics.total_snapshots}</strong>
+            </article>
+          )}
+          {timelineEvents.length > 0 ? (
+            <a className="summary-card summary-card-action" href="#governance-events">
+              <span>Governance events</span>
+              <strong>{timelineEvents.length}</strong>
+              <small>Review recent audit actions</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Governance events</span>
+              <strong>{timelineEvents.length}</strong>
+            </article>
+          )}
           {snapshotMetrics.latest_snapshot_id ? (
             <Link
               className="summary-card summary-card-action"
@@ -378,10 +444,19 @@ export default function AuditHomePage() {
         </div>
       </section>
 
-      <section className="task-panel">
-        <p className="inline-note">
-          Mulai dari snapshot list -&gt; baca narrative trail &amp; reference ISO mapping.
-        </p>
+      <section className="task-panel" id="snapshot-ledger">
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="audit-ledger-info"
+            label="Informasi trace ledger audit"
+            lines={[
+              "Mulai dari snapshot ledger untuk menelusuri project, period, approver, dan waktu keputusan.",
+              "Klik baris snapshot untuk membuka detail immutable trail.",
+              "Data audit bersumber dari backend read-only records.",
+            ]}
+          />
+        </div>
+        <h2>Snapshot Trace Ledger</h2>
         <div className="field-grid admin-filter-row audit-filter-grid">
           <label>
             Workspace Project
@@ -419,43 +494,62 @@ export default function AuditHomePage() {
         ) : null}
 
         {!loading && !error && snapshots.length > 0 ? (
-          <div className="evidence-list">
-            {visibleSnapshots.length === 0 ? (
-              <div className="empty-state">
-                <p>Tidak ada snapshot yang cocok dengan filter saat ini.</p>
-              </div>
-            ) : null}
-            {visibleSnapshots.map((entry) => {
-              const periodKey = `${entry.snapshot.project_id}|${entry.snapshot.period_id || ""}`;
-              const periodLabel =
-                (entry.snapshot.period_id
-                  ? periodLabelByProjectPeriodId.get(periodKey)
-                  : null) ||
-                entry.snapshot.period_id ||
-                NA_TEXT;
-
-              return (
-              <article className="evidence-item" key={entry.snapshot_id}>
-                <p>
-                  <strong>{projectNameById.get(entry.snapshot.project_id) || entry.snapshot.project_id || NA_TEXT}</strong>
-                </p>
-                <p>Project ID: {entry.snapshot.project_id || NA_TEXT}</p>
-                <p>Period: {periodLabel}</p>
-                <p>Approved at: {formatDateText(entry.snapshot.approved_at)}</p>
-                <p>Approved by: {entry.snapshot.approved_by || NA_TEXT}</p>
-                <div className="item-actions">
-                  <Link className="revisi" href={`/audit/snapshots/${encodeURIComponent(entry.snapshot_id)}`}>
-                    Open Snapshot
-                  </Link>
-                </div>
-              </article>
-            );
-            })}
+          <div className="admin-table-wrap">
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th>Snapshot ID</th>
+                  <th>Project</th>
+                  <th>Period</th>
+                  <th>Approved At</th>
+                  <th>Approved By</th>
+                  <th>Lock Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleSnapshots.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>Tidak ada snapshot yang cocok dengan filter saat ini.</td>
+                  </tr>
+                ) : (
+                  visibleSnapshots.map((entry) => {
+                    const periodKey = `${entry.snapshot.project_id}|${entry.snapshot.period_id || ""}`;
+                    const periodLabel =
+                      (entry.snapshot.period_id ? periodLabelByProjectPeriodId.get(periodKey) : null) ||
+                      entry.snapshot.period_id ||
+                      NA_TEXT;
+                    return (
+                      <tr
+                        key={entry.snapshot_id}
+                        className="table-row-clickable"
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => openSnapshotDetail(entry.snapshot_id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openSnapshotDetail(entry.snapshot_id);
+                          }
+                        }}
+                        aria-label={`Open snapshot ${entry.snapshot_id}`}
+                      >
+                        <td>{entry.snapshot_id || NA_TEXT}</td>
+                        <td>{projectNameById.get(entry.snapshot.project_id) || entry.snapshot.project_id || NA_TEXT}</td>
+                        <td>{periodLabel}</td>
+                        <td>{formatDateText(entry.snapshot.approved_at)}</td>
+                        <td>{entry.snapshot.approved_by || NA_TEXT}</td>
+                        <td>{getSnapshotLockStatus(entry.snapshot)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         ) : null}
       </section>
 
-      <section className="task-panel">
+      <section className="task-panel" id="coverage-matrix">
         <h2>Project Coverage Matrix</h2>
         <div className="admin-table-wrap">
           <table className="audit-table responsive-stack-table audit-coverage-table">
@@ -475,30 +569,42 @@ export default function AuditHomePage() {
                   <td colSpan={5}>No project coverage available.</td>
                 </tr>
               ) : (
-                coverageRows.map((row) => (
-                  <tr key={row.project_id}>
-                    <td>{row.project_label}</td>
-                    <td>{row.period_count}</td>
-                    <td>{row.locked_period_count}</td>
-                    <td>{row.snapshot_count}</td>
-                    <td>
-                      {row.latest_snapshot_id ? (
-                        <Link href={`/audit/snapshots/${encodeURIComponent(row.latest_snapshot_id)}`}>
-                          {formatDateText(row.latest_snapshot_at)}
-                        </Link>
-                      ) : (
-                        formatDateText(row.latest_snapshot_at)
-                      )}
-                    </td>
-                  </tr>
-                ))
+                coverageRows.map((row) => {
+                  const isClickable = Boolean(row.latest_snapshot_id);
+                  return (
+                    <tr
+                      key={row.project_id}
+                      className={isClickable ? "table-row-clickable" : undefined}
+                      role={isClickable ? "link" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      onClick={isClickable ? () => openSnapshotDetail(String(row.latest_snapshot_id)) : undefined}
+                      onKeyDown={
+                        isClickable
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openSnapshotDetail(String(row.latest_snapshot_id));
+                              }
+                            }
+                          : undefined
+                      }
+                      aria-label={isClickable ? `Open latest snapshot for ${row.project_label}` : undefined}
+                    >
+                      <td>{row.project_label}</td>
+                      <td>{row.period_count}</td>
+                      <td>{row.locked_period_count}</td>
+                      <td>{row.snapshot_count}</td>
+                      <td>{formatDateText(row.latest_snapshot_at)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </section>
 
-      <section className="task-panel">
+      <section className="task-panel" id="governance-events">
         <h2>Recent Governance Events</h2>
         <div className="admin-table-wrap">
           <table className="audit-table responsive-stack-table audit-events-table">
@@ -517,18 +623,39 @@ export default function AuditHomePage() {
                   <td colSpan={4}>No governance events yet.</td>
                 </tr>
               ) : (
-                timelineEvents.slice(0, 20).map((event) => (
-                  <tr key={event.id}>
-                    <td>{formatDateText(event.created_at)}</td>
-                    <td>
-                      {formatActionLabel(event.action)}
-                      <br />
-                      <small>{event.action}</small>
-                    </td>
-                    <td>{formatEntityLabel(event.entity_type, event.entity_id)}</td>
-                    <td>{event.actor_id || NA_TEXT}</td>
-                  </tr>
-                ))
+                timelineEvents.slice(0, 20).map((event) => {
+                  const snapshotId = resolveEventSnapshotId(event);
+                  const isClickable = Boolean(snapshotId);
+                  return (
+                    <tr
+                      key={event.id}
+                      className={isClickable ? "table-row-clickable" : undefined}
+                      role={isClickable ? "link" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      onClick={isClickable ? () => openSnapshotDetail(String(snapshotId)) : undefined}
+                      onKeyDown={
+                        isClickable
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                openSnapshotDetail(String(snapshotId));
+                              }
+                            }
+                          : undefined
+                      }
+                      aria-label={isClickable ? `Open snapshot ${snapshotId} from event trace` : undefined}
+                    >
+                      <td>{formatDateText(event.created_at)}</td>
+                      <td>
+                        {formatActionLabel(event.action)}
+                        <br />
+                        <small>{event.action}</small>
+                      </td>
+                      <td>{formatEntityLabel(event.entity_type, event.entity_id)}</td>
+                      <td>{event.actor_id || NA_TEXT}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

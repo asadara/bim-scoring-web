@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import BackendStatusBanner from "@/components/BackendStatusBanner";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 
@@ -9,11 +10,13 @@ type AuditorLayoutProps = {
   projectLabel?: string | null;
   periodLabel?: string | null;
   snapshotId?: string | null;
+  backendMode?: "backend" | "prototype";
+  backendMessage?: string | null;
   children: ReactNode;
 };
 
 export default function AuditorLayout(props: AuditorLayoutProps) {
-  const { title, subtitle, projectLabel, periodLabel, snapshotId, children } = props;
+  const { title, subtitle, projectLabel, periodLabel, snapshotId, backendMode, backendMessage, children } = props;
 
   return (
     <main className="task-shell">
@@ -35,6 +38,12 @@ export default function AuditorLayout(props: AuditorLayoutProps) {
             <span>Mode</span>
             <strong>Read-only Auditor View</strong>
           </div>
+          {backendMode ? (
+            <div className="context-card">
+              <span>Backend</span>
+              <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
+            </div>
+          ) : null}
         </div>
       </header>
 

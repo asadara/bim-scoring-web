@@ -2,7 +2,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { IndicatorRecord, NA_TEXT, fetchRole1Context } from "@/lib/role1TaskLayer";
 
@@ -106,9 +105,10 @@ export default function ProjectIndicatorsPage() {
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode}
+      backendMessage={context.backend_message}
     >
       {error ? <p className="error-box">{error}</p> : null}
-      <BackendStatusBanner mode={context.data_mode} message={context.backend_message} />
 
       <section className="task-panel">
         <h2>Indicator Mapping</h2>

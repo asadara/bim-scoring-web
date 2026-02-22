@@ -9,6 +9,7 @@ export type AdminProject = {
   id: string;
   code: string | null;
   name: string | null;
+  phase: string | null;
   config_key: string | null;
   is_active: boolean | null;
   created_at?: string | null;
@@ -243,7 +244,7 @@ export async function listAdminProjects(session: AdminSession): Promise<AdminPro
 
 export async function createAdminProject(
   session: AdminSession,
-  input: { code?: string; name: string; config_key?: string; is_active?: boolean }
+  input: { code?: string; name: string; phase?: string; config_key?: string; is_active?: boolean }
 ): Promise<AdminProject> {
   return await requestAdmin<AdminProject>(session, "/admin/projects", {
     method: "POST",
@@ -254,7 +255,13 @@ export async function createAdminProject(
 export async function updateAdminProject(
   session: AdminSession,
   projectId: string,
-  patch: { code?: string | null; name?: string | null; config_key?: string | null; is_active?: boolean | null }
+  patch: {
+    code?: string | null;
+    name?: string | null;
+    phase?: string | null;
+    config_key?: string | null;
+    is_active?: boolean | null;
+  }
 ): Promise<AdminProject> {
   return await requestAdmin<AdminProject>(session, `/admin/projects/${encodeURIComponent(projectId)}`, {
     method: "PUT",

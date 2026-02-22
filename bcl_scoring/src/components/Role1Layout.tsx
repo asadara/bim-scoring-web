@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import BackendStatusBanner from "@/components/BackendStatusBanner";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT, ProjectRecord, ScoringPeriod, formatPeriodLabel, formatProjectLabel } from "@/lib/role1TaskLayer";
 
@@ -10,6 +11,8 @@ type Role1LayoutProps = {
   project: ProjectRecord | null;
   activePeriod: ScoringPeriod | null;
   periodStatusLabel: string;
+  backendMode?: "backend" | "prototype";
+  backendMessage?: string | null;
   children: ReactNode;
 };
 
@@ -21,6 +24,8 @@ export default function Role1Layout(props: Role1LayoutProps) {
     project,
     activePeriod,
     periodStatusLabel,
+    backendMode,
+    backendMessage,
     children,
   } = props;
   const periodChipClass =
@@ -58,6 +63,12 @@ export default function Role1Layout(props: Role1LayoutProps) {
                 <span>Period status</span>
                 <strong>{periodStatusLabel || NA_TEXT}</strong>
               </div>
+              {backendMode ? (
+                <div className="context-card role-context-card">
+                  <span>Backend</span>
+                  <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
+                </div>
+              ) : null}
             </div>
           </aside>
         </div>

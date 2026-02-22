@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import AuditorLayout from "@/components/AuditorLayout";
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import {
   AuditSnapshotView,
   buildAuditExportPayload,
@@ -271,10 +271,21 @@ export default function AuditSnapshotDetailPage() {
       projectLabel={formatProjectLabel(project || { id: snapshot.project_id, name: null, code: null, phase: null, is_active: null })}
       periodLabel={periodLabel}
       snapshotId={typeof snapshotId === "string" ? decodeURIComponent(snapshotId) : null}
+      backendMode={dataMode}
+      backendMessage={backendMessage}
     >
-      <BackendStatusBanner mode={dataMode} message={backendMessage} />
-
       <section className="task-panel">
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="audit-snapshot-header-info"
+            label="Informasi sumber data snapshot"
+            lines={[
+              "Snapshot merekam kondisi final period saat keputusan approval dijalankan.",
+              "Data snapshot bersifat read-only dan immutable untuk kebutuhan audit trail.",
+              "Sumber data snapshot: database backend.",
+            ]}
+          />
+        </div>
         <h2>Snapshot Header</h2>
         <p>Project: {project?.name || project?.code || snapshot.project_id || NA_TEXT}</p>
         <p>Project ID: {snapshot.project_id || NA_TEXT}</p>
@@ -284,7 +295,6 @@ export default function AuditSnapshotDetailPage() {
         <p>Approved at: {formatDateText(snapshot.approved_at)}</p>
         <p>Lock status: {getSnapshotLockStatus(snapshot)}</p>
         <p>Snapshot ID: {snapshotView.snapshot_id || NA_TEXT}</p>
-        <p className="inline-note">Snapshot source: backend database.</p>
       </section>
 
       <section className="task-panel">
@@ -308,26 +318,58 @@ export default function AuditSnapshotDetailPage() {
       <section className="task-panel">
         <h2>Evidence Review Counts</h2>
         <div className="task-grid-3">
-          <article className="summary-card">
-            <span>ACCEPTABLE</span>
-            <strong>{snapshot.evidence_counts.ACCEPTABLE}</strong>
-          </article>
-          <article className="summary-card">
-            <span>NEEDS REVISION</span>
-            <strong>{snapshot.evidence_counts.NEEDS_REVISION}</strong>
-          </article>
-          <article className="summary-card">
-            <span>REJECTED</span>
-            <strong>{snapshot.evidence_counts.REJECTED}</strong>
-          </article>
-          <article className="summary-card">
-            <span>Awaiting review</span>
-            <strong>{snapshot.evidence_counts.AWAITING_REVIEW}</strong>
-          </article>
+          {snapshot.evidence_counts.ACCEPTABLE > 0 ? (
+            <a className="summary-card summary-card-action" href="#narrative-audit-trail">
+              <span>ACCEPTABLE</span>
+              <strong>{snapshot.evidence_counts.ACCEPTABLE}</strong>
+              <small>Trace narrative chain</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>ACCEPTABLE</span>
+              <strong>{snapshot.evidence_counts.ACCEPTABLE}</strong>
+            </article>
+          )}
+          {snapshot.evidence_counts.NEEDS_REVISION > 0 ? (
+            <a className="summary-card summary-card-action" href="#narrative-audit-trail">
+              <span>NEEDS REVISION</span>
+              <strong>{snapshot.evidence_counts.NEEDS_REVISION}</strong>
+              <small>Trace narrative chain</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>NEEDS REVISION</span>
+              <strong>{snapshot.evidence_counts.NEEDS_REVISION}</strong>
+            </article>
+          )}
+          {snapshot.evidence_counts.REJECTED > 0 ? (
+            <a className="summary-card summary-card-action" href="#narrative-audit-trail">
+              <span>REJECTED</span>
+              <strong>{snapshot.evidence_counts.REJECTED}</strong>
+              <small>Trace narrative chain</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>REJECTED</span>
+              <strong>{snapshot.evidence_counts.REJECTED}</strong>
+            </article>
+          )}
+          {snapshot.evidence_counts.AWAITING_REVIEW > 0 ? (
+            <a className="summary-card summary-card-action" href="#narrative-audit-trail">
+              <span>Awaiting review</span>
+              <strong>{snapshot.evidence_counts.AWAITING_REVIEW}</strong>
+              <small>Trace narrative chain</small>
+            </a>
+          ) : (
+            <article className="summary-card">
+              <span>Awaiting review</span>
+              <strong>{snapshot.evidence_counts.AWAITING_REVIEW}</strong>
+            </article>
+          )}
         </div>
       </section>
 
-      <section className="task-panel">
+      <section className="task-panel" id="narrative-audit-trail">
         <h2>Narrative Audit Trail</h2>
         <ol className="audit-trail">
           <li>
@@ -370,7 +412,13 @@ export default function AuditSnapshotDetailPage() {
 
       <section className="task-panel">
         <h2>ISO 19650 Reference Mapping</h2>
-        <p className="inline-note">{ISO19650_REFERENCE_ONLY_LABEL}</p>
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="audit-iso-reference-info"
+            label="Informasi referensi ISO 19650"
+            lines={[ISO19650_REFERENCE_ONLY_LABEL]}
+          />
+        </div>
         <table className="audit-table">
           <thead>
             <tr>

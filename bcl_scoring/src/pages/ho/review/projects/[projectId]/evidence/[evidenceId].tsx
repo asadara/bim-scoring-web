@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import Role2Layout from "@/components/Role2Layout";
 import { canWriteRole2Review } from "@/lib/accessControl";
 import {
@@ -364,12 +364,21 @@ export default function HoEvidenceReviewPage() {
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode}
+      backendMessage={bannerHint || context.backend_message}
     >
-      <BackendStatusBanner mode={context.data_mode} message={bannerHint || context.backend_message} />
-
       <section className="task-panel">
-        <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
-        <p className="inline-note">Evidence review tersimpan ke backend.</p>
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="role2-evidence-review-info"
+            label="Informasi alur review Role 2"
+            lines={[
+              "BIM Coordinator HO memproses evidence SUBMITTED -> tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.",
+              "Review tidak mengubah skor dan bukan approval period.",
+              "Sumber data review: database backend.",
+            ]}
+          />
+        </div>
         {isLocked ? <p className="warning-box">LOCKED (read-only)</p> : null}
         {!canWrite ? (
           <p className="read-only-banner">

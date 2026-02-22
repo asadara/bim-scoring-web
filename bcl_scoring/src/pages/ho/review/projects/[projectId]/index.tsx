@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import Role2Layout from "@/components/Role2Layout";
 import { DataMode, NA_TEXT } from "@/lib/role1TaskLayer";
 import {
@@ -122,19 +122,25 @@ export default function HoProjectReviewPage() {
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
+      backendMessage={context.backend_message || evidenceMessage}
     >
-      <BackendStatusBanner
-        mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
-        message={context.backend_message || evidenceMessage}
-      />
-
       <section className="task-panel">
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="role2-project-review-info"
+            label="Informasi alur review Role 2"
+            lines={[
+              "BIM Coordinator HO memproses evidence SUBMITTED -> tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.",
+              "Review tidak mengubah skor dan bukan approval period.",
+              "Sumber data review: database backend.",
+            ]}
+          />
+        </div>
         <p>
           Period status: <span className={statusClass}>{context.period_status_label || NA_TEXT}</span>
         </p>
         {context.period_locked ? <p className="warning-box">LOCKED (read-only)</p> : null}
-        <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
-        <p className="inline-note">Review queue ditarik dari database backend.</p>
       </section>
 
       <section className="task-panel">

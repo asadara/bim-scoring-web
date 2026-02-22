@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import { canWriteRole3Approval } from "@/lib/accessControl";
 import { NA_TEXT, formatProjectLabel } from "@/lib/role1TaskLayer";
 import { ApproverProjectContext, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
@@ -118,9 +118,9 @@ export default function ProjectApprovalContextPage() {
       projectName={formatProjectLabel(context.project)}
       periodLabel={context.period_label}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode}
+      backendMessage={context.backend_message}
     >
-      <BackendStatusBanner mode={context.data_mode} message={context.backend_message} />
-
       <section className="task-panel">
         <div className="wizard-actions">
           <Link href="/approve">Kembali ke Daftar Project Approval</Link>
@@ -233,7 +233,17 @@ export default function ProjectApprovalContextPage() {
 
         {context.snapshots.length > 0 ? (
           <>
-            <p className="inline-note">Snapshot source: backend database.</p>
+            <div className="task-panel-inline-help">
+              <InfoTooltip
+                id="role3-project-snapshot-info"
+                label="Informasi snapshot approval Role 3"
+                lines={[
+                  "Snapshot terbentuk dari keputusan approval level period.",
+                  "Snapshot bersifat read-only sebagai jejak keputusan final.",
+                  "Sumber data snapshot: database backend.",
+                ]}
+              />
+            </div>
             <p>Snapshots: {context.snapshots.length}</p>
           </>
         ) : null}

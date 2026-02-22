@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import { canWriteRole3Approval } from "@/lib/accessControl";
 import {
   ApprovalDecision,
@@ -206,12 +206,22 @@ export default function ApprovalDecisionPage() {
       projectName={formatProjectLabel(contextValue.project)}
       periodLabel={contextValue.period_label}
       periodStatusLabel={contextValue.period_status_label}
+      backendMode={contextValue.data_mode}
+      backendMessage={bannerHint || contextValue.backend_message}
     >
-      <BackendStatusBanner mode={contextValue.data_mode} message={bannerHint || contextValue.backend_message} />
-
       <section className="task-panel">
         <p className="warning-box">Approval akan mengunci period dan membentuk rekam jejak final.</p>
-        <p className="inline-note">Snapshot source: backend database.</p>
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="role3-decision-snapshot-info"
+            label="Informasi keputusan approval Role 3"
+            lines={[
+              "Keputusan approval/reject diproses pada level period.",
+              "Jika APPROVE PERIOD lolos gate, snapshot final akan direkam.",
+              "Sumber data snapshot: database backend.",
+            ]}
+          />
+        </div>
         {approveBlockedByPolicy ? (
           <p className="warning-box">
             APPROVE PERIOD dinonaktifkan karena gating policy belum terpenuhi.

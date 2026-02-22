@@ -2,7 +2,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
@@ -569,8 +568,9 @@ export default function AddEvidencePage() {
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode}
+      backendMessage={bannerHint || context.backend_message}
     >
-      <BackendStatusBanner mode={context.data_mode} message={bannerHint || context.backend_message} />
       <section className="task-panel">
         <div className="stepper" role="list" aria-label="Add evidence steps">
           {STEP_LABELS.map((label, index) => (

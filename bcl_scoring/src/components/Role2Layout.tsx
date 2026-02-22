@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import BackendStatusBanner from "@/components/BackendStatusBanner";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import {
   NA_TEXT,
@@ -18,6 +19,8 @@ type Role2LayoutProps = {
   periodStatusLabel?: string;
   projectLabel?: string;
   activePeriodLabel?: string;
+  backendMode?: "backend" | "prototype";
+  backendMessage?: string | null;
   children: ReactNode;
 };
 
@@ -31,6 +34,8 @@ export default function Role2Layout(props: Role2LayoutProps) {
     periodStatusLabel,
     projectLabel,
     activePeriodLabel,
+    backendMode,
+    backendMessage,
     children,
   } = props;
   const periodText = periodStatusLabel || NA_TEXT;
@@ -69,6 +74,12 @@ export default function Role2Layout(props: Role2LayoutProps) {
                 <span>Period status</span>
                 <strong>{periodText}</strong>
               </div>
+              {backendMode ? (
+                <div className="context-card role-context-card">
+                  <span>Backend</span>
+                  <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
+                </div>
+              ) : null}
             </div>
           </aside>
         </div>

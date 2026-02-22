@@ -2,7 +2,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
 import {
@@ -217,11 +216,9 @@ export default function MyEvidenceListPage() {
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
+      backendMode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
+      backendMessage={context.backend_message || evidenceMessage}
     >
-      <BackendStatusBanner
-        mode={context.data_mode === "prototype" || evidenceMode === "prototype" ? "prototype" : "backend"}
-        message={context.backend_message || evidenceMessage}
-      />
       <section className="task-panel">
         <h2>Evidence Status Groups</h2>
         <p className="inline-note">Data evidence sinkron dari backend.</p>

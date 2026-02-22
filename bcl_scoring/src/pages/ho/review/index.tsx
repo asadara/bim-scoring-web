@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
-import BackendStatusBanner from "@/components/BackendStatusBanner";
+import InfoTooltip from "@/components/InfoTooltip";
 import Role2Layout from "@/components/Role2Layout";
 import {
   DataMode,
@@ -47,6 +48,7 @@ function resolveRecommendedAction(params: {
 }
 
 export default function HoReviewHomePage() {
+  const router = useRouter();
   const credential = useCredential();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +191,9 @@ export default function HoReviewHomePage() {
     if (statuses.length > 1) return "Mixed";
     return "Not synced";
   }, [loading, rows]);
+  const openProjectReview = (targetProjectId: string) => {
+    void router.push(`/ho/review/projects/${targetProjectId}`);
+  };
 
   return (
     <Role2Layout
@@ -199,9 +204,9 @@ export default function HoReviewHomePage() {
       activePeriodLabel={headerActivePeriodLabel}
       activePeriod={null}
       project={null}
+      backendMode={dataMode}
+      backendMessage={backendMessage}
     >
-      <BackendStatusBanner mode={dataMode} message={backendMessage} />
-
       <section className="task-grid-3" aria-label="HO review summary">
         {firstProjectId ? (
           <Link className="summary-card summary-card-action" href={`/ho/review/projects/${firstProjectId}`}>
@@ -264,11 +269,17 @@ export default function HoReviewHomePage() {
       </section>
 
       <section className="task-panel">
-        <p className="inline-note">
-          BIM Coordinator HO memproses evidence SUBMITTED -&gt; tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.
-        </p>
-        <p className="inline-note">Review tidak mengubah skor dan bukan approval period.</p>
-        <p className="inline-note">Sumber data review: database backend.</p>
+        <div className="task-panel-inline-help">
+          <InfoTooltip
+            id="role2-home-review-info"
+            label="Informasi alur review Role 2"
+            lines={[
+              "BIM Coordinator HO memproses evidence SUBMITTED -> tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.",
+              "Review tidak mengubah skor dan bukan approval period.",
+              "Sumber data review: database backend.",
+            ]}
+          />
+        </div>
 
         {loading ? <p>Loading...</p> : null}
         {error ? <p className="error-box">{error}</p> : null}
@@ -292,12 +303,24 @@ export default function HoReviewHomePage() {
                   <th>Active Period</th>
                   <th>Submitted Queue</th>
                   <th>Priority</th>
-                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.project.id}>
+                  <tr
+                    key={row.project.id}
+                    className="table-row-clickable"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => openProjectReview(row.project.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openProjectReview(row.project.id);
+                      }
+                    }}
+                    aria-label={`Open review queue for ${row.project.name || row.project.code || row.project.id}`}
+                  >
                     <td>
                       <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
                       <br />
@@ -317,13 +340,6 @@ export default function HoReviewHomePage() {
                       <strong>{row.queue_level}</strong>
                       <br />
                       <small>{row.recommended_action}</small>
-                    </td>
-                    <td>
-                      <div className="item-actions">
-                        <Link className="revisi" href={`/ho/review/projects/${row.project.id}`}>
-                          Review Evidence
-                        </Link>
-                      </div>
                     </td>
                   </tr>
                 ))}

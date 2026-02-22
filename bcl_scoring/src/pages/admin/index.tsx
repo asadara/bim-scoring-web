@@ -227,17 +227,23 @@ export default function AdminControlPanelPage() {
   const [showIndicatorCreateForm, setShowIndicatorCreateForm] = useState(false);
 
   const [projectForm, setProjectForm] = useState({
+    code: "",
     name: "",
+    phase: "",
     config_key: "",
   });
   const [editingProjectId, setEditingProjectId] = useState("");
   const [projectSettingForm, setProjectSettingForm] = useState<{
+    code: string;
     name: string;
+    phase: string;
     config_key: string;
     is_active: boolean;
     week_anchor: WeekAnchor;
   }>({
+    code: "",
     name: "",
+    phase: "",
     config_key: "",
     is_active: true,
     week_anchor: "MONDAY",
@@ -545,18 +551,22 @@ export default function AdminControlPanelPage() {
 
   async function handleCreateProject(event: FormEvent) {
     event.preventDefault();
+    const code = toNonEmptyString(projectForm.code);
     const name = toNonEmptyString(projectForm.name);
+    const phase = toNonEmptyString(projectForm.phase);
     if (!name) {
       setError("Nama project wajib diisi.");
       return;
     }
     await runAction(async () => {
       await createAdminProject(session, {
+        code: code || undefined,
         name,
+        phase: phase || undefined,
         config_key: toNonEmptyString(projectForm.config_key) || undefined,
         is_active: true,
       });
-      setProjectForm({ name: "", config_key: "" });
+      setProjectForm({ code: "", name: "", phase: "", config_key: "" });
       setShowProjectCreateForm(false);
       await reloadBase(session);
     }, "Workspace project berhasil dibuat.");
@@ -565,7 +575,9 @@ export default function AdminControlPanelPage() {
   function handleOpenProjectSettingEditor(project: AdminProject) {
     setEditingProjectId(project.id);
     setProjectSettingForm({
+      code: project.code || "",
       name: project.name || "",
+      phase: project.phase || "",
       config_key: project.config_key || "",
       is_active: project.is_active !== false,
       week_anchor: parseWeekAnchorFromConfigKey(project.config_key),
@@ -578,7 +590,9 @@ export default function AdminControlPanelPage() {
   function handleCloseProjectSettingEditor() {
     setEditingProjectId("");
     setProjectSettingForm({
+      code: "",
       name: "",
+      phase: "",
       config_key: "",
       is_active: true,
       week_anchor: "MONDAY",
@@ -588,7 +602,9 @@ export default function AdminControlPanelPage() {
   async function handleSaveProjectSetting(event: FormEvent) {
     event.preventDefault();
     const projectId = toNonEmptyString(editingProjectId);
+    const code = toNonEmptyString(projectSettingForm.code);
     const name = toNonEmptyString(projectSettingForm.name);
+    const phase = toNonEmptyString(projectSettingForm.phase);
     if (!projectId) {
       setError("Pilih workspace yang akan diubah.");
       return;
@@ -604,7 +620,9 @@ export default function AdminControlPanelPage() {
         projectSettingForm.week_anchor
       );
       await updateAdminProject(session, projectId, {
+        code,
         name,
+        phase,
         config_key: toNonEmptyString(nextConfigKey),
         is_active: projectSettingForm.is_active,
       });
@@ -1426,6 +1444,8 @@ export default function AdminControlPanelPage() {
             <thead>
               <tr>
                 <th scope="col">Nama Workspace</th>
+                <th scope="col">Code</th>
+                <th scope="col">Phase</th>
                 <th scope="col">Status</th>
                 <th scope="col">Dibuat</th>
                 <th scope="col">Diperbarui</th>
@@ -1435,12 +1455,14 @@ export default function AdminControlPanelPage() {
             <tbody>
               {projects.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Belum ada workspace project.</td>
+                  <td colSpan={7}>Belum ada workspace project.</td>
                 </tr>
               )}
               {projects.map((item) => (
                 <tr key={item.id}>
                   <td>{item.name || "Tanpa nama"}</td>
+                  <td>{item.code || "-"}</td>
+                  <td>{item.phase || "-"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
                   <td>{formatDateTime(item.created_at)}</td>
                   <td>{formatDateTime(item.updated_at)}</td>
@@ -1481,6 +1503,16 @@ export default function AdminControlPanelPage() {
         {editingProjectId ? (
           <form className="field-grid" onSubmit={(event) => void handleSaveProjectSetting(event)}>
             <label>
+              Code Workspace
+              <input
+                value={projectSettingForm.code}
+                onChange={(event) =>
+                  setProjectSettingForm((prev) => ({ ...prev, code: event.target.value }))
+                }
+                placeholder="Contoh: GED-UNP"
+              />
+            </label>
+            <label>
               Nama Workspace
               <input
                 value={projectSettingForm.name}
@@ -1489,6 +1521,16 @@ export default function AdminControlPanelPage() {
                 }
                 placeholder="Nama Workspace"
                 required
+              />
+            </label>
+            <label>
+              Phase Workspace
+              <input
+                value={projectSettingForm.phase}
+                onChange={(event) =>
+                  setProjectSettingForm((prev) => ({ ...prev, phase: event.target.value }))
+                }
+                placeholder="Contoh: Design Development"
               />
             </label>
             <label>
@@ -1547,12 +1589,28 @@ export default function AdminControlPanelPage() {
         {showProjectCreateForm && (
           <form className="field-grid" onSubmit={(event) => void handleCreateProject(event)}>
             <label>
+              Code Workspace (opsional)
+              <input
+                value={projectForm.code}
+                onChange={(event) => setProjectForm((prev) => ({ ...prev, code: event.target.value }))}
+                placeholder="Contoh: GED-UNP"
+              />
+            </label>
+            <label>
               Nama Workspace
               <input
                 value={projectForm.name}
                 onChange={(event) => setProjectForm((prev) => ({ ...prev, name: event.target.value }))}
                 placeholder="Nama Workspace Proyek"
                 required
+              />
+            </label>
+            <label>
+              Phase Workspace (opsional)
+              <input
+                value={projectForm.phase}
+                onChange={(event) => setProjectForm((prev) => ({ ...prev, phase: event.target.value }))}
+                placeholder="Contoh: Design Development"
               />
             </label>
             <label>

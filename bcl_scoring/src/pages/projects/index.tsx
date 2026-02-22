@@ -274,7 +274,7 @@ export default function ProjectsIndexPage() {
   return (
     <main className="task-shell">
       <header className="task-header role-hero role-hero-role1">
-        <div className="role-hero-grid role-hero-grid-single">
+        <div className="role-hero-grid">
           <div className="role-hero-main">
             <p className="task-kicker">BIM Coordinator Project</p>
             <h1>{headerTitle}</h1>
@@ -301,10 +301,28 @@ export default function ProjectsIndexPage() {
             </div>
           </div>
 
+          <aside className="role-context-panel">
+            <div className="role-context-grid">
+              <div className="context-card role-context-card">
+                <span>Workspace scope</span>
+                <strong>{role1WorkspaceLabel || "All workspaces"}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Need action</span>
+                <strong>{projectsNeedAction}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Submitted evidence</span>
+                <strong>{totalSubmitted}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Backend</span>
+                <BackendStatusBanner mode={dataMode} message={backendMessage} variant="compact" />
+              </div>
+            </div>
+          </aside>
         </div>
       </header>
-
-      <BackendStatusBanner mode={dataMode} message={backendMessage} />
 
       <section className="task-grid-3" aria-label="Role 1 operational summary">
         <article className="summary-card">
