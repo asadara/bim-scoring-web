@@ -274,7 +274,7 @@ export default function ProjectsIndexPage() {
   return (
     <main className="task-shell">
       <header className="task-header role-hero role-hero-role1">
-        <div className="role-hero-grid">
+        <div className="role-hero-grid role-hero-grid-single">
           <div className="role-hero-main">
             <p className="task-kicker">BIM Coordinator Project</p>
             <h1>{headerTitle}</h1>
@@ -301,18 +301,6 @@ export default function ProjectsIndexPage() {
             </div>
           </div>
 
-          <aside className="role-context-panel">
-            <div className="role-context-grid">
-              <div className="context-card role-context-card">
-                <span>Submitted Evidence</span>
-                <strong>{totalSubmitted}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Needs Revision</span>
-                <strong>{totalNeedsRevision}</strong>
-              </div>
-            </div>
-          </aside>
         </div>
       </header>
 

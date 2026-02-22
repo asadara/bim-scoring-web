@@ -80,6 +80,129 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const SHORT_TEXT_THRESHOLD = 5;
+    const CARD_SELECTOR = [
+      ".summary-card",
+      ".context-card",
+      ".landing-card",
+      ".desktop-insight-card",
+      ".dashboard-kpi-card",
+      ".dashboard-trend-card",
+      ".dashboard-side-stat",
+      ".dashboard-readiness-item",
+      ".desktop-perspective-card",
+    ].join(", ");
+
+    const normalizeText = (value: string) => value.replace(/\s+/g, " ").trim();
+
+    const getLineCount = (element: HTMLElement): number => {
+      const text = normalizeText(element.textContent || "");
+      if (!text) return 0;
+
+      const computed = window.getComputedStyle(element);
+      const lineHeight = Number.parseFloat(computed.lineHeight);
+      const { height } = element.getBoundingClientRect();
+      if (!Number.isFinite(lineHeight) || lineHeight <= 0 || !Number.isFinite(height) || height <= 0) {
+        return 1;
+      }
+      return Math.max(1, Math.round(height / lineHeight));
+    };
+
+    const alignTableColumns = (table: HTMLTableElement) => {
+      const headRows = table.tHead ? Array.from(table.tHead.rows) : [];
+      const bodyRows = table.tBodies.length
+        ? Array.from(table.tBodies).flatMap((body) => Array.from(body.rows))
+        : Array.from(table.rows);
+      const allRows = [...headRows, ...bodyRows];
+
+      const columnCount = allRows.reduce((max, row) => Math.max(max, row.cells.length), 0);
+      if (columnCount === 0) return;
+
+      table.querySelectorAll("th, td").forEach((cell) => {
+        cell.classList.remove("table-col-short", "table-col-long");
+      });
+
+      for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+        let longestBodyText = 0;
+
+        for (const row of bodyRows) {
+          const cell = row.cells.item(columnIndex);
+          if (!cell) continue;
+          const length = normalizeText(cell.textContent || "").length;
+          if (length === 0) continue;
+          longestBodyText = Math.max(longestBodyText, length);
+        }
+
+        if (longestBodyText === 0) {
+          for (const row of headRows) {
+            const headerCell = row.cells.item(columnIndex);
+            if (!headerCell) continue;
+            const length = normalizeText(headerCell.textContent || "").length;
+            if (length === 0) continue;
+            longestBodyText = Math.max(longestBodyText, length);
+          }
+        }
+
+        const className =
+          longestBodyText > 0 && longestBodyText < SHORT_TEXT_THRESHOLD ? "table-col-short" : "table-col-long";
+
+        for (const row of allRows) {
+          const cell = row.cells.item(columnIndex);
+          if (cell) {
+            cell.classList.add(className);
+          }
+        }
+      }
+    };
+
+    const alignCardHeaders = () => {
+      const cards = Array.from(document.querySelectorAll<HTMLElement>(CARD_SELECTOR));
+      for (const card of cards) {
+        card.classList.remove("card-title-on-border");
+
+        const firstChild = card.firstElementChild;
+        if (!(firstChild instanceof HTMLElement)) continue;
+        const headerTag = firstChild.tagName.toUpperCase();
+        if (!["SPAN", "P", "H2", "H3", "H4", "H5", "H6"].includes(headerTag)) continue;
+
+        const contentChildren = Array.from(card.children).filter(
+          (child): child is HTMLElement => child instanceof HTMLElement && child !== firstChild
+        );
+        let bodyLines = 0;
+        for (const child of contentChildren) {
+          bodyLines += getLineCount(child);
+          if (bodyLines > 1) break;
+        }
+
+        if (bodyLines > 1) {
+          card.classList.add("card-title-on-border");
+        }
+      }
+    };
+
+    let rafId = 0;
+    const scheduleRefresh = () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        document.querySelectorAll("table").forEach((table) => alignTableColumns(table as HTMLTableElement));
+        alignCardHeaders();
+      });
+    };
+
+    scheduleRefresh();
+    const observer = new MutationObserver(() => scheduleRefresh());
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", scheduleRefresh);
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleRefresh);
+    };
+  }, [router.asPath]);
+
   const currentPath = normalizePath(router.asPath || router.pathname || "/");
   const needsAuthentication = useMemo(
     () =>

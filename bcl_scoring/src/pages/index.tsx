@@ -542,7 +542,7 @@ export default function Home() {
         });
       } catch (e) {
         if (cancelled) return;
-        setError(toUserFacingErrorMessage(e, "Gagal memuat dashboard desktop."));
+        setError(toUserFacingErrorMessage(e, "Gagal memuat dashboard."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -708,8 +708,8 @@ export default function Home() {
                   src="/bim_nke_logo.gif"
                   alt="BIM NKE Program"
                   className="dashboard-brand-logo dashboard-brand-logo-secondary"
-                  width={68}
-                  height={32}
+                  width={85}
+                  height={40}
                   loading="eager"
                   onError={() => setShowBimProgramLogo(false)}
                   unoptimized
@@ -717,7 +717,6 @@ export default function Home() {
               ) : (
                 <div className="dashboard-logo-fallback dashboard-logo-fallback-secondary">BIM</div>
               )}
-              <small>BIM NKE Program</small>
             </div>
           </div>
 
@@ -1114,7 +1113,7 @@ export default function Home() {
             </div>
           </div>
           <p className="inline-note">
-            Config lock dan audit detail berada pada domain Admin. Desktop ini menampilkan read-only snapshot.
+            Config lock dan audit detail berada pada domain Admin. Dashboard ini menampilkan read-only snapshot.
           </p>
           <div className="wizard-actions">
             {canAccessAdmin ? <Link href="/admin">{actionText.openAdminControl}</Link> : null}
@@ -1171,7 +1170,7 @@ export default function Home() {
           >
             <header className="desktop-drawer-head">
               <div>
-                <p className="task-kicker">Desktop Insight</p>
+                <p className="task-kicker">Dashboard Insight</p>
                 <h2 id="desktop-drawer-title">
                   {activePerspective.perspectiveId} - {activePerspective.title}
                 </h2>

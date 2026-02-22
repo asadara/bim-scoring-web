@@ -381,6 +381,23 @@ a {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
+.card-title-on-border {
+  position: relative;
+  padding-top: 16px;
+}
+
+.card-title-on-border > :first-child {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 0 6px;
+  max-width: calc(100% - 24px);
+  background: var(--task-surface);
+  z-index: 1;
+}
+
 .summary-card.summary-card-action {
   display: block;
   text-decoration: none;
@@ -435,6 +452,7 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  margin-top: 12px;
 }
 
 .me-section-grid .task-panel {
@@ -1433,6 +1451,16 @@ a {
   vertical-align: top;
 }
 
+table th.table-col-short,
+table td.table-col-short {
+  text-align: center;
+}
+
+table th.table-col-long,
+table td.table-col-long {
+  text-align: left;
+}
+
 .audit-table .table-row-clickable {
   cursor: pointer;
   transition: background-color 120ms ease;
@@ -1984,6 +2012,10 @@ a {
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+}
+
+.role-hero-grid.role-hero-grid-single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .role-hero-main {
@@ -2652,8 +2684,8 @@ a {
 }
 
 .dashboard-brand-logo-secondary {
-  width: 68px;
-  height: 32px;
+  width: 85px;
+  height: 40px;
 }
 
 .dashboard-logo-fallback {
@@ -2683,11 +2715,6 @@ a {
   display: grid;
   gap: 3px;
   justify-items: start;
-}
-
-.dashboard-program-brand small {
-  color: #526071;
-  font-size: 11px;
 }
 
 .dashboard-meta-chip-row {
