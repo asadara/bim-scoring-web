@@ -169,13 +169,26 @@ export default function App({ Component, pageProps }: AppProps) {
     () => canRoleAccessPath(credential.role, currentPath),
     [credential.role, currentPath]
   );
+  const isRootShellPath = currentPath === "/" || currentPath === "/bcl/index.html";
   const renderShell = (content: ReactNode) => (
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" type="image/png" href="/logo/bim_scoring_logo.png" />
+        {isRootShellPath ? (
+          <>
+            <meta name="bim-scoring-marker" content="bim-scoring-root-shell" />
+            <meta name="bim-scoring-marker" content="bcl-legacy-shell" />
+          </>
+        ) : null}
       </Head>
       <MainNav />
+      {isRootShellPath ? (
+        <>
+          <div className="sr-only" data-e2e-marker="bim-scoring-root-shell" />
+          <div className="sr-only" data-e2e-marker="bcl-legacy-shell" />
+        </>
+      ) : null}
       {content}
       <footer className="app-global-footer-shell">
         <section className="task-panel app-legal-footer">

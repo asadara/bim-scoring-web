@@ -79,13 +79,19 @@ async function main() {
       checkPage({
         name: "Web root",
         path: "/",
-        mustContainAny: ["Desktop", "BCL Dashboard"],
+        mustContainAny: [
+          'data-e2e-marker="bim-scoring-root-shell"',
+          'content="bim-scoring-root-shell"',
+        ],
       }),
     () =>
       checkPage({
         name: "Legacy route alias",
         path: "/bcl/index.html",
-        mustContainAny: ["Desktop", "BCL Dashboard"],
+        mustContainAny: [
+          'data-e2e-marker="bcl-legacy-shell"',
+          'content="bcl-legacy-shell"',
+        ],
       }),
     () =>
       checkPage({
