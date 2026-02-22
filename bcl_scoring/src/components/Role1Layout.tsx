@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
+import HeaderContextCard from "@/components/HeaderContextCard";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT, ProjectRecord, ScoringPeriod, formatPeriodLabel, formatProjectLabel } from "@/lib/role1TaskLayer";
 
@@ -42,6 +43,17 @@ export default function Role1Layout(props: Role1LayoutProps) {
         ? "Read mode fallback"
         : null;
   const connectionTone = backendMode === "backend" ? "open" : "lock";
+  const contextItems: Array<{ label: string; value: ReactNode }> = [
+    { label: "Project", value: formatProjectLabel(project) },
+    { label: "Active period", value: formatPeriodLabel(activePeriod) },
+    { label: "Period status", value: periodStatusLabel || NA_TEXT },
+  ];
+  if (backendMode) {
+    contextItems.push({
+      label: "Backend",
+      value: <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />,
+    });
+  }
 
   return (
     <main className="task-shell page-corporate-shell">
@@ -59,28 +71,7 @@ export default function Role1Layout(props: Role1LayoutProps) {
             </div>
           </div>
 
-          <aside className="role-context-panel">
-            <div className="role-context-grid">
-              <div className="context-card role-context-card">
-                <span>Project</span>
-                <strong>{formatProjectLabel(project)}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Active period</span>
-                <strong>{formatPeriodLabel(activePeriod)}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Period status</span>
-                <strong>{periodStatusLabel || NA_TEXT}</strong>
-              </div>
-              {backendMode ? (
-                <div className="context-card role-context-card">
-                  <span>Backend</span>
-                  <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
-                </div>
-              ) : null}
-            </div>
-          </aside>
+          <HeaderContextCard title="Reporting Context" items={contextItems} />
         </div>
       </header>
 

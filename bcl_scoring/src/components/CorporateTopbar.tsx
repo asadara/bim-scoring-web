@@ -62,10 +62,10 @@ export default function CorporateTopbar(props: CorporateTopbarProps) {
         <div className="dashboard-program-brand">
           {showBimLogo ? (
             <Image
-              src="/logo/bim_scoring_logo.png"
-              alt="BIM Scoring Logo"
-              className="dashboard-brand-logo dashboard-brand-logo-secondary page-corp-logo-secondary"
-              width={40}
+              src="/logo/bim_scoring_main_logo_full.png"
+              alt="BIM Scoring Main Logo"
+              className="dashboard-brand-logo dashboard-brand-logo-secondary"
+              width={130}
               height={40}
               loading="eager"
               onError={() => setShowBimLogo(false)}

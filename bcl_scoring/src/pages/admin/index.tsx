@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import CorporateTopbar from "@/components/CorporateTopbar";
+import HeaderContextCard from "@/components/HeaderContextCard";
 import {
   AdminConfigLock,
   AdminIndicator,
@@ -980,6 +981,12 @@ export default function AdminControlPanelPage() {
       : "Connected (admin workspace)";
   const adminConnectionTone = loading ? "na" : error ? "lock" : "open";
   const configLockLabel = configLock?.is_locked ? "Locked" : "Open";
+  const adminHeaderItems = [
+    { label: "Admin actor", value: toNonEmptyString(session.actorId) || "admin-web" },
+    { label: "Header role", value: toNonEmptyString(session.role) || "Admin" },
+    { label: "Role mappings", value: String(roleMappings.length) },
+    { label: "Pending proposals", value: String(role2Proposals.length) },
+  ];
 
   return (
     <main className="task-shell admin-control-panel page-corporate-shell">
@@ -1002,26 +1009,7 @@ export default function AdminControlPanelPage() {
             </div>
           </div>
 
-          <aside className="role-context-panel">
-            <div className="role-context-grid">
-              <div className="context-card role-context-card">
-                <span>Admin actor</span>
-                <strong>{toNonEmptyString(session.actorId) || "admin-web"}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Header role</span>
-                <strong>{toNonEmptyString(session.role) || "Admin"}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Role mappings</span>
-                <strong>{roleMappings.length}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Pending proposals</span>
-                <strong>{role2Proposals.length}</strong>
-              </div>
-            </div>
-          </aside>
+          <HeaderContextCard title="Reporting Context" items={adminHeaderItems} />
         </div>
       </header>
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
+import HeaderContextCard from "@/components/HeaderContextCard";
 import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
 import {
   DataMode,
@@ -269,6 +270,15 @@ export default function ProjectsIndexPage() {
   }, [credential.role, rows, scopedProjectId]);
   const headerTitle = role1WorkspaceLabel ? `Projects - ${role1WorkspaceLabel}` : "Projects";
   const connectionLabel = dataMode === "backend" ? "Connected (live data)" : "Read mode fallback";
+  const contextItems = [
+    { label: "Workspace scope", value: role1WorkspaceLabel || "All workspaces" },
+    { label: "Need action", value: String(projectsNeedAction) },
+    { label: "Submitted evidence", value: String(totalSubmitted) },
+    {
+      label: "Backend",
+      value: <BackendStatusBanner mode={dataMode} message={backendMessage} variant="compact" />,
+    },
+  ];
   const openProjectTask = (targetProjectId: string) => {
     void router.push(`/projects/${targetProjectId}`);
   };
@@ -305,26 +315,7 @@ export default function ProjectsIndexPage() {
             </div>
           </div>
 
-          <aside className="role-context-panel">
-            <div className="role-context-grid">
-              <div className="context-card role-context-card">
-                <span>Workspace scope</span>
-                <strong>{role1WorkspaceLabel || "All workspaces"}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Need action</span>
-                <strong>{projectsNeedAction}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Submitted evidence</span>
-                <strong>{totalSubmitted}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Backend</span>
-                <BackendStatusBanner mode={dataMode} message={backendMessage} variant="compact" />
-              </div>
-            </div>
-          </aside>
+          <HeaderContextCard title="Reporting Context" items={contextItems} />
         </div>
       </header>
 

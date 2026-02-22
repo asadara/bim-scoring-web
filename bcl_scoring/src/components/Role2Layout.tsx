@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
+import HeaderContextCard from "@/components/HeaderContextCard";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import {
   NA_TEXT,
@@ -53,6 +54,17 @@ export default function Role2Layout(props: Role2LayoutProps) {
         ? "Read mode fallback"
         : null;
   const connectionTone = backendMode === "backend" ? "open" : "lock";
+  const contextItems: Array<{ label: string; value: ReactNode }> = [
+    { label: "Project", value: projectLabel || formatProjectLabel(project || null) },
+    { label: "Active period", value: activePeriodLabel || formatPeriodLabel(activePeriod || null) },
+    { label: "Period status", value: periodText },
+  ];
+  if (backendMode) {
+    contextItems.push({
+      label: "Backend",
+      value: <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />,
+    });
+  }
 
   return (
     <main className="task-shell page-corporate-shell">
@@ -70,28 +82,7 @@ export default function Role2Layout(props: Role2LayoutProps) {
             </div>
           </div>
 
-          <aside className="role-context-panel">
-            <div className="role-context-grid">
-              <div className="context-card role-context-card">
-                <span>Project</span>
-                <strong>{projectLabel || formatProjectLabel(project || null)}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Active period</span>
-                <strong>{activePeriodLabel || formatPeriodLabel(activePeriod || null)}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Period status</span>
-                <strong>{periodText}</strong>
-              </div>
-              {backendMode ? (
-                <div className="context-card role-context-card">
-                  <span>Backend</span>
-                  <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
-                </div>
-              ) : null}
-            </div>
-          </aside>
+          <HeaderContextCard title="Reporting Context" items={contextItems} />
         </div>
       </header>
 

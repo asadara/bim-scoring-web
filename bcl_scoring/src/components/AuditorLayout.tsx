@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
 import CorporateTopbar from "@/components/CorporateTopbar";
+import HeaderContextCard from "@/components/HeaderContextCard";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT } from "@/lib/role1TaskLayer";
 
@@ -25,6 +26,17 @@ export default function AuditorLayout(props: AuditorLayoutProps) {
         ? "Read mode fallback"
         : null;
   const connectionTone = backendMode === "backend" ? "open" : "lock";
+  const contextItems: Array<{ label: string; value: ReactNode }> = [
+    { label: "Project", value: projectLabel || NA_TEXT },
+    { label: "Period", value: periodLabel || NA_TEXT },
+    { label: "Mode", value: "Read-only Auditor View" },
+  ];
+  if (backendMode) {
+    contextItems.push({
+      label: "Backend",
+      value: <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />,
+    });
+  }
 
   return (
     <main className="task-shell page-corporate-shell">
@@ -42,28 +54,7 @@ export default function AuditorLayout(props: AuditorLayoutProps) {
             </div>
           </div>
 
-          <aside className="role-context-panel">
-            <div className="role-context-grid">
-              <div className="context-card role-context-card">
-                <span>Project</span>
-                <strong>{projectLabel || NA_TEXT}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Period</span>
-                <strong>{periodLabel || NA_TEXT}</strong>
-              </div>
-              <div className="context-card role-context-card">
-                <span>Mode</span>
-                <strong>Read-only Auditor View</strong>
-              </div>
-              {backendMode ? (
-                <div className="context-card role-context-card">
-                  <span>Backend</span>
-                  <BackendStatusBanner mode={backendMode} message={backendMessage} variant="compact" />
-                </div>
-              ) : null}
-            </div>
-          </aside>
+          <HeaderContextCard title="Reporting Context" items={contextItems} />
         </div>
       </header>
 

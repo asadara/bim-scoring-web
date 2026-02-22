@@ -295,25 +295,8 @@ a {
 }
 
 .task-header h1,
-.me-page-title,
 .task-shell > .task-panel > h1 {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   min-width: 0;
-}
-
-.task-header h1::before,
-.me-page-title::before,
-.task-shell > .task-panel > h1::before {
-  content: "";
-  width: 0.95em;
-  height: 1.05em;
-  flex: 0 0 auto;
-  background-image: url("/logo/bim_scoring_logo.png");
-  background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center;
 }
 
 .task-subtitle {
@@ -2782,15 +2765,6 @@ table td.table-col-long {
   margin-top: 0;
 }
 
-.page-corp-logo-secondary {
-  width: 40px;
-  height: 40px;
-}
-
-.page-corp-topbar .dashboard-logo-fallback-secondary {
-  width: 40px;
-}
-
 .page-hero-card {
   margin-top: 0;
   background: #ffffff;
@@ -2809,6 +2783,25 @@ table td.table-col-long {
 
 .page-hero-card .role-context-card {
   background: #ffffff;
+}
+
+.page-header-context {
+  min-width: 0;
+}
+
+.page-header-context dl div {
+  align-items: center;
+}
+
+.page-header-context dt,
+.page-header-context dd {
+  white-space: nowrap;
+}
+
+.page-header-context dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
 }
 
 .dashboard-corp-topbar {
@@ -3215,6 +3208,11 @@ table td.table-col-long {
   .dashboard-meta-chip-row {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .page-header-context dt,
+  .page-header-context dd {
+    white-space: normal;
   }
 
   .dashboard-kpi-card strong {
