@@ -10,6 +10,7 @@ import MainNav from "@/components/MainNav";
 import { canRoleAccessPath, normalizePath } from "@/lib/accessControl";
 import { startAuthCredentialSync, syncCredentialFromAuth } from "@/lib/authClient";
 import {
+  DEFAULT_APP_LANGUAGE,
   applyLanguage,
   getGlobalText,
   getRoleLabelLocalized,
@@ -36,7 +37,7 @@ const DEFAULT_CREDENTIAL: UserCredential = {
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [credential, setCredential] = useState<UserCredential>(DEFAULT_CREDENTIAL);
-  const [language, setLanguage] = useState<AppLanguage>(() => resolvePreferredLanguage());
+  const [language, setLanguage] = useState<AppLanguage>(DEFAULT_APP_LANGUAGE);
   const [ready, setReady] = useState(false);
   const text = useMemo(() => getGlobalText(language), [language]);
 
