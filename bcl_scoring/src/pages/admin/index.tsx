@@ -29,6 +29,7 @@ import {
   listAdminUsers,
   setAdminConfigLock,
   updateAdminRoleMapping,
+  updateAdminIndicator,
   updateAdminProject,
 } from "@/lib/adminTaskLayer";
 import { resolveTestWorkspaceProject } from "@/lib/testWorkspace";
@@ -220,6 +221,7 @@ export default function AdminControlPanelPage() {
   const [roleMappings, setRoleMappings] = useState<AdminRoleMapping[]>([]);
   const [role2Proposals, setRole2Proposals] = useState<Role2BimUseProposal[]>([]);
   const [userRoleDraftById, setUserRoleDraftById] = useState<Record<string, AppRole>>({});
+  const [editingUserId, setEditingUserId] = useState("");
   const [periods, setPeriods] = useState<AdminScoringPeriod[]>([]);
   const [configLock, setConfigLock] = useState<AdminConfigLock | null>(null);
   const [indicatorPerspectiveFilter, setIndicatorPerspectiveFilter] = useState<string>("");
@@ -256,6 +258,7 @@ export default function AdminControlPanelPage() {
     title: "",
     description: "",
   });
+  const [editingIndicatorId, setEditingIndicatorId] = useState("");
   const [lockReason, setLockReason] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [cleanupUserFilter, setCleanupUserFilter] = useState("");
@@ -319,6 +322,10 @@ export default function AdminControlPanelPage() {
       )
     );
   }, [users]);
+  const selectedRoleUser = useMemo(() => {
+    if (!editingUserId) return null;
+    return sortedUsers.find((item) => item.id === editingUserId) || null;
+  }, [editingUserId, sortedUsers]);
 
   const selectedPeriodProject = useMemo(() => {
     if (!periodProjectFilter) return null;
@@ -486,8 +493,28 @@ export default function AdminControlPanelPage() {
     if (exists) return;
     setIndicatorPerspectiveFilter("");
     setShowIndicatorCreateForm(false);
+    setEditingIndicatorId("");
     setIndicatorForm({ perspective_id: "", title: "", description: "" });
   }, [sortedPerspectiveOptions, indicatorPerspectiveFilter]);
+
+  useEffect(() => {
+    if (!editingUserId) return;
+    const exists = sortedUsers.some((item) => item.id === editingUserId);
+    if (exists) return;
+    setEditingUserId("");
+  }, [editingUserId, sortedUsers]);
+
+  useEffect(() => {
+    if (!editingIndicatorId) return;
+    const exists = indicators.some((item) => item.id === editingIndicatorId);
+    if (exists) return;
+    setEditingIndicatorId("");
+    setIndicatorForm({
+      perspective_id: indicatorPerspectiveFilter,
+      title: "",
+      description: "",
+    });
+  }, [editingIndicatorId, indicators, indicatorPerspectiveFilter]);
 
   useEffect(() => {
     setPeriodFeedback(null);
@@ -576,6 +603,7 @@ export default function AdminControlPanelPage() {
 
   function handleOpenProjectSettingEditor(project: AdminProject) {
     setEditingProjectId(project.id);
+    setShowProjectCreateForm(false);
     setProjectSettingForm({
       code: project.code || "",
       name: project.name || "",
@@ -599,6 +627,17 @@ export default function AdminControlPanelPage() {
       is_active: true,
       week_anchor: "MONDAY",
     });
+  }
+
+  function handleOpenUserRoleEditor(user: AdminUser) {
+    const currentRole = userCurrentRoleById.get(user.id) || "viewer";
+    setEditingUserId(user.id);
+    setUserRoleDraftById((prev) => ({
+      ...prev,
+      [user.id]: prev[user.id] || currentRole,
+    }));
+    setError(null);
+    setNotice(null);
   }
 
   async function handleSaveProjectSetting(event: FormEvent) {
@@ -716,7 +755,28 @@ export default function AdminControlPanelPage() {
     }
   }
 
-  async function handleCreateIndicator(event: FormEvent) {
+  function handleOpenIndicatorEditor(indicator: AdminIndicator) {
+    setEditingIndicatorId(indicator.id);
+    setShowIndicatorCreateForm(true);
+    setIndicatorForm({
+      perspective_id: indicator.perspective_id || indicatorPerspectiveFilter,
+      title: indicator.title || "",
+      description: indicator.description || "",
+    });
+    setError(null);
+    setNotice(null);
+  }
+
+  function handleCloseIndicatorEditor() {
+    setEditingIndicatorId("");
+    setIndicatorForm({
+      perspective_id: indicatorPerspectiveFilter,
+      title: "",
+      description: "",
+    });
+  }
+
+  async function handleSubmitIndicator(event: FormEvent) {
     event.preventDefault();
     const perspective_id =
       toNonEmptyString(indicatorForm.perspective_id) || toNonEmptyString(indicatorPerspectiveFilter);
@@ -725,26 +785,36 @@ export default function AdminControlPanelPage() {
       setError("Perspektif dan judul indikator wajib diisi.");
       return;
     }
-    const perspectiveLabel = perspectiveTitleById.get(perspective_id) || "GEN";
-    const code = buildInternalCode(`IND${buildCodePrefix(`${perspectiveLabel} ${title}`, "GEN")}`);
-
+    const description = toNonEmptyString(indicatorForm.description) || null;
     await runAction(async () => {
-      await createAdminIndicator(session, {
-        perspective_id,
-        code,
-        title,
-        description: toNonEmptyString(indicatorForm.description) || undefined,
-        is_active: true,
-      });
+      if (editingIndicatorId) {
+        await updateAdminIndicator(session, editingIndicatorId, {
+          perspective_id,
+          title,
+          description,
+        });
+      } else {
+        const perspectiveLabel = perspectiveTitleById.get(perspective_id) || "GEN";
+        const code = buildInternalCode(`IND${buildCodePrefix(`${perspectiveLabel} ${title}`, "GEN")}`);
+        await createAdminIndicator(session, {
+          perspective_id,
+          code,
+          title,
+          description: description || undefined,
+          is_active: true,
+        });
+      }
       setIndicatorForm((prev) => ({
         ...prev,
         perspective_id,
         title: "",
         description: "",
       }));
+      setEditingIndicatorId("");
       setShowIndicatorCreateForm(false);
-      await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
-    }, "Indikator berhasil ditambahkan (kode internal dibuat otomatis).");
+      setIndicatorPerspectiveFilter(perspective_id);
+      await reloadIndicatorsForPerspective(session, perspective_id);
+    }, editingIndicatorId ? "Indikator berhasil diperbarui." : "Indikator berhasil ditambahkan (kode internal dibuat otomatis).");
   }
 
   async function handleToggleLock(nextLock: boolean) {
@@ -948,6 +1018,10 @@ export default function AdminControlPanelPage() {
   async function handleDeleteIndicator(id: string) {
     await runAction(async () => {
       await deleteAdminIndicator(session, id);
+      if (editingIndicatorId === id) {
+        handleCloseIndicatorEditor();
+        setShowIndicatorCreateForm(false);
+      }
       await reloadIndicatorsForPerspective(session, indicatorPerspectiveFilter);
     }, "Indikator berhasil dihapus.");
   }
@@ -967,11 +1041,20 @@ export default function AdminControlPanelPage() {
 
   function handleChangeIndicatorPerspective(nextPerspectiveId: string) {
     setIndicatorPerspectiveFilter(nextPerspectiveId);
+    setEditingIndicatorId("");
     setIndicatorForm({
       perspective_id: nextPerspectiveId,
       title: "",
       description: "",
     });
+  }
+
+  function handleChangeIndicatorFormPerspective(nextPerspectiveId: string) {
+    setIndicatorPerspectiveFilter(nextPerspectiveId);
+    setIndicatorForm((prev) => ({
+      ...prev,
+      perspective_id: nextPerspectiveId,
+    }));
   }
 
   const adminConnectionLabel = loading
@@ -1026,6 +1109,7 @@ export default function AdminControlPanelPage() {
 
       <section className="task-panel">
         <h2>Manajemen Role Pengguna</h2>
+        <p className="inline-note">Klik baris user untuk membuka editor role.</p>
         <div className="admin-table-wrap">
           <table className="audit-table responsive-stack-table admin-user-table">
             <caption className="sr-only">Daftar user dan manajemen role</caption>
@@ -1037,20 +1121,17 @@ export default function AdminControlPanelPage() {
                 <th scope="col">Pengajuan Role</th>
                 <th scope="col">Pengajuan Scope Project</th>
                 <th scope="col">Role Aktif</th>
-                <th scope="col">Atur Role</th>
-                <th scope="col">Setujui Pengajuan</th>
-                <th scope="col">Aksi Manual</th>
+                <th scope="col">Interaksi</th>
               </tr>
             </thead>
             <tbody>
               {sortedUsers.length === 0 && (
                 <tr>
-                  <td colSpan={9}>Belum ada user terdaftar.</td>
+                  <td colSpan={7}>Belum ada user terdaftar.</td>
                 </tr>
               )}
               {sortedUsers.map((item) => {
                 const currentRole = userCurrentRoleById.get(item.id) || "viewer";
-                const draftRole = userRoleDraftById[item.id] || currentRole;
                 const requestedRole = normalizeRequestedRole(item.requested_role);
                 const requestedProjectIds = normalizeRequestedProjectIds(item.requested_project_ids);
                 const isRole1WorkspaceSwitchToTest = requestedRole === "role1" && currentRole === "role1";
@@ -1128,8 +1209,27 @@ export default function AdminControlPanelPage() {
                 const cannotApproveRole1WithoutTestWorkspace =
                   requestedRole === "role1" && isRole1WorkspaceSwitchToTest && !testWorkspaceProject;
                 const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
+                const isActiveRow = editingUserId === item.id;
                 return (
-                  <tr key={item.id}>
+                  <tr
+                    key={item.id}
+                    className={`table-row-clickable${isActiveRow ? " table-row-active" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Edit role untuk ${item.name || item.email || item.id}`}
+                    aria-pressed={isActiveRow}
+                    onClick={() => {
+                      if (working) return;
+                      handleOpenUserRoleEditor(item);
+                    }}
+                    onKeyDown={(event) => {
+                      if (working) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleOpenUserRoleEditor(item);
+                      }
+                    }}
+                  >
                     <td>{item.name || "-"}</td>
                     <td>{item.employee_number || "-"}</td>
                     <td>{item.email || "-"}</td>
@@ -1148,53 +1248,155 @@ export default function AdminControlPanelPage() {
                     </td>
                     <td>{requestedScopeLabel}</td>
                     <td>{getRoleLabel(currentRole)}</td>
-                    <td>
-                      <select
-                        aria-label={`Set role untuk ${item.name || item.email || item.id}`}
-                        value={draftRole}
-                        onChange={(event) =>
-                          setUserRoleDraftById((prev) => ({
-                            ...prev,
-                            [item.id]: event.target.value as AppRole,
-                          }))
-                        }
-                      >
-                        {ROLE_OPTIONS.map((option) => (
-                          <option key={`${item.id}-${option.value}`} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        disabled={working || !requestedRole || isRequestAlreadyApplied || cannotApproveRole1WithoutTestWorkspace}
-                        onClick={() => void handleApproveRequestedRole(item)}
-                      >
-                        {isRequestAlreadyApplied
-                          ? "Sudah Disetujui"
-                          : cannotApproveRole1WithoutTestWorkspace
-                            ? "Butuh Workspace Ujicoba"
-                            : "Setujui Sesuai Pengajuan"}
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="action-primary"
-                        disabled={working}
-                        onClick={() => void handleAssignUserRole(item.id)}
-                      >
-                        Simpan Role
-                      </button>
-                    </td>
+                    <td>{isActiveRow ? "Sedang diedit" : "Klik untuk atur role"}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        {selectedRoleUser ? (() => {
+          const currentRole = userCurrentRoleById.get(selectedRoleUser.id) || "viewer";
+          const draftRole = userRoleDraftById[selectedRoleUser.id] || currentRole;
+          const requestedRole = normalizeRequestedRole(selectedRoleUser.requested_role);
+          const requestedProjectIds = normalizeRequestedProjectIds(selectedRoleUser.requested_project_ids);
+          const isRole1WorkspaceSwitchToTest = requestedRole === "role1" && currentRole === "role1";
+          const testWorkspaceId = toNonEmptyString(testWorkspaceProject?.id || "");
+          const requestedRole2Or3ScopeWithTrial =
+            (requestedRole === "role2" || requestedRole === "role3") &&
+              requestedProjectIds.length > 0 &&
+              testWorkspaceId
+              ? [...new Set([...requestedProjectIds, testWorkspaceId])]
+              : requestedProjectIds;
+          const requestedScopeLabel =
+            requestedRole === "role1"
+              ? isRole1WorkspaceSwitchToTest
+                ? testWorkspaceProject
+                  ? `${testWorkspaceProject.name || TEST_WORKSPACE_NAME} (ujicoba)`
+                  : "Workspace ujicoba belum tersedia"
+                : requestedProjectIds.length > 0
+                  ? requestedProjectIds.map((id) => projectNameById.get(id) || id).join(", ")
+                  : "-"
+              : requestedRole2Or3ScopeWithTrial.length > 0
+                ? requestedRole2Or3ScopeWithTrial.map((id) => projectNameById.get(id) || id).join(", ")
+                : "-";
+          const activeRole2Scopes = roleMappings
+            .filter(
+              (mapping) =>
+                mapping.user_id === selectedRoleUser.id &&
+                mapping.is_active !== false &&
+                String(mapping.role || "").trim().toLowerCase() === "role2"
+            )
+            .map((mapping) => toNonEmptyString(mapping.project_id || ""))
+            .filter(Boolean) as string[];
+          const activeRole3Scopes = roleMappings
+            .filter(
+              (mapping) =>
+                mapping.user_id === selectedRoleUser.id &&
+                mapping.is_active !== false &&
+                String(mapping.role || "").trim().toLowerCase() === "role3"
+            )
+            .map((mapping) => toNonEmptyString(mapping.project_id || ""))
+            .filter(Boolean) as string[];
+          const activeRole1Scopes = roleMappings
+            .filter(
+              (mapping) =>
+                mapping.user_id === selectedRoleUser.id &&
+                mapping.is_active !== false &&
+                String(mapping.role || "").trim().toLowerCase() === "role1"
+            )
+            .map((mapping) => toNonEmptyString(mapping.project_id || ""))
+            .filter(Boolean) as string[];
+          const normalizedRole1Scopes = [...new Set(activeRole1Scopes)];
+          const normalizedRole2Scopes = [...new Set(activeRole2Scopes)];
+          const normalizedRole3Scopes = [...new Set(activeRole3Scopes)];
+          const isRequestAlreadyApplied = (() => {
+            if (!requestedRole) return false;
+            if (requestedRole === "role1") {
+              if (currentRole !== "role1") return false;
+              const expectedRole1Scope = isRole1WorkspaceSwitchToTest
+                ? testWorkspaceId
+                : requestedProjectIds[0] || null;
+              if (!expectedRole1Scope) return normalizedRole1Scopes.length === 0;
+              return normalizedRole1Scopes.length === 1 && normalizedRole1Scopes[0] === expectedRole1Scope;
+            }
+            if (requestedRole === "role2") {
+              if (currentRole !== "role2") return false;
+              if (requestedRole2Or3ScopeWithTrial.length === 0) return true;
+              return requestedRole2Or3ScopeWithTrial.every((projectId) => normalizedRole2Scopes.includes(projectId));
+            }
+            if (requestedRole === "role3") {
+              if (currentRole !== "role3") return false;
+              if (requestedRole2Or3ScopeWithTrial.length === 0) return true;
+              return requestedRole2Or3ScopeWithTrial.every((projectId) => normalizedRole3Scopes.includes(projectId));
+            }
+            return requestedRole === currentRole;
+          })();
+          const cannotApproveRole1WithoutTestWorkspace =
+            requestedRole === "role1" && isRole1WorkspaceSwitchToTest && !testWorkspaceProject;
+          const requestSubmittedAt = formatDateTime(selectedRoleUser.requested_role_submitted_at);
+          return (
+            <form className="field-grid" onSubmit={(event) => event.preventDefault()}>
+              <p className="inline-note">
+                Mengatur role untuk: <strong>{selectedRoleUser.name || selectedRoleUser.email || selectedRoleUser.id}</strong>
+              </p>
+              <p className="inline-note">
+                Role aktif saat ini: <strong>{getRoleLabel(currentRole)}</strong>
+              </p>
+              <p className="inline-note">
+                Pengajuan role: <strong>{requestedRole ? getRoleLabel(requestedRole) : "-"}</strong> | Scope:{" "}
+                <strong>{requestedScopeLabel}</strong>
+              </p>
+              <p className="inline-note">
+                Diajukan: <strong>{requestSubmittedAt}</strong> | Status:{" "}
+                <strong>{isRequestAlreadyApplied ? "Disetujui" : "Menunggu"}</strong>
+              </p>
+              <label>
+                Atur Role
+                <select
+                  aria-label={`Set role untuk ${selectedRoleUser.name || selectedRoleUser.email || selectedRoleUser.id}`}
+                  value={draftRole}
+                  onChange={(event) =>
+                    setUserRoleDraftById((prev) => ({
+                      ...prev,
+                      [selectedRoleUser.id]: event.target.value as AppRole,
+                    }))
+                  }
+                >
+                  {ROLE_OPTIONS.map((option) => (
+                    <option key={`${selectedRoleUser.id}-${option.value}`} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="wizard-actions">
+                <button
+                  type="button"
+                  disabled={working || !requestedRole || isRequestAlreadyApplied || cannotApproveRole1WithoutTestWorkspace}
+                  onClick={() => void handleApproveRequestedRole(selectedRoleUser)}
+                >
+                  {isRequestAlreadyApplied
+                    ? "Sudah Disetujui"
+                    : cannotApproveRole1WithoutTestWorkspace
+                      ? "Butuh Workspace Ujicoba"
+                      : "Setujui Sesuai Pengajuan"}
+                </button>
+                <button
+                  type="button"
+                  className="action-primary"
+                  disabled={working}
+                  onClick={() => void handleAssignUserRole(selectedRoleUser.id)}
+                >
+                  Simpan Role
+                </button>
+                <button type="button" disabled={working} onClick={() => setEditingUserId("")}>
+                  Tutup Editor
+                </button>
+              </div>
+            </form>
+          );
+        })() : null}
       </section>
 
       <section className="task-panel">
@@ -1458,12 +1660,20 @@ export default function AdminControlPanelPage() {
         <p className="inline-note">
           Catatan: queue Role 2 hanya menampilkan evidence berstatus <strong>SUBMITTED</strong> pada period aktif dan workspace yang masuk scope role2.
         </p>
+        <p className="inline-note">Klik baris workspace untuk membuka editor setting.</p>
         <div className="wizard-actions">
           <button
             type="button"
             className="action-primary"
             disabled={working}
-            onClick={() => setShowProjectCreateForm((prev) => !prev)}
+            onClick={() => {
+              if (showProjectCreateForm) {
+                setShowProjectCreateForm(false);
+                return;
+              }
+              handleCloseProjectSettingEditor();
+              setShowProjectCreateForm(true);
+            }}
           >
             {showProjectCreateForm ? "Tutup Form Tambah" : "Tambah Workspace"}
           </button>
@@ -1480,7 +1690,7 @@ export default function AdminControlPanelPage() {
                 <th scope="col">Status</th>
                 <th scope="col">Dibuat</th>
                 <th scope="col">Diperbarui</th>
-                <th scope="col">Aksi</th>
+                <th scope="col">Interaksi</th>
               </tr>
             </thead>
             <tbody>
@@ -1489,44 +1699,37 @@ export default function AdminControlPanelPage() {
                   <td colSpan={7}>Belum ada workspace project.</td>
                 </tr>
               )}
-              {projects.map((item) => (
-                <tr key={item.id}>
+              {projects.map((item) => {
+                const isActiveRow = editingProjectId === item.id;
+                return (
+                <tr
+                  key={item.id}
+                  className={`table-row-clickable${isActiveRow ? " table-row-active" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Edit workspace ${item.name || item.id}`}
+                  aria-pressed={isActiveRow}
+                  onClick={() => {
+                    if (working) return;
+                    handleOpenProjectSettingEditor(item);
+                  }}
+                  onKeyDown={(event) => {
+                    if (working) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleOpenProjectSettingEditor(item);
+                    }
+                  }}
+                >
                   <td>{item.name || "Tanpa nama"}</td>
                   <td>{item.code || "-"}</td>
                   <td>{item.phase || "-"}</td>
                   <td>{asBooleanLabel(item.is_active)}</td>
                   <td>{formatDateTime(item.created_at)}</td>
                   <td>{formatDateTime(item.updated_at)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      disabled={working}
-                      onClick={() => {
-                        const nextActive = item.is_active === false;
-                        const label = item.name || "tanpa nama";
-                        requestConfirm({
-                          title: nextActive ? "Aktifkan workspace?" : "Nonaktifkan workspace?",
-                          message: nextActive
-                            ? `Workspace "${label}" akan kembali tersedia untuk alur aktif.`
-                            : `Workspace "${label}" tidak dihapus, hanya disembunyikan dari alur aktif.`,
-                          confirmLabel: nextActive ? "Aktifkan" : "Nonaktifkan",
-                          tone: nextActive ? "default" : "danger",
-                          onConfirm: () => handleSetProjectActive(item.id, nextActive),
-                        });
-                      }}
-                    >
-                      {item.is_active === false ? "Aktifkan" : "Nonaktifkan"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={working}
-                      onClick={() => handleOpenProjectSettingEditor(item)}
-                    >
-                      Edit Setting
-                    </button>
-                  </td>
+                  <td>{isActiveRow ? "Sedang diedit" : "Klik untuk edit"}</td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -1842,9 +2045,26 @@ export default function AdminControlPanelPage() {
             type="button"
             className="action-primary"
             disabled={working || !indicatorPerspectiveFilter}
-            onClick={() => setShowIndicatorCreateForm((prev) => !prev)}
+            onClick={() => {
+              if (showIndicatorCreateForm) {
+                handleCloseIndicatorEditor();
+                setShowIndicatorCreateForm(false);
+                return;
+              }
+              setEditingIndicatorId("");
+              setIndicatorForm({
+                perspective_id: indicatorPerspectiveFilter,
+                title: "",
+                description: "",
+              });
+              setShowIndicatorCreateForm(true);
+            }}
           >
-            {showIndicatorCreateForm ? "Tutup Form Tambah" : "Tambah Indikator"}
+            {showIndicatorCreateForm
+              ? editingIndicatorId
+                ? "Tutup Form Edit"
+                : "Tutup Form Tambah"
+              : "Tambah Indikator"}
           </button>
         </div>
 
@@ -1874,6 +2094,11 @@ export default function AdminControlPanelPage() {
             Menampilkan indikator untuk: <strong>{selectedIndicatorPerspective.title || "Perspektif tanpa judul"}</strong>
           </p>
         )}
+        {indicatorPerspectiveFilter && (
+          <p className="inline-note">
+            Klik baris indikator untuk membuka mode edit.
+          </p>
+        )}
 
         <div className="admin-table-wrap">
           <table className="audit-table responsive-stack-table admin-indicator-table">
@@ -1884,7 +2109,7 @@ export default function AdminControlPanelPage() {
                 <th scope="col">Deskripsi</th>
                 <th scope="col">Status</th>
                 <th scope="col">Diperbarui</th>
-                <th scope="col">Aksi</th>
+                <th scope="col">Interaksi</th>
               </tr>
             </thead>
             <tbody>
@@ -1903,42 +2128,47 @@ export default function AdminControlPanelPage() {
                   <td colSpan={5}>Belum ada indikator pada perspektif ini.</td>
                 </tr>
               )}
-              {indicators.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.title || "Tanpa judul"}</td>
-                  <td>{item.description || "-"}</td>
-                  <td>{asBooleanLabel(item.is_active)}</td>
-                  <td>{formatDateTime(item.updated_at)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      disabled={working}
-                      onClick={() => {
-                        requestConfirm({
-                          title: "Hapus indikator?",
-                          message: `Indikator "${item.title || "tanpa judul"}" akan dihapus permanen.`,
-                          confirmLabel: "Hapus",
-                          tone: "danger",
-                          onConfirm: () => handleDeleteIndicator(item.id),
-                        });
-                      }}
-                    >
-                      Hapus
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {indicators.map((item) => {
+                const isActiveRow = editingIndicatorId === item.id && showIndicatorCreateForm;
+                return (
+                  <tr
+                    key={item.id}
+                    className={`table-row-clickable${isActiveRow ? " table-row-active" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Edit indikator ${item.title || item.id}`}
+                    aria-pressed={isActiveRow}
+                    onClick={() => {
+                      if (working) return;
+                      handleOpenIndicatorEditor(item);
+                    }}
+                    onKeyDown={(event) => {
+                      if (working) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleOpenIndicatorEditor(item);
+                      }
+                    }}
+                  >
+                    <td>{item.title || "Tanpa judul"}</td>
+                    <td>{item.description || "-"}</td>
+                    <td>{asBooleanLabel(item.is_active)}</td>
+                    <td>{formatDateTime(item.updated_at)}</td>
+                    <td>{isActiveRow ? "Sedang diedit" : "Klik untuk edit"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {showIndicatorCreateForm && (
-          <form className="field-grid" onSubmit={(event) => void handleCreateIndicator(event)}>
+          <form className="field-grid" onSubmit={(event) => void handleSubmitIndicator(event)}>
             <label>
               Perspektif Terpilih
               <select
                 value={indicatorForm.perspective_id || indicatorPerspectiveFilter}
-                onChange={(event) => handleChangeIndicatorPerspective(event.target.value)}
+                onChange={(event) => handleChangeIndicatorFormPerspective(event.target.value)}
                 required
               >
                 <option value="">Pilih perspektif</option>
@@ -1966,12 +2196,52 @@ export default function AdminControlPanelPage() {
                 placeholder="Deskripsi indikator"
               />
             </label>
-            <p className="inline-note">Kode internal indikator dibuat otomatis saat simpan.</p>
+            {editingIndicatorId ? (
+              <p className="inline-note">Mode edit aktif. Perubahan akan diterapkan ke indikator terpilih.</p>
+            ) : (
+              <p className="inline-note">Kode internal indikator dibuat otomatis saat simpan.</p>
+            )}
             <div className="wizard-actions">
               <button type="submit" className="action-primary" disabled={working}>
-                Simpan Indikator
+                {editingIndicatorId ? "Simpan Perubahan" : "Simpan Indikator"}
               </button>
+              <button
+                type="button"
+                disabled={working}
+                onClick={() => {
+                  handleCloseIndicatorEditor();
+                  setShowIndicatorCreateForm(false);
+                }}
+              >
+                Batal
+              </button>
+              {editingIndicatorId && (
+                <button
+                  type="button"
+                  className="action-danger"
+                  disabled={working}
+                  onClick={() => {
+                    const editingRow = indicators.find((item) => item.id === editingIndicatorId);
+                    requestConfirm({
+                      title: "Hapus indikator?",
+                      message: `Indikator "${editingRow?.title || "tanpa judul"}" akan dihapus permanen.`,
+                      confirmLabel: "Hapus",
+                      tone: "danger",
+                      onConfirm: () => handleDeleteIndicator(editingIndicatorId),
+                    });
+                  }}
+                >
+                  Hapus Indikator
+                </button>
+              )}
             </div>
+            {editingIndicatorId && (
+              <div className="wizard-actions">
+                <p className="inline-note">
+                  Pilih baris lain untuk berpindah edit indikator.
+                </p>
+              </div>
+            )}
           </form>
         )}
       </section>

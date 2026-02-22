@@ -363,6 +363,22 @@ export async function createAdminIndicator(
   });
 }
 
+export async function updateAdminIndicator(
+  session: AdminSession,
+  indicatorId: string,
+  patch: {
+    perspective_id?: string;
+    title?: string;
+    description?: string | null;
+    is_active?: boolean | null;
+  }
+): Promise<AdminIndicator> {
+  return await requestAdmin<AdminIndicator>(session, `/admin/indicators/${encodeURIComponent(indicatorId)}`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+}
+
 export async function deleteAdminIndicator(
   session: AdminSession,
   indicatorId: string

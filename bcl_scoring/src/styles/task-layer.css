@@ -1580,6 +1580,10 @@ table td.table-col-long {
   background: #eef8f3;
 }
 
+.audit-table .table-row-active {
+  background: #eef8f3;
+}
+
 .admin-table-wrap {
   overflow-x: auto;
 }
@@ -1790,9 +1794,7 @@ table td.table-col-long {
 .admin-user-table td:nth-child(4) { --cell-label: "Pengajuan Role"; }
 .admin-user-table td:nth-child(5) { --cell-label: "Scope Project"; }
 .admin-user-table td:nth-child(6) { --cell-label: "Role Aktif"; }
-.admin-user-table td:nth-child(7) { --cell-label: "Atur Role"; }
-.admin-user-table td:nth-child(8) { --cell-label: "Setujui"; }
-.admin-user-table td:nth-child(9) { --cell-label: "Aksi"; }
+.admin-user-table td:nth-child(7) { --cell-label: "Interaksi"; }
 
 .admin-role2-proposal-table td:nth-child(1) { --cell-label: "Pemohon"; }
 .admin-role2-proposal-table td:nth-child(2) { --cell-label: "Project"; }
@@ -1809,7 +1811,7 @@ table td.table-col-long {
 .admin-project-table td:nth-child(4) { --cell-label: "Status"; }
 .admin-project-table td:nth-child(5) { --cell-label: "Dibuat"; }
 .admin-project-table td:nth-child(6) { --cell-label: "Diperbarui"; }
-.admin-project-table td:nth-child(7) { --cell-label: "Aksi"; }
+.admin-project-table td:nth-child(7) { --cell-label: "Interaksi"; }
 
 .admin-period-table td:nth-child(1) { --cell-label: "Periode"; }
 .admin-period-table td:nth-child(2) { --cell-label: "Rentang"; }
@@ -1827,7 +1829,7 @@ table td.table-col-long {
 .admin-indicator-table td:nth-child(2) { --cell-label: "Deskripsi"; }
 .admin-indicator-table td:nth-child(3) { --cell-label: "Status"; }
 .admin-indicator-table td:nth-child(4) { --cell-label: "Diperbarui"; }
-.admin-indicator-table td:nth-child(5) { --cell-label: "Aksi"; }
+.admin-indicator-table td:nth-child(5) { --cell-label: "Interaksi"; }
 
 .audit-coverage-table td:nth-child(1) { --cell-label: "Project"; }
 .audit-coverage-table td:nth-child(2) { --cell-label: "Periode"; }
