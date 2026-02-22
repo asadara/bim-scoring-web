@@ -79,32 +79,8 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     const SHORT_TEXT_THRESHOLD = 5;
-    const CARD_SELECTOR = [
-      ".summary-card",
-      ".context-card",
-      ".landing-card",
-      ".desktop-insight-card",
-      ".dashboard-kpi-card",
-      ".dashboard-trend-card",
-      ".dashboard-side-stat",
-      ".dashboard-readiness-item",
-      ".desktop-perspective-card",
-    ].join(", ");
 
     const normalizeText = (value: string) => value.replace(/\s+/g, " ").trim();
-
-    const getLineCount = (element: HTMLElement): number => {
-      const text = normalizeText(element.textContent || "");
-      if (!text) return 0;
-
-      const computed = window.getComputedStyle(element);
-      const lineHeight = Number.parseFloat(computed.lineHeight);
-      const { height } = element.getBoundingClientRect();
-      if (!Number.isFinite(lineHeight) || lineHeight <= 0 || !Number.isFinite(height) || height <= 0) {
-        return 1;
-      }
-      return Math.max(1, Math.round(height / lineHeight));
-    };
 
     const alignTableColumns = (table: HTMLTableElement) => {
       const headRows = table.tHead ? Array.from(table.tHead.rows) : [];
@@ -153,38 +129,12 @@ export default function App({ Component, pageProps }: AppProps) {
       }
     };
 
-    const alignCardHeaders = () => {
-      const cards = Array.from(document.querySelectorAll<HTMLElement>(CARD_SELECTOR));
-      for (const card of cards) {
-        card.classList.remove("card-title-on-border");
-
-        const firstChild = card.firstElementChild;
-        if (!(firstChild instanceof HTMLElement)) continue;
-        const headerTag = firstChild.tagName.toUpperCase();
-        if (!["SPAN", "P", "H2", "H3", "H4", "H5", "H6"].includes(headerTag)) continue;
-
-        const contentChildren = Array.from(card.children).filter(
-          (child): child is HTMLElement => child instanceof HTMLElement && child !== firstChild
-        );
-        let bodyLines = 0;
-        for (const child of contentChildren) {
-          bodyLines += getLineCount(child);
-          if (bodyLines > 1) break;
-        }
-
-        if (bodyLines > 1) {
-          card.classList.add("card-title-on-border");
-        }
-      }
-    };
-
     let rafId = 0;
     const scheduleRefresh = () => {
       if (rafId) window.cancelAnimationFrame(rafId);
       rafId = window.requestAnimationFrame(() => {
         rafId = 0;
         document.querySelectorAll("table").forEach((table) => alignTableColumns(table as HTMLTableElement));
-        alignCardHeaders();
       });
     };
 
