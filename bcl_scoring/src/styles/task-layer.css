@@ -1709,7 +1709,7 @@ table td.table-col-long {
 .admin-control-panel button {
   border: 1px solid var(--task-control-border);
   border-radius: 10px;
-  background: linear-gradient(180deg, var(--task-control-bg) 0%, var(--task-control-bg-hover) 100%);
+  background: var(--task-control-bg);
   color: var(--task-control-ink);
   padding: 8px 12px;
   font: inherit;
@@ -1722,7 +1722,7 @@ table td.table-col-long {
 .admin-control-panel button:hover:not(:disabled),
 .admin-control-panel button:focus-visible:not(:disabled) {
   border-color: var(--task-control-border-hover);
-  background: linear-gradient(180deg, var(--task-control-bg-hover) 0%, var(--task-control-bg) 100%);
+  background: var(--task-control-bg-hover);
   color: var(--task-control-ink);
 }
 
@@ -1733,15 +1733,15 @@ table td.table-col-long {
 
 .admin-control-panel button.action-primary {
   border-color: transparent;
-  background: linear-gradient(180deg, var(--task-primary) 0%, var(--task-primary) 100%);
+  background: var(--task-primary);
   color: var(--task-primary-ink);
 }
 
 .admin-control-panel button.action-primary:hover:not(:disabled),
 .admin-control-panel button.action-primary:focus-visible:not(:disabled) {
-  border-color: var(--task-control-border-hover);
-  background: linear-gradient(180deg, var(--task-control-bg-hover) 0%, var(--task-control-bg-hover) 100%);
-  color: var(--task-control-ink);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--task-primary) 88%, #ffffff 12%);
+  color: var(--task-primary-ink);
 }
 
 .admin-control-panel button.action-danger {
@@ -1752,8 +1752,15 @@ table td.table-col-long {
 
 .admin-control-panel button.action-danger:hover:not(:disabled),
 .admin-control-panel button.action-danger:focus-visible:not(:disabled) {
-  background: linear-gradient(180deg, #cf4b3d 0%, #ad382c 100%);
+  background: #ad382c;
   color: #ffffff;
+}
+
+.admin-control-panel .wizard-actions button.action-primary:hover:not(:disabled),
+.admin-control-panel .wizard-actions button.action-primary:focus-visible:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--task-primary) 88%, #ffffff 12%);
+  color: var(--task-primary-ink);
 }
 
 .admin-control-panel button:disabled {
