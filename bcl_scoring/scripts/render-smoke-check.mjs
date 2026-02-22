@@ -104,21 +104,21 @@ async function main() {
         name: "Projects route",
         path: "/projects",
         mustContainAll: ['"page":"/projects"'],
-        mustContainAny: ["Project", "Role 1", "Checking Access"],
+        mustContainAny: ["Project", "Role 1", "Checking Access", "Memeriksa Akses"],
       }),
     () =>
       checkPage({
         name: "HO review route",
         path: "/ho/review",
         mustContainAll: ['"page":"/ho/review"'],
-        mustContainAny: ["Evidence Review - HO", "Review Evidence", "Checking Access"],
+        mustContainAny: ["Evidence Review - HO", "Review Evidence", "Checking Access", "Memeriksa Akses"],
       }),
     () =>
       checkPage({
         name: "Approve route",
         path: "/approve",
         mustContainAll: ['"page":"/approve"'],
-        mustContainAny: ["Period Approval", "Approval", "Checking Access"],
+        mustContainAny: ["Period Approval", "Approval", "Checking Access", "Memeriksa Akses"],
       }),
     () => checkPage({ name: "Audit route", path: "/audit", mustContainAny: ["Audit", "Snapshot"] }),
     () => checkApiHealth("/health", "ok"),
