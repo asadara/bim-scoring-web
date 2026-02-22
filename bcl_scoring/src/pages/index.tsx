@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import DashboardPerspectiveChart from "@/components/DashboardPerspectiveChart";
 import { canRoleAccessPath } from "@/lib/accessControl";
 import {
   buildApiUrl,
@@ -296,6 +297,7 @@ export default function Home() {
   const [indicatorScores, setIndicatorScores] = useState<IndicatorScoreRow[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>("");
   const [activePerspectiveId, setActivePerspectiveId] = useState<string | null>(null);
+  const [performanceViewMode, setPerformanceViewMode] = useState<"list" | "chart">("list");
   const [showNkeLogo, setShowNkeLogo] = useState(true);
   const [showBimProgramLogo, setShowBimProgramLogo] = useState(true);
 
@@ -865,42 +867,68 @@ export default function Home() {
         <section className="dashboard-main-grid">
           <div className="dashboard-main-left">
         <section className="task-panel">
-          <h2>Project Performance Overview</h2>
-          <p className="inline-note">Klik bar chart perspektif untuk membuka drawer insight detail.</p>
-          <div className="desktop-analytics-grid">
-            <div className="desktop-chart-list">
-              {perspectiveAnalytics.map((item) => {
-                const toneClass =
-                  item.riskLabel === "High risk"
-                    ? "desktop-tone-risk"
-                    : item.riskLabel === "Watch"
-                      ? "desktop-tone-watch"
-                      : "desktop-tone-healthy";
-
-                return (
-                  <button
-                    key={item.perspectiveId}
-                    type="button"
-                    className={`desktop-chart-row ${activePerspectiveId === item.perspectiveId ? "is-active" : ""}`}
-                    onClick={() => setActivePerspectiveId(item.perspectiveId)}
-                    aria-expanded={activePerspectiveId === item.perspectiveId}
-                    aria-controls={activePerspectiveId === item.perspectiveId ? "desktop-perspective-drawer" : undefined}
-                  >
-                    <span className="desktop-chart-label">
-                      <strong>{item.perspectiveId}</strong>
-                      <small>{item.title}</small>
-                    </span>
-                    <span className="desktop-chart-track">
-                      <span className={`desktop-chart-fill ${toneClass}`} style={{ width: `${item.scorePercent}%` }} />
-                    </span>
-                    <span className="desktop-chart-value">
-                      {item.score.toFixed(2)}
-                      <small>/ 5.00</small>
-                    </span>
-                  </button>
-                );
-              })}
+          <div className="dashboard-view-switch-row">
+            <h2>Project Performance Overview</h2>
+            <div className="dashboard-view-toggle" role="group" aria-label="Chart view mode">
+              <button
+                type="button"
+                className={performanceViewMode === "list" ? "is-active" : ""}
+                onClick={() => setPerformanceViewMode("list")}
+              >
+                List
+              </button>
+              <button
+                type="button"
+                className={performanceViewMode === "chart" ? "is-active" : ""}
+                onClick={() => setPerformanceViewMode("chart")}
+              >
+                Chart
+              </button>
             </div>
+          </div>
+          <p className="inline-note">Klik item perspektif pada mode List/Chart untuk membuka drawer insight detail.</p>
+          <div className="desktop-analytics-grid">
+            {performanceViewMode === "chart" ? (
+              <DashboardPerspectiveChart
+                rows={perspectiveAnalytics}
+                activePerspectiveId={activePerspectiveId}
+                onSelectPerspective={setActivePerspectiveId}
+              />
+            ) : (
+              <div className="desktop-chart-list">
+                {perspectiveAnalytics.map((item) => {
+                  const toneClass =
+                    item.riskLabel === "High risk"
+                      ? "desktop-tone-risk"
+                      : item.riskLabel === "Watch"
+                        ? "desktop-tone-watch"
+                        : "desktop-tone-healthy";
+
+                  return (
+                    <button
+                      key={item.perspectiveId}
+                      type="button"
+                      className={`desktop-chart-row ${activePerspectiveId === item.perspectiveId ? "is-active" : ""}`}
+                      onClick={() => setActivePerspectiveId(item.perspectiveId)}
+                      aria-expanded={activePerspectiveId === item.perspectiveId}
+                      aria-controls={activePerspectiveId === item.perspectiveId ? "desktop-perspective-drawer" : undefined}
+                    >
+                      <span className="desktop-chart-label">
+                        <strong>{item.perspectiveId}</strong>
+                        <small>{item.title}</small>
+                      </span>
+                      <span className="desktop-chart-track">
+                        <span className={`desktop-chart-fill ${toneClass}`} style={{ width: `${item.scorePercent}%` }} />
+                      </span>
+                      <span className="desktop-chart-value">
+                        {item.score.toFixed(2)}
+                        <small>/ 5.00</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             <aside className="desktop-analytics-side">
               <article className="desktop-insight-card">

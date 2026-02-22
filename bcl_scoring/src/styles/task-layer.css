@@ -2297,6 +2297,69 @@ table td.table-col-long {
   align-items: start;
 }
 
+.dashboard-view-switch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-view-switch-row h2 {
+  margin: 0;
+}
+
+.dashboard-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cfd9e2;
+  border-radius: 999px;
+  background: #f4f8fb;
+  padding: 2px;
+  gap: 2px;
+}
+
+.dashboard-view-toggle button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #3f566c;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.dashboard-view-toggle button:hover,
+.dashboard-view-toggle button:focus-visible {
+  background: #e8f0f6;
+}
+
+.dashboard-view-toggle button.is-active {
+  background: #ffffff;
+  color: #1d3248;
+  box-shadow: 0 1px 2px rgba(13, 36, 62, 0.14);
+}
+
+.desktop-chart-canvas-wrap {
+  border: 1px solid var(--task-line);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+  min-width: 0;
+}
+
+.desktop-chart-canvas {
+  position: relative;
+  min-height: 285px;
+}
+
+.desktop-chart-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .desktop-chart-list {
   display: grid;
   gap: 8px;
@@ -2698,6 +2761,11 @@ table td.table-col-long {
 }
 
 @media (max-width: 720px) {
+  .dashboard-view-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
   .role-context-grid {
     grid-template-columns: 1fr;
   }
