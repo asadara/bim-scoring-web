@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import CorporateTopbar from "@/components/CorporateTopbar";
 import {
   AdminConfigLock,
   AdminIndicator,
@@ -972,14 +973,56 @@ export default function AdminControlPanelPage() {
     });
   }
 
+  const adminConnectionLabel = loading
+    ? "Syncing admin data..."
+    : error
+      ? "Attention required"
+      : "Connected (admin workspace)";
+  const adminConnectionTone = loading ? "na" : error ? "lock" : "open";
+  const configLockLabel = configLock?.is_locked ? "Locked" : "Open";
+
   return (
-    <main className="task-shell admin-control-panel">
-      <header className="task-header">
-        <p className="task-kicker">BIM Scoring Platform</p>
-        <h1>Panel Kontrol Admin</h1>
-        <p className="task-subtitle">
-          Workspace untuk admin: kelola project, perspektif, indikator, dan kunci konfigurasi.
-        </p>
+    <main className="task-shell admin-control-panel page-corporate-shell">
+      <CorporateTopbar connectionLabel={adminConnectionLabel} connectionTone={adminConnectionTone} />
+
+      <header className="task-header role-hero role-hero-role3 page-hero-card">
+        <div className="role-hero-grid">
+          <div className="role-hero-main">
+            <p className="task-kicker">BIM Scoring Platform</p>
+            <h1>Panel Kontrol Admin</h1>
+            <p className="task-subtitle">
+              Workspace untuk admin: kelola project, perspektif, indikator, dan kunci konfigurasi.
+            </p>
+            <div className="landing-chip-row">
+              <span className="status-chip status-na">Projects: {projects.length}</span>
+              <span className="status-chip status-na">Users: {users.length}</span>
+              <span className={`status-chip ${configLock?.is_locked ? "status-lock" : "status-open"}`}>
+                Config: {configLockLabel}
+              </span>
+            </div>
+          </div>
+
+          <aside className="role-context-panel">
+            <div className="role-context-grid">
+              <div className="context-card role-context-card">
+                <span>Admin actor</span>
+                <strong>{toNonEmptyString(session.actorId) || "admin-web"}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Header role</span>
+                <strong>{toNonEmptyString(session.role) || "Admin"}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Role mappings</span>
+                <strong>{roleMappings.length}</strong>
+              </div>
+              <div className="context-card role-context-card">
+                <span>Pending proposals</span>
+                <strong>{role2Proposals.length}</strong>
+              </div>
+            </div>
+          </aside>
+        </div>
       </header>
 
       {error && <p className="error-box">{error}</p>}

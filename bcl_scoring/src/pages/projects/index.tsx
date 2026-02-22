@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
+import CorporateTopbar from "@/components/CorporateTopbar";
 import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
 import {
   DataMode,
@@ -267,13 +268,16 @@ export default function ProjectsIndexPage() {
     return firstRow.project.name || firstRow.project.code || firstRow.project.id;
   }, [credential.role, rows, scopedProjectId]);
   const headerTitle = role1WorkspaceLabel ? `Projects - ${role1WorkspaceLabel}` : "Projects";
+  const connectionLabel = dataMode === "backend" ? "Connected (live data)" : "Read mode fallback";
   const openProjectTask = (targetProjectId: string) => {
     void router.push(`/projects/${targetProjectId}`);
   };
 
   return (
-    <main className="task-shell">
-      <header className="task-header role-hero role-hero-role1">
+    <main className="task-shell page-corporate-shell">
+      <CorporateTopbar connectionLabel={connectionLabel} connectionTone={dataMode === "backend" ? "open" : "lock"} />
+
+      <header className="task-header role-hero role-hero-role1 page-hero-card">
         <div className="role-hero-grid">
           <div className="role-hero-main">
             <p className="task-kicker">BIM Coordinator Project</p>

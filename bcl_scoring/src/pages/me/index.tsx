@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import CorporateTopbar from "@/components/CorporateTopbar";
 import { getMainNavItemsForRole } from "@/lib/accessControl";
 import {
   AuthProfilePhoto,
@@ -277,6 +278,13 @@ export default function MePage() {
   const accessSectionLabel = showRoleScopeRequest ? "5. Akses Saya Saat Ini" : "4. Akses Saya Saat Ini";
   const settingsSectionLabel = showRoleScopeRequest ? "6. Pengaturan Akun Dasar" : "5. Pengaturan Akun Dasar";
   const helpSectionLabel = showRoleScopeRequest ? "7. Bantuan" : "6. Bantuan";
+  const accountConnectionLabel = !isConfigured
+    ? "Auth service not configured"
+    : isSignedIn
+      ? "Connected (account service)"
+      : "Guest session";
+  const accountConnectionTone = !isConfigured ? "lock" : isSignedIn ? "open" : "na";
+  const accountLastSync = formatDateTimeOrNull(credential.updated_at);
 
   useEffect(() => {
     const preferredRole = account.requested_role || toRequestedRoleFromActiveRole(credential.role);
@@ -460,8 +468,14 @@ export default function MePage() {
       <Head>
         <title>{pageTitleText} - BIM Scoring</title>
       </Head>
-      <main className="task-shell me-shell">
-        <section className="task-panel">
+      <main className="task-shell me-shell page-corporate-shell">
+        <CorporateTopbar
+          connectionLabel={accountConnectionLabel}
+          connectionTone={accountConnectionTone}
+          lastSyncLabel={accountLastSync}
+        />
+
+        <section className="task-panel page-hero-card me-hero-card">
           <div className="me-header">
             <div className="me-header-copy">
               <h1 className="me-page-title">

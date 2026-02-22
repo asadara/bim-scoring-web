@@ -2768,6 +2768,49 @@ table td.table-col-long {
   box-shadow: none;
 }
 
+.page-corporate-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.page-corporate-shell > .task-panel,
+.page-corporate-shell > .task-header {
+  margin-top: 0;
+}
+
+.page-corp-topbar {
+  margin-top: 0;
+}
+
+.page-corp-logo-secondary {
+  width: 40px;
+  height: 40px;
+}
+
+.page-corp-topbar .dashboard-logo-fallback-secondary {
+  width: 40px;
+}
+
+.page-hero-card {
+  margin-top: 0;
+  background: #ffffff;
+  border-color: #d3dbe4;
+  box-shadow: none;
+}
+
+.page-hero-card.role-hero::after {
+  opacity: 0.35;
+}
+
+.page-hero-card .role-context-panel {
+  border-color: #d6dee6;
+  background: #fbfcfd;
+}
+
+.page-hero-card .role-context-card {
+  background: #ffffff;
+}
+
 .dashboard-corp-topbar {
   margin-top: 0;
   display: flex;

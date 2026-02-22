@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 
 import BackendStatusBanner from "@/components/BackendStatusBanner";
+import CorporateTopbar from "@/components/CorporateTopbar";
 import QuickAccessNav from "@/components/QuickAccessNav";
 import { NA_TEXT, ProjectRecord, ScoringPeriod, formatPeriodLabel, formatProjectLabel } from "@/lib/role1TaskLayer";
 
@@ -34,10 +35,19 @@ export default function Role1Layout(props: Role1LayoutProps) {
       : periodStatusLabel === "OPEN"
         ? "status-chip status-open"
         : "status-chip status-na";
+  const connectionLabel =
+    backendMode === "backend"
+      ? "Connected (live data)"
+      : backendMode === "prototype"
+        ? "Read mode fallback"
+        : null;
+  const connectionTone = backendMode === "backend" ? "open" : "lock";
 
   return (
-    <main className="task-shell">
-      <header className="task-header role-hero role-hero-role1">
+    <main className="task-shell page-corporate-shell">
+      <CorporateTopbar connectionLabel={connectionLabel} connectionTone={connectionTone} />
+
+      <header className="task-header role-hero role-hero-role1 page-hero-card">
         <div className="role-hero-grid">
           <div className="role-hero-main">
             <p className="task-kicker">BIM Coordinator Project</p>
