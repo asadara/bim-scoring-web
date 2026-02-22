@@ -10,7 +10,6 @@ import MainNav from "@/components/MainNav";
 import { canRoleAccessPath, normalizePath } from "@/lib/accessControl";
 import { startAuthCredentialSync, syncCredentialFromAuth } from "@/lib/authClient";
 import {
-  DEFAULT_APP_LANGUAGE,
   applyLanguage,
   getGlobalText,
   getRoleLabelLocalized,
@@ -37,16 +36,14 @@ const DEFAULT_CREDENTIAL: UserCredential = {
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [credential, setCredential] = useState<UserCredential>(DEFAULT_CREDENTIAL);
-  const [language, setLanguage] = useState<AppLanguage>(DEFAULT_APP_LANGUAGE);
+  const [language, setLanguage] = useState<AppLanguage>(() => resolvePreferredLanguage());
   const [ready, setReady] = useState(false);
   const text = useMemo(() => getGlobalText(language), [language]);
 
   useEffect(() => {
     applyTheme(resolveStoredTheme());
-    const preferredLanguage = resolvePreferredLanguage();
-    applyLanguage(preferredLanguage);
-    setLanguage(preferredLanguage);
-  }, []);
+    applyLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     let active = true;
@@ -226,10 +223,18 @@ export default function App({ Component, pageProps }: AppProps) {
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" href="/logo/bim_scoring_logo.png" />
       </Head>
       <MainNav />
       {content}
+      <footer className="app-global-footer-shell">
+        <section className="task-panel app-legal-footer">
+          <p>&copy; 2026 PT Nusa Konstruksi Enjiniring Tbk &mdash; Engineering Department &mdash; Divisi BIM</p>
+          <p>
+            This platform supports information governance aligned with ISO 19650 (conceptual alignment).
+          </p>
+        </section>
+      </footer>
     </>
   );
 
@@ -282,3 +287,4 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return renderShell(<Component {...pageProps} />);
 }
+

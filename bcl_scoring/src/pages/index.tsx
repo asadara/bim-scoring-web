@@ -705,10 +705,10 @@ export default function Home() {
             <div className="dashboard-program-brand">
               {showBimProgramLogo ? (
                 <Image
-                  src="/bim_nke_logo.gif"
-                  alt="BIM NKE Program"
+                  src="/logo/bim_scoring_main_logo_full.png"
+                  alt="BIM Scoring Main Logo"
                   className="dashboard-brand-logo dashboard-brand-logo-secondary"
-                  width={85}
+                  width={130}
                   height={40}
                   loading="eager"
                   onError={() => setShowBimProgramLogo(false)}
@@ -1148,14 +1148,6 @@ export default function Home() {
         </section>
           </aside>
         </section>
-
-        <footer className="task-panel dashboard-legal-footer">
-          <p>© 2026 PT Nusa Konstruksi Enjiniring Tbk — Divisi BIM, Engineering Department</p>
-          <p>
-            This platform supports information governance aligned with ISO 19650 (conceptual alignment; not an
-            automatic compliance claim).
-          </p>
-        </footer>
       </main>
 
       {activePerspective ? (
@@ -1258,3 +1250,4 @@ export default function Home() {
     </>
   );
 }
+

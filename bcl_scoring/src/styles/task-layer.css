@@ -266,6 +266,12 @@ a {
   min-width: 0;
 }
 
+.app-global-footer-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 18px 28px;
+}
+
 .task-header {
   background: linear-gradient(140deg, var(--task-header-from) 0%, var(--task-header-to) 68%);
   border: 1px solid var(--task-line);
@@ -286,6 +292,28 @@ a {
   margin: 8px 0 4px;
   font-size: 28px;
   line-height: 1.1;
+}
+
+.task-header h1,
+.me-page-title,
+.task-shell > .task-panel > h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.task-header h1::before,
+.me-page-title::before,
+.task-shell > .task-panel > h1::before {
+  content: "";
+  width: 0.95em;
+  height: 1.05em;
+  flex: 0 0 auto;
+  background-image: url("/logo/bim_scoring_logo.png");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
 }
 
 .task-subtitle {
@@ -1856,6 +1884,10 @@ table td.table-col-long {
     padding: 20px 12px 28px;
   }
 
+  .app-global-footer-shell {
+    padding: 0 12px 20px;
+  }
+
   .task-header h1 {
     font-size: 24px;
   }
@@ -2684,7 +2716,7 @@ table td.table-col-long {
 }
 
 .dashboard-brand-logo-secondary {
-  width: 85px;
+  width: 130px;
   height: 40px;
 }
 
@@ -3022,12 +3054,14 @@ table td.table-col-long {
   font-size: 12px;
 }
 
+.app-legal-footer,
 .dashboard-legal-footer {
   margin-top: 0;
   border-color: #cfd8e2;
   background: #f9fbfc;
 }
 
+.app-legal-footer p,
 .dashboard-legal-footer p {
   margin: 0;
   color: #41556a;
@@ -3035,6 +3069,7 @@ table td.table-col-long {
   line-height: 1.45;
 }
 
+.app-legal-footer p + p,
 .dashboard-legal-footer p + p {
   margin-top: 6px;
 }
