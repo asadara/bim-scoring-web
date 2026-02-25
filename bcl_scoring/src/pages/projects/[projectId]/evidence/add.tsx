@@ -688,33 +688,36 @@ export default function AddEvidencePage() {
               <div className="bim-use-card-grid">
                 {context.bim_uses.map((group) => {
                   const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
-                  return (
-                    <article key={group.bim_use_id} className="bim-use-card">
+                  const cardContent = (
+                    <>
                       <p className="task-kicker">BIM Use</p>
                       <h3>{group.label}</h3>
-                      <div className="bim-use-card-metrics">
-                        <p>
-                          <strong>{evidenceCount}</strong>
-                          <small>Evidence ditambahkan</small>
-                        </p>
-                        <p>
-                          <strong>{group.indicators.length}</strong>
-                          <small>Indicator tersedia</small>
-                        </p>
-                      </div>
-                      <div className="wizard-actions">
-                        <Link
-                          href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
-                          className={`action-primary${isBimUseCardActionDisabled ? " disabled-link" : ""}`}
-                          aria-disabled={isBimUseCardActionDisabled}
-                          onClick={(event) => {
-                            if (isBimUseCardActionDisabled) event.preventDefault();
-                          }}
-                        >
-                          Lanjut Input Evidence
-                        </Link>
-                      </div>
-                    </article>
+                      <p className="bim-use-card-info">
+                        Evidence ditambahkan: <strong>{evidenceCount}</strong>
+                      </p>
+                      <p className="bim-use-card-info">
+                        Indicator tersedia: <strong>{group.indicators.length}</strong>
+                      </p>
+                      <p className="bim-use-card-cta">Klik card ini untuk lanjut input evidence.</p>
+                    </>
+                  );
+
+                  if (isBimUseCardActionDisabled) {
+                    return (
+                      <article key={group.bim_use_id} className="bim-use-card bim-use-card-disabled">
+                        {cardContent}
+                      </article>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={group.bim_use_id}
+                      href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
+                      className="bim-use-card bim-use-card-link"
+                    >
+                      {cardContent}
+                    </Link>
                   );
                 })}
               </div>

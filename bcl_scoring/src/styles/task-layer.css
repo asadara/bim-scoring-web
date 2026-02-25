@@ -1411,7 +1411,7 @@ a {
   background: linear-gradient(155deg, #f8fcfa 0%, #ffffff 75%);
   padding: 12px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .bim-use-card h3 {
@@ -1423,31 +1423,45 @@ a {
   margin: 0;
 }
 
-.bim-use-card-metrics {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.bim-use-card-link {
+  text-decoration: none;
+  color: var(--task-ink);
+  border-color: #9fc4b3;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
-.bim-use-card-metrics p {
-  margin: 0;
-  border: 1px solid var(--task-line);
-  border-radius: 8px;
+.bim-use-card-link:hover,
+.bim-use-card-link:focus-visible {
+  border-color: var(--task-primary);
   background: #ffffff;
-  padding: 8px;
+  box-shadow: 0 0 0 2px var(--task-focus-ring);
 }
 
-.bim-use-card-metrics strong {
-  display: block;
-  font-size: 22px;
-  line-height: 1.1;
+.bim-use-card-disabled {
+  border-color: var(--task-disabled-border);
+  background: var(--task-disabled-bg);
+  color: var(--task-disabled-ink);
 }
 
-.bim-use-card-metrics small {
-  display: block;
-  margin-top: 4px;
+.bim-use-card-info {
+  margin: 0;
+  font-size: 14px;
   color: var(--task-muted);
+}
+
+.bim-use-card-info strong {
+  color: var(--task-ink);
+}
+
+.bim-use-card-cta {
+  margin: 4px 0 0;
   font-size: 12px;
+  font-weight: 700;
+  color: var(--task-primary);
+}
+
+.bim-use-card-disabled .bim-use-card-cta {
+  color: var(--task-disabled-ink);
 }
 
 .group-section {
