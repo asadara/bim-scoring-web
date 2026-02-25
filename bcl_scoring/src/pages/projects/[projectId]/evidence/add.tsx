@@ -693,12 +693,13 @@ export default function AddEvidencePage() {
                       <p className="task-kicker">BIM Use</p>
                       <h3>{group.label}</h3>
                       <p className="bim-use-card-info">
-                        Evidence ditambahkan: <strong>{evidenceCount}</strong>
+                        <span>Evidence ditambahkan</span>
+                        <strong>{evidenceCount}</strong>
                       </p>
                       <p className="bim-use-card-info">
-                        Indicator tersedia: <strong>{group.indicators.length}</strong>
+                        <span>Indicator tersedia</span>
+                        <strong>{group.indicators.length}</strong>
                       </p>
-                      <p className="bim-use-card-cta">Klik card ini untuk lanjut input evidence.</p>
                     </>
                   );
 

@@ -1411,16 +1411,18 @@ a {
   background: linear-gradient(155deg, #f8fcfa 0%, #ffffff 75%);
   padding: 12px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .bim-use-card h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 24px;
+  line-height: 1.15;
 }
 
 .bim-use-card .task-kicker {
   margin: 0;
+  font-size: 11px;
 }
 
 .bim-use-card-link {
@@ -1445,22 +1447,29 @@ a {
 
 .bim-use-card-info {
   margin: 0;
-  font-size: 14px;
+  display: grid;
+  gap: 2px;
+  padding-top: 2px;
+  border-top: 1px dashed #d6e2dd;
+}
+
+.bim-use-card-info span {
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--task-muted);
 }
 
 .bim-use-card-info strong {
-  color: var(--task-ink);
-}
-
-.bim-use-card-cta {
-  margin: 4px 0 0;
-  font-size: 12px;
-  font-weight: 700;
+  display: block;
+  font-size: 32px;
+  line-height: 1.05;
+  font-weight: 800;
   color: var(--task-primary);
 }
 
-.bim-use-card-disabled .bim-use-card-cta {
+.bim-use-card-disabled .bim-use-card-info span,
+.bim-use-card-disabled .bim-use-card-info strong {
   color: var(--task-disabled-ink);
 }
 
