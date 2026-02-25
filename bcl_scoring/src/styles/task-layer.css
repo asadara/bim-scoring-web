@@ -1416,19 +1416,23 @@ a {
 
 .bim-use-card-title {
   margin: 0;
-  font-size: 21px;
-  line-height: 1.15;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 700;
   color: var(--task-ink);
 }
 
 .bim-use-card-stat {
   margin: 0;
   color: var(--task-muted);
-  font-size: 18px;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .bim-use-card-stat strong {
-  font-size: 24px;
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 26px;
   line-height: 1;
   font-weight: 700;
   color: var(--task-primary);
