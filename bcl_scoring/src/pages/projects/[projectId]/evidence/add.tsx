@@ -18,6 +18,7 @@ import {
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
 } from "@/lib/role1TaskLayer";
+import type { IndicatorRecord } from "@/lib/role1TaskLayer";
 import { submitRole2BimUseProposal } from "@/lib/role2ProposalClient";
 import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
@@ -26,6 +27,7 @@ type WizardForm = {
   evidence_id: string | null;
   bim_use_id: string;
   indicator_ids: string[];
+  evidence_option: string;
   type: EvidenceType | "";
   file_type: "PDF" | "IMAGE" | "DOC" | "SPREADSHEET" | "MODEL" | "OTHER" | "";
   title: string;
@@ -45,10 +47,76 @@ const STEP_LABELS = [
   "Step 3 - Fill evidence form",
 ];
 
+const BIM_USE_EVIDENCE_OPTION_LIBRARY: Record<string, string[]> = {
+  "4d planning": [
+    "BEP (Pre & Post)",
+    "4D POS",
+    "ABBR Register",
+    "Naming Convention Register",
+    "RACI",
+    "Federation Strategy",
+    "Federated Model",
+    "Master Schedule",
+    "4D-ID Register",
+    "Dokumen Mobilisasi/Pengadaan Software Platform Interoperabilitas",
+    "File Product Simulasi 4D",
+    "Capacity Capability Management",
+    "Training Report",
+    "Sertifikasi 4D Simulation",
+    "Dokumen Lesson Learn 4D",
+    "Dokumentasi Meeting Koordinasi 4D",
+  ],
+};
+
+const BIM_USE_EVIDENCE_OPTION_ALIASES: Record<string, string> = {
+  "4d": "4d planning",
+  "4d planning": "4d planning",
+};
+
+function normalizeEvidenceBimUseKey(value: string): string {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const item = String(raw || "").trim();
+    if (!item) continue;
+    const normalized = item.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(item);
+  }
+  return out;
+}
+
+function fallbackEvidenceOptionsFromIndicators(indicators: IndicatorRecord[]): string[] {
+  const fromTitles = indicators
+    .map((row) => String(row.title || "").trim())
+    .filter(Boolean);
+  return uniqueNonEmpty(fromTitles).slice(0, 20);
+}
+
+function resolveEvidenceOptionsForBimUse(input: { label: string; indicators: IndicatorRecord[] }): string[] {
+  const baseKey = normalizeEvidenceBimUseKey(input.label);
+  const mappedKey = BIM_USE_EVIDENCE_OPTION_ALIASES[baseKey] || baseKey;
+  const fromLibrary = BIM_USE_EVIDENCE_OPTION_LIBRARY[mappedKey];
+  if (Array.isArray(fromLibrary) && fromLibrary.length > 0) {
+    return uniqueNonEmpty(fromLibrary);
+  }
+  const fallback = fallbackEvidenceOptionsFromIndicators(input.indicators);
+  return fallback;
+}
+
 const INITIAL_FORM: WizardForm = {
   evidence_id: null,
   bim_use_id: "",
   indicator_ids: [],
+  evidence_option: "",
   type: "",
   file_type: "",
   title: "",
@@ -267,6 +335,7 @@ export default function AddEvidencePage() {
           evidence_id: hit.id,
           bim_use_id: hit.bim_use_id || NO_BIM_USE_ID,
           indicator_ids: hit.indicator_ids.slice(0, 1),
+          evidence_option: hit.title || "",
           type: hit.type,
           file_type: hit.type === "FILE" ? inferFileTypeFromEvidence(hit) : "",
           title: hit.title,
@@ -298,6 +367,7 @@ export default function AddEvidencePage() {
         if (
           !prev.bim_use_id &&
           prev.indicator_ids.length === 0 &&
+          !prev.evidence_option &&
           !prev.type &&
           !prev.title &&
           !prev.description
@@ -361,6 +431,26 @@ export default function AddEvidencePage() {
     if (!context) return null;
     return context.bim_uses.find((item) => item.bim_use_id === form.bim_use_id) || null;
   }, [context, form.bim_use_id]);
+  const evidenceOptionCountByBimUseId = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!context) return map;
+    for (const group of context.bim_uses) {
+      const options = resolveEvidenceOptionsForBimUse({ label: group.label, indicators: group.indicators });
+      map[group.bim_use_id] = options.length;
+    }
+    return map;
+  }, [context]);
+  const selectedBimUseEvidenceOptions = useMemo(() => {
+    if (!selectedBimUse) return [] as string[];
+    const base = resolveEvidenceOptionsForBimUse({
+      label: selectedBimUse.label,
+      indicators: selectedBimUse.indicators,
+    });
+    if (form.evidence_option && !base.includes(form.evidence_option)) {
+      return [form.evidence_option, ...base];
+    }
+    return base;
+  }, [form.evidence_option, selectedBimUse]);
 
   const indicators = useMemo(() => selectedBimUse?.indicators || [], [selectedBimUse]);
   const selectedIndicator = useMemo(() => {
@@ -371,6 +461,7 @@ export default function AddEvidencePage() {
   const selectedIndicatorLabel = selectedIndicator
     ? `${selectedIndicator.code} - ${selectedIndicator.title}`
     : "Belum dipilih";
+  const selectedEvidenceOptionLabel = form.evidence_option || "Belum dipilih";
   const selectedEvidenceTypeLabel = form.type || "Belum dipilih";
   const selectedFileTypeLabel =
     form.type === "FILE" ? form.file_type || "Belum dipilih" : "N/A (bukan tipe FILE)";
@@ -386,6 +477,17 @@ export default function AddEvidencePage() {
     setGapProposedBimUse(selectedBimUse.label);
   }, [showGapProposalForm, gapProposedBimUse, selectedBimUse?.label]);
 
+  useEffect(() => {
+    if (!selectedBimUse) return;
+    if (form.evidence_option && selectedBimUseEvidenceOptions.includes(form.evidence_option)) return;
+    if (selectedBimUseEvidenceOptions.length === 0) return;
+    setForm((prev) => ({
+      ...prev,
+      evidence_option: selectedBimUseEvidenceOptions[0] || "",
+      title: prev.title || selectedBimUseEvidenceOptions[0] || prev.title,
+    }));
+  }, [form.evidence_option, selectedBimUse, selectedBimUseEvidenceOptions]);
+
   function setField<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSubmitError(null);
@@ -398,6 +500,9 @@ export default function AddEvidencePage() {
     }
     if (targetStep >= 1 && form.indicator_ids.length === 0) {
       return "Step 1 wajib: pilih 1 indikator.";
+    }
+    if (targetStep >= 1 && selectedBimUseEvidenceOptions.length > 0 && !form.evidence_option.trim()) {
+      return "Step 1 wajib: pilih 1 evidence dari daftar BIM Use.";
     }
     if (targetStep >= 2 && !form.type) {
       return "Step 2 wajib: pilih tipe evidence (FILE/URL/TEXT).";
@@ -443,6 +548,20 @@ export default function AddEvidencePage() {
 
   function onSelectIndicator(indicatorId: string) {
     setField("indicator_ids", indicatorId ? [indicatorId] : []);
+  }
+
+  function onSelectEvidenceOption(option: string) {
+    setForm((prev) => {
+      const nextOption = option.trim();
+      const shouldSyncTitle = !prev.title.trim() || prev.title.trim() === prev.evidence_option.trim();
+      return {
+        ...prev,
+        evidence_option: nextOption,
+        title: shouldSyncTitle && nextOption ? nextOption : prev.title,
+      };
+    });
+    setSubmitError(null);
+    setSubmitInfo(null);
   }
 
   function onSelectEvidenceType(type: EvidenceType) {
@@ -522,6 +641,7 @@ export default function AddEvidencePage() {
       `project_id=${projectId}`,
       `selected_bim_use=${selectedBimUseLabel}`,
       `selected_indicator=${selectedIndicatorLabel}`,
+      `selected_evidence_option=${selectedEvidenceOptionLabel}`,
       `draft_type=${selectedEvidenceTypeLabel}`,
       `draft_title=${form.title.trim() || NA_TEXT}`,
     ];
@@ -567,7 +687,9 @@ export default function AddEvidencePage() {
     if (validationError) {
       setSubmitError(validationError);
       const failingStep =
-        !form.bim_use_id || form.indicator_ids.length === 0
+        !form.bim_use_id ||
+        form.indicator_ids.length === 0 ||
+        (selectedBimUseEvidenceOptions.length > 0 && !form.evidence_option.trim())
           ? 1
           : !form.type || (form.type === "FILE" && !form.file_type)
             ? 2
@@ -719,6 +841,7 @@ export default function AddEvidencePage() {
               <div className="bim-use-card-grid">
                 {context.bim_uses.map((group) => {
                   const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
+                  const evidenceOptionCount = evidenceOptionCountByBimUseId[group.bim_use_id] || 0;
                   const cardContent = (
                     <>
                       <h3 className="bim-use-card-title">
@@ -750,7 +873,7 @@ export default function AddEvidencePage() {
 
                   if (isBimUseCardActionDisabled) {
                     return (
-                      <article key={group.bim_use_id} className="bim-use-card bim-use-card-disabled" aria-disabled="true">
+                      <article key={group.bim_use_id} className="bim-use-card bim-use-card-disabled">
                         {cardContent}
                       </article>
                     );
@@ -761,7 +884,7 @@ export default function AddEvidencePage() {
                       key={group.bim_use_id}
                       href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
                       className="bim-use-card bim-use-card-link"
-                      aria-label={`Buka input evidence untuk BIM Use ${group.label}. ${evidenceCount} evidence, ${group.indicators.length} indikator.`}
+                      aria-label={`Buka input evidence untuk BIM Use ${group.label}. ${evidenceCount} evidence tersimpan, ${group.indicators.length} indikator, ${evidenceOptionCount} opsi evidence tersedia.`}
                     >
                       {cardContent}
                     </Link>
@@ -789,6 +912,7 @@ export default function AddEvidencePage() {
               </p>
               <p>Step 1 - BIM Use: {selectedBimUseLabel}</p>
               <p>Step 1 - Indicator: {selectedIndicatorLabel}</p>
+              <p>Step 1 - Evidence: {selectedEvidenceOptionLabel}</p>
               <p>Step 2 - Evidence Type: {selectedEvidenceTypeLabel}</p>
               <p>Step 2 - Jenis File: {selectedFileTypeLabel}</p>
             </div>
@@ -822,16 +946,40 @@ export default function AddEvidencePage() {
                         ))}
                       </select>
                     </label>
+                    <label htmlFor="evidence-option-select">
+                      Evidence (berdasarkan BIM Use terpilih)
+                      <select
+                        id="evidence-option-select"
+                        value={form.evidence_option}
+                        onChange={(event) => onSelectEvidenceOption(event.target.value)}
+                        disabled={fieldDisabled || selectedBimUseEvidenceOptions.length === 0}
+                      >
+                        <option value="">Pilih evidence</option>
+                        {selectedBimUseEvidenceOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     {selectedIndicator ? (
                       <p className="inline-note">
-                        Indicator terpilih: <strong>{selectedIndicator.code}</strong> | Perspective:{" "}
-                        {selectedIndicator.perspective_id || NA_TEXT} | BIM Use:{" "}
+                        Indicator terpilih: <strong>{selectedIndicator.code}</strong> | BIM Use:{" "}
                         {selectedIndicator.bim_use_tags.length
                           ? selectedIndicator.bim_use_tags.join(", ")
                           : NA_TEXT}
                       </p>
                     ) : (
                       <p className="inline-note">Belum ada indikator terpilih.</p>
+                    )}
+                    {form.evidence_option ? (
+                      <p className="inline-note">
+                        Evidence terpilih: <strong>{form.evidence_option}</strong>
+                      </p>
+                    ) : selectedBimUseEvidenceOptions.length > 0 ? (
+                      <p className="inline-note">Pilih evidence dari daftar untuk BIM Use ini.</p>
+                    ) : (
+                      <p className="warning-box">Daftar evidence untuk BIM Use ini belum tersedia.</p>
                     )}
                   </>
                 ) : (
