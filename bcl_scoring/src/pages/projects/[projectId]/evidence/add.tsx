@@ -9,7 +9,6 @@ import {
   EvidenceType,
   fetchEvidenceListReadMode,
   fetchProjectPeriodsReadMode,
-  getRole1ScopedProjectId,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
   NO_BIM_USE_ID,
@@ -41,7 +40,7 @@ type WizardForm = {
 const LOCAL_FILE_SIZE_LIMIT_BYTES = 2 * 1024 * 1024; // 2 MB (localStorage-safe for prototype)
 
 const STEP_LABELS = [
-  "Step 1 - Select BIM Use & indicator",
+  "Step 1 - Select indicator",
   "Step 2 - Select evidence type",
   "Step 3 - Fill evidence form",
 ];
@@ -139,7 +138,7 @@ function buildFileAccept(type: WizardForm["file_type"]): string | undefined {
 
 export default function AddEvidencePage() {
   const router = useRouter();
-  const { projectId, evidenceId, mode } = router.query;
+  const { projectId, evidenceId, mode, bimUseId } = router.query;
   const credential = useCredential();
 
   const [step, setStep] = useState(1);
@@ -158,6 +157,18 @@ export default function AddEvidencePage() {
   const [gapSubmitting, setGapSubmitting] = useState(false);
   const [gapError, setGapError] = useState<string | null>(null);
   const [gapInfo, setGapInfo] = useState<string | null>(null);
+  const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
+  const scopedProjectId = useMemo(() => {
+    if (credential.role !== "role1") return null;
+    const scopedIds = Array.isArray(credential.scoped_project_ids)
+      ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    return scopedIds[0] || null;
+  }, [credential.role, credential.scoped_project_ids]);
+  const selectedBimUseIdFromQuery = useMemo(
+    () => (typeof bimUseId === "string" ? bimUseId.trim() : ""),
+    [bimUseId]
+  );
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string") return;
@@ -185,19 +196,14 @@ export default function AddEvidencePage() {
   }, [router.isReady, projectId]);
 
   useEffect(() => {
-    if (!context || typeof projectId !== "string") return;
+    if (!router.isReady || typeof projectId !== "string") return;
+    if (credential.role !== "role1" || !scopedProjectId || scopedProjectId === projectId) return;
+    void router.replace(`/projects/${scopedProjectId}/evidence/add`);
+  }, [credential.role, projectId, router, router.isReady, scopedProjectId]);
 
-    if (typeof evidenceId !== "string") {
-      setSubmitError(null);
-      setForm((prev) => {
-        if (prev.bim_use_id) return prev;
-        return {
-          ...prev,
-          bim_use_id: "",
-        };
-      });
-      return;
-    }
+  useEffect(() => {
+    if (!context || typeof projectId !== "string") return;
+    if (typeof evidenceId !== "string") return;
 
     let cancelled = false;
     (async () => {
@@ -252,11 +258,78 @@ export default function AddEvidencePage() {
     };
   }, [context, evidenceId, projectId]);
 
+  useEffect(() => {
+    if (!context || typeof projectId !== "string") return;
+    if (typeof evidenceId === "string") return;
+
+    if (!selectedBimUseIdFromQuery) {
+      setForm((prev) => {
+        if (
+          !prev.bim_use_id &&
+          prev.indicator_ids.length === 0 &&
+          !prev.type &&
+          !prev.title &&
+          !prev.description
+        ) {
+          return prev;
+        }
+        return { ...INITIAL_FORM };
+      });
+      setStep(1);
+      setLocalFileMeta(null);
+      setShowGapProposalForm(false);
+      setSubmitError(null);
+      return;
+    }
+
+    const hasBimUse = context.bim_uses.some((item) => item.bim_use_id === selectedBimUseIdFromQuery);
+    if (!hasBimUse) {
+      setSubmitError("BIM Use yang dipilih tidak tersedia pada workspace ini.");
+      return;
+    }
+
+    setSubmitError(null);
+    setSubmitInfo(null);
+    setStep(1);
+    setLocalFileMeta(null);
+    setShowGapProposalForm(false);
+    setForm((prev) => {
+      if (prev.bim_use_id === selectedBimUseIdFromQuery) return prev;
+      return {
+        ...INITIAL_FORM,
+        bim_use_id: selectedBimUseIdFromQuery,
+      };
+    });
+  }, [context, evidenceId, projectId, selectedBimUseIdFromQuery]);
+
+  useEffect(() => {
+    if (!context || typeof projectId !== "string") return;
+
+    let mounted = true;
+    fetchEvidenceListReadMode(projectId, context.active_period?.id ?? null)
+      .then((result) => {
+        if (!mounted) return;
+        const nextCountByBimUse: Record<string, number> = {};
+        for (const item of result.data) {
+          const key = String(item.bim_use_id || "").trim() || NO_BIM_USE_ID;
+          nextCountByBimUse[key] = (nextCountByBimUse[key] || 0) + 1;
+        }
+        setBimUseEvidenceCountById(nextCountByBimUse);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setBimUseEvidenceCountById({});
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [context, projectId]);
+
   const selectedBimUse = useMemo(() => {
     if (!context) return null;
     return context.bim_uses.find((item) => item.bim_use_id === form.bim_use_id) || null;
   }, [context, form.bim_use_id]);
-  const scopedProjectId = getRole1ScopedProjectId();
 
   const indicators = useMemo(() => selectedBimUse?.indicators || [], [selectedBimUse]);
   const selectedIndicator = useMemo(() => {
@@ -386,20 +459,6 @@ export default function AddEvidencePage() {
       setSubmitError("Gagal membaca file dari browser.");
     };
     reader.readAsDataURL(file);
-  }
-
-  function onSelectBimUse(value: string) {
-    const group = context?.bim_uses.find((item) => item.bim_use_id === value) || null;
-    const validIndicatorIds = new Set((group?.indicators || []).map((item) => item.id));
-    const firstSelected = form.indicator_ids.find((id) => validIndicatorIds.has(id)) || "";
-
-    setForm((prev) => ({
-      ...prev,
-      bim_use_id: value,
-      indicator_ids: firstSelected ? [firstSelected] : [],
-    }));
-    setSubmitError(null);
-    setSubmitInfo(null);
   }
 
   async function onSubmitGapProposal(event: FormEvent<HTMLFormElement>) {
@@ -537,6 +596,14 @@ export default function AddEvidencePage() {
     );
   }
 
+  if (credential.role === "role1" && scopedProjectId && typeof projectId === "string" && scopedProjectId !== projectId) {
+    return (
+      <main className="task-shell">
+        <section className="task-panel">Mengarahkan ke workspace project Anda...</section>
+      </main>
+    );
+  }
+
   if (!context || typeof projectId !== "string") {
     return (
       <main className="task-shell">
@@ -553,18 +620,19 @@ export default function AddEvidencePage() {
 
   const isLocked = context.period_locked;
   const canWrite = canWriteRole1Evidence(credential.role) && canRole1WriteProject(projectId);
-  const role1OutOfScopeReadOnly =
-    credential.role === "role1" && Boolean(scopedProjectId) && scopedProjectId !== projectId;
   const fieldDisabled = isLocked || !canWrite;
   const writeDisabled =
     fieldDisabled || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
   const isRevisionMode = mode === "revisi";
+  const isEditingEvidence = typeof evidenceId === "string";
+  const showBimUseSelectionCards = !isEditingEvidence && !form.bim_use_id;
+  const isBimUseCardActionDisabled = fieldDisabled;
 
   return (
     <Role1Layout
       projectId={projectId}
       title="Tambahkan Evidence untuk BIM Use"
-      subtitle="Light wizard BIM Coordinator Project: pilih BIM Use + indikator, pilih tipe, lalu isi evidence."
+      subtitle="Pilih card BIM Use workspace, lalu lanjutkan wizard evidence yang sudah ada."
       project={context.project}
       activePeriod={context.active_period}
       periodStatusLabel={context.period_status_label}
@@ -572,27 +640,6 @@ export default function AddEvidencePage() {
       backendMessage={bannerHint || context.backend_message}
     >
       <section className="task-panel">
-        <div className="stepper" role="list" aria-label="Add evidence steps">
-          {STEP_LABELS.map((label, index) => (
-            <span
-              key={label}
-              role="listitem"
-              className={`step-pill ${step === index + 1 ? "active" : ""}`}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-        <div className="task-note">
-          <p>
-            <strong>Ringkasan Pilihan Saat Ini</strong>
-          </p>
-          <p>Step 1 - BIM Use: {selectedBimUseLabel}</p>
-          <p>Step 1 - Indicator: {selectedIndicatorLabel}</p>
-          <p>Step 2 - Evidence Type: {selectedEvidenceTypeLabel}</p>
-          <p>Step 2 - Jenis File: {selectedFileTypeLabel}</p>
-        </div>
-
         {isLocked ? (
           <p className="warning-box">
             Period saat ini LOCKED. Semua input read-only dan aksi Save/Submit dinonaktifkan.
@@ -616,12 +663,6 @@ export default function AddEvidencePage() {
             dinonaktifkan.
           </p>
         ) : null}
-        {role1OutOfScopeReadOnly ? (
-          <p className="read-only-banner">
-            Workspace ini di luar scope input Role 1 Anda. Buka workspace utama untuk input evidence:{" "}
-            <Link href={`/projects/${scopedProjectId}/evidence/add`}>Tambah Evidence di Workspace Utama</Link>.
-          </p>
-        ) : null}
         {credential.role === "role1" && !scopedProjectId ? (
           <p className="warning-box">
             Workspace input Role 1 Anda belum ditetapkan admin. Halaman ini hanya read-only sampai scope ditetapkan.
@@ -634,327 +675,382 @@ export default function AddEvidencePage() {
           </p>
         ) : null}
 
-        {step === 1 ? (
-          <div className="field-grid">
-            <label htmlFor="bim-use-select">
-              Select BIM Use
-              <select
-                id="bim-use-select"
-                value={form.bim_use_id}
-                onChange={(event) => onSelectBimUse(event.target.value)}
-                disabled={fieldDisabled}
-              >
-                <option value="">Pilih BIM Use</option>
-                {context.bim_uses.map((group) => (
-                  <option key={group.bim_use_id} value={group.bim_use_id}>
-                    {group.label} ({group.indicators.length} indikator)
-                  </option>
-                ))}
-              </select>
-            </label>
+        {showBimUseSelectionCards ? (
+          <>
+            <h2>Pilih BIM Use Workspace</h2>
+            <p className="inline-note">
+              Mulai dari card BIM Use. Setiap card menampilkan jumlah evidence yang sudah ditambahkan dan jumlah
+              indicator yang tersedia.
+            </p>
             {context.bim_uses.length === 0 ? (
               <p className="warning-box">BIM Use belum tersedia dari endpoint. Not available.</p>
-            ) : null}
-          </div>
-        ) : null}
+            ) : (
+              <div className="bim-use-card-grid">
+                {context.bim_uses.map((group) => {
+                  const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
+                  return (
+                    <article key={group.bim_use_id} className="bim-use-card">
+                      <p className="task-kicker">BIM Use</p>
+                      <h3>{group.label}</h3>
+                      <div className="bim-use-card-metrics">
+                        <p>
+                          <strong>{evidenceCount}</strong>
+                          <small>Evidence ditambahkan</small>
+                        </p>
+                        <p>
+                          <strong>{group.indicators.length}</strong>
+                          <small>Indicator tersedia</small>
+                        </p>
+                      </div>
+                      <div className="wizard-actions">
+                        <Link
+                          href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
+                          className={`action-primary${isBimUseCardActionDisabled ? " disabled-link" : ""}`}
+                          aria-disabled={isBimUseCardActionDisabled}
+                          onClick={(event) => {
+                            if (isBimUseCardActionDisabled) event.preventDefault();
+                          }}
+                        >
+                          Lanjut Input Evidence
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="stepper" role="list" aria-label="Add evidence steps">
+              {STEP_LABELS.map((label, index) => (
+                <span
+                  key={label}
+                  role="listitem"
+                  className={`step-pill ${step === index + 1 ? "active" : ""}`}
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+            <div className="task-note">
+              <p>
+                <strong>Ringkasan Pilihan Saat Ini</strong>
+              </p>
+              <p>Step 1 - BIM Use: {selectedBimUseLabel}</p>
+              <p>Step 1 - Indicator: {selectedIndicatorLabel}</p>
+              <p>Step 2 - Evidence Type: {selectedEvidenceTypeLabel}</p>
+              <p>Step 2 - Jenis File: {selectedFileTypeLabel}</p>
+            </div>
 
-        {step === 1 ? (
-          <div className="field-grid">
-            <p>Pilih satu indikator yang paling relevan untuk evidence ini.</p>
-            {form.bim_use_id ? (
-              <>
-                <label htmlFor="indicator-select">
-                  Indicator
+            {step === 1 ? (
+              <div className="field-grid">
+                <p>
+                  BIM Use terpilih: <strong>{selectedBimUseLabel}</strong>
+                </p>
+                {!isEditingEvidence ? (
+                  <div className="wizard-actions">
+                    <Link href={`/projects/${projectId}/evidence/add`}>Ganti BIM Use</Link>
+                  </div>
+                ) : null}
+                <p>Pilih satu indikator yang paling relevan untuk evidence ini.</p>
+                {form.bim_use_id ? (
+                  <>
+                    <label htmlFor="indicator-select">
+                      Indicator
+                      <select
+                        id="indicator-select"
+                        value={form.indicator_ids[0] || ""}
+                        onChange={(event) => onSelectIndicator(event.target.value)}
+                        disabled={fieldDisabled}
+                      >
+                        <option value="">Pilih indikator</option>
+                        {indicators.map((indicator) => (
+                          <option key={indicator.id} value={indicator.id}>
+                            {indicator.code} - {indicator.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedIndicator ? (
+                      <p className="inline-note">
+                        Indicator terpilih: <strong>{selectedIndicator.code}</strong> | Perspective:{" "}
+                        {selectedIndicator.perspective_id || NA_TEXT} | BIM Use:{" "}
+                        {selectedIndicator.bim_use_tags.length
+                          ? selectedIndicator.bim_use_tags.join(", ")
+                          : NA_TEXT}
+                      </p>
+                    ) : (
+                      <p className="inline-note">Belum ada indikator terpilih.</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="warning-box">Pilih BIM Use dari card workspace terlebih dahulu.</p>
+                )}
+
+                {form.bim_use_id && indicators.length === 0 ? (
+                  <p className="warning-box">Indicator untuk BIM Use ini Not available.</p>
+                ) : null}
+
+                <div className="task-note">
+                  <p>
+                    <strong>Tidak menemukan BIM Use/Indicator yang cocok?</strong>
+                  </p>
+                  <p className="inline-note">
+                    Ajukan kebutuhan mapping ke Role 2. Role 1 tidak dapat menambah indikator secara langsung.
+                  </p>
+                  <div className="wizard-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowGapProposalForm((prev) => !prev);
+                        setGapError(null);
+                        setGapInfo(null);
+                      }}
+                      disabled={credential.role !== "role1" || !proposalActor || gapSubmitting}
+                    >
+                      {showGapProposalForm ? "Tutup Form Pengajuan" : "Ajukan ke Role 2"}
+                    </button>
+                  </div>
+                  {showGapProposalForm ? (
+                    <form className="field-grid" onSubmit={(event) => void onSubmitGapProposal(event)}>
+                      <label>
+                        Usulan BIM Use
+                        <input
+                          value={gapProposedBimUse}
+                          onChange={(event) => setGapProposedBimUse(event.target.value)}
+                          placeholder="Contoh: Clash Coordination - Structural"
+                          disabled={gapSubmitting}
+                        />
+                      </label>
+                      <label>
+                        Alasan Pengajuan
+                        <textarea
+                          value={gapReason}
+                          onChange={(event) => setGapReason(event.target.value)}
+                          placeholder="Jelaskan kenapa evidence tidak cocok dengan BIM Use/Indicator yang tersedia."
+                          rows={4}
+                          disabled={gapSubmitting}
+                        />
+                      </label>
+                      <div className="wizard-actions">
+                        <button type="submit" className="action-primary" disabled={gapSubmitting}>
+                          {gapSubmitting ? "Mengirim..." : "Kirim Pengajuan"}
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {gapError ? <p className="error-box">{gapError}</p> : null}
+                  {gapInfo ? <p className="task-note action-feedback">{gapInfo}</p> : null}
+                </div>
+              </div>
+            ) : null}
+
+            {step === 2 ? (
+              <div className="field-grid">
+                <label htmlFor="evidence-type">
+                  Evidence Type
                   <select
-                    id="indicator-select"
-                    value={form.indicator_ids[0] || ""}
-                    onChange={(event) => onSelectIndicator(event.target.value)}
+                    id="evidence-type"
+                    value={form.type}
+                    onChange={(event) => onSelectEvidenceType(event.target.value as EvidenceType)}
                     disabled={fieldDisabled}
                   >
-                    <option value="">Pilih indikator</option>
-                    {indicators.map((indicator) => (
-                      <option key={indicator.id} value={indicator.id}>
-                        {indicator.code} - {indicator.title}
+                    <option value="">Pilih tipe evidence</option>
+                    {(["FILE", "URL", "TEXT"] as EvidenceType[]).map((type) => (
+                      <option key={type} value={type}>
+                        {type}
                       </option>
                     ))}
                   </select>
                 </label>
-                {selectedIndicator ? (
-                  <p className="inline-note">
-                    Indicator terpilih: <strong>{selectedIndicator.code}</strong> | Perspective:{" "}
-                    {selectedIndicator.perspective_id || NA_TEXT} | BIM Use:{" "}
-                    {selectedIndicator.bim_use_tags.length
-                      ? selectedIndicator.bim_use_tags.join(", ")
-                      : NA_TEXT}
-                  </p>
-                ) : (
-                  <p className="inline-note">Belum ada indikator terpilih.</p>
-                )}
-              </>
-            ) : (
-              <p className="warning-box">Pilih BIM Use pada Step 1 terlebih dahulu.</p>
-            )}
-
-            {form.bim_use_id && indicators.length === 0 ? (
-              <p className="warning-box">Indicator untuk BIM Use ini Not available.</p>
-            ) : null}
-
-            <div className="task-note">
-              <p>
-                <strong>Tidak menemukan BIM Use/Indicator yang cocok?</strong>
-              </p>
-              <p className="inline-note">
-                Ajukan kebutuhan mapping ke Role 2. Role 1 tidak dapat menambah indikator secara langsung.
-              </p>
-              <div className="wizard-actions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowGapProposalForm((prev) => !prev);
-                    setGapError(null);
-                    setGapInfo(null);
-                  }}
-                  disabled={credential.role !== "role1" || !proposalActor || gapSubmitting}
-                >
-                  {showGapProposalForm ? "Tutup Form Pengajuan" : "Ajukan ke Role 2"}
-                </button>
+                {form.type === "FILE" ? (
+                  <label htmlFor="file-type-select">
+                    Jenis File
+                    <select
+                      id="file-type-select"
+                      value={form.file_type}
+                      onChange={(event) => setField("file_type", event.target.value as WizardForm["file_type"])}
+                      disabled={fieldDisabled}
+                    >
+                      <option value="">Pilih jenis file</option>
+                      <option value="PDF">PDF</option>
+                      <option value="IMAGE">Image</option>
+                      <option value="DOC">Document</option>
+                      <option value="SPREADSHEET">Spreadsheet</option>
+                      <option value="MODEL">BIM Model</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </label>
+                ) : null}
+                <p className="inline-note">{renderTypeHint(form.type)}</p>
               </div>
-              {showGapProposalForm ? (
-                <form className="field-grid" onSubmit={(event) => void onSubmitGapProposal(event)}>
-                  <label>
-                    Usulan BIM Use
-                    <input
-                      value={gapProposedBimUse}
-                      onChange={(event) => setGapProposedBimUse(event.target.value)}
-                      placeholder="Contoh: Clash Coordination - Structural"
-                      disabled={gapSubmitting}
-                    />
-                  </label>
-                  <label>
-                    Alasan Pengajuan
-                    <textarea
-                      value={gapReason}
-                      onChange={(event) => setGapReason(event.target.value)}
-                      placeholder="Jelaskan kenapa evidence tidak cocok dengan BIM Use/Indicator yang tersedia."
-                      rows={4}
-                      disabled={gapSubmitting}
-                    />
-                  </label>
-                  <div className="wizard-actions">
-                    <button type="submit" className="action-primary" disabled={gapSubmitting}>
-                      {gapSubmitting ? "Mengirim..." : "Kirim Pengajuan"}
-                    </button>
-                  </div>
-                </form>
-              ) : null}
-              {gapError ? <p className="error-box">{gapError}</p> : null}
-              {gapInfo ? <p className="task-note action-feedback">{gapInfo}</p> : null}
-            </div>
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div className="field-grid">
-            <label htmlFor="evidence-type">
-              Evidence Type
-              <select
-                id="evidence-type"
-                value={form.type}
-                onChange={(event) => onSelectEvidenceType(event.target.value as EvidenceType)}
-                disabled={fieldDisabled}
-              >
-                <option value="">Pilih tipe evidence</option>
-                {(["FILE", "URL", "TEXT"] as EvidenceType[]).map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {form.type === "FILE" ? (
-              <label htmlFor="file-type-select">
-                Jenis File
-                <select
-                  id="file-type-select"
-                  value={form.file_type}
-                  onChange={(event) => setField("file_type", event.target.value as WizardForm["file_type"])}
-                  disabled={fieldDisabled}
-                >
-                  <option value="">Pilih jenis file</option>
-                  <option value="PDF">PDF</option>
-                  <option value="IMAGE">Image</option>
-                  <option value="DOC">Document</option>
-                  <option value="SPREADSHEET">Spreadsheet</option>
-                  <option value="MODEL">BIM Model</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </label>
-            ) : null}
-            <p className="inline-note">{renderTypeHint(form.type)}</p>
-          </div>
-        ) : null}
-
-        {step === 3 ? (
-          <div className="field-grid">
-            <label htmlFor="title-input">
-              Title
-              <input
-                id="title-input"
-                value={form.title}
-                onChange={(event) => setField("title", event.target.value)}
-                disabled={fieldDisabled}
-                maxLength={160}
-              />
-            </label>
-
-            <label htmlFor="description-input">
-              Description
-              <textarea
-                id="description-input"
-                value={form.description}
-                onChange={(event) => setField("description", event.target.value)}
-                disabled={fieldDisabled}
-                maxLength={2000}
-              />
-            </label>
-
-            {form.type === "URL" ? (
-              <label htmlFor="external-url-input">
-                external_url
-                <input
-                  id="external-url-input"
-                  value={form.external_url}
-                  onChange={(event) => setField("external_url", event.target.value)}
-                  disabled={fieldDisabled}
-                  placeholder="https://..."
-                />
-              </label>
             ) : null}
 
-            {form.type === "TEXT" ? (
-              <label htmlFor="text-content-input">
-                text content (plain text)
-                <textarea
-                  id="text-content-input"
-                  value={form.text_content}
-                  onChange={(event) => setField("text_content", event.target.value)}
-                  disabled={fieldDisabled}
-                  placeholder="Tuliskan konteks evidence sebagai plain text"
-                />
-              </label>
-            ) : null}
-
-            {form.type === "FILE" ? (
-              <>
-                <p className="inline-note">
-                  Jenis file: <strong>{form.file_type || "Belum dipilih"}</strong>
-                </p>
-                <label htmlFor="file-binary-upload">
-                  Upload binary file (prototype local)
+            {step === 3 ? (
+              <div className="field-grid">
+                <label htmlFor="title-input">
+                  Title
                   <input
-                    id="file-binary-upload"
-                    type="file"
-                    accept={buildFileAccept(form.file_type)}
-                    onChange={(event) => onSelectLocalBinaryFile(event.target.files?.[0] || null)}
+                    id="title-input"
+                    value={form.title}
+                    onChange={(event) => setField("title", event.target.value)}
                     disabled={fieldDisabled}
+                    maxLength={160}
                   />
                 </label>
-                <details className="collapsible-section">
-                  <summary className="collapsible-summary">
-                    Field URL Optional (default tertutup)
-                  </summary>
-                  <div className="collapsible-content">
-                    <label htmlFor="file-view-url-input">
-                      view_url ({form.file_type || "FILE"} - optional)
-                      <input
-                        id="file-view-url-input"
-                        value={form.file_view_url}
-                        onChange={(event) => setField("file_view_url", event.target.value)}
-                        disabled={fieldDisabled}
-                        placeholder="https://..."
-                      />
-                    </label>
 
-                    <label htmlFor="file-download-url-input">
-                      download_url ({form.file_type || "FILE"} - optional)
-                      <input
-                        id="file-download-url-input"
-                        value={form.file_download_url}
-                        onChange={(event) => setField("file_download_url", event.target.value)}
-                        disabled={fieldDisabled}
-                        placeholder="https://..."
-                      />
-                    </label>
+                <label htmlFor="description-input">
+                  Description
+                  <textarea
+                    id="description-input"
+                    value={form.description}
+                    onChange={(event) => setField("description", event.target.value)}
+                    disabled={fieldDisabled}
+                    maxLength={2000}
+                  />
+                </label>
 
-                    <label htmlFor="file-reference-url-input">
-                      single reference URL ({form.file_type || "FILE"} - optional)
+                {form.type === "URL" ? (
+                  <label htmlFor="external-url-input">
+                    external_url
+                    <input
+                      id="external-url-input"
+                      value={form.external_url}
+                      onChange={(event) => setField("external_url", event.target.value)}
+                      disabled={fieldDisabled}
+                      placeholder="https://..."
+                    />
+                  </label>
+                ) : null}
+
+                {form.type === "TEXT" ? (
+                  <label htmlFor="text-content-input">
+                    text content (plain text)
+                    <textarea
+                      id="text-content-input"
+                      value={form.text_content}
+                      onChange={(event) => setField("text_content", event.target.value)}
+                      disabled={fieldDisabled}
+                      placeholder="Tuliskan konteks evidence sebagai plain text"
+                    />
+                  </label>
+                ) : null}
+
+                {form.type === "FILE" ? (
+                  <>
+                    <p className="inline-note">
+                      Jenis file: <strong>{form.file_type || "Belum dipilih"}</strong>
+                    </p>
+                    <label htmlFor="file-binary-upload">
+                      Upload binary file (prototype local)
                       <input
-                        id="file-reference-url-input"
-                        value={form.file_reference_url}
-                        onChange={(event) => setField("file_reference_url", event.target.value)}
+                        id="file-binary-upload"
+                        type="file"
+                        accept={buildFileAccept(form.file_type)}
+                        onChange={(event) => onSelectLocalBinaryFile(event.target.files?.[0] || null)}
                         disabled={fieldDisabled}
-                        placeholder="https://..."
                       />
                     </label>
-                  </div>
-                </details>
-              </>
+                    <details className="collapsible-section">
+                      <summary className="collapsible-summary">
+                        Field URL Optional (default tertutup)
+                      </summary>
+                      <div className="collapsible-content">
+                        <label htmlFor="file-view-url-input">
+                          view_url ({form.file_type || "FILE"} - optional)
+                          <input
+                            id="file-view-url-input"
+                            value={form.file_view_url}
+                            onChange={(event) => setField("file_view_url", event.target.value)}
+                            disabled={fieldDisabled}
+                            placeholder="https://..."
+                          />
+                        </label>
+
+                        <label htmlFor="file-download-url-input">
+                          download_url ({form.file_type || "FILE"} - optional)
+                          <input
+                            id="file-download-url-input"
+                            value={form.file_download_url}
+                            onChange={(event) => setField("file_download_url", event.target.value)}
+                            disabled={fieldDisabled}
+                            placeholder="https://..."
+                          />
+                        </label>
+
+                        <label htmlFor="file-reference-url-input">
+                          single reference URL ({form.file_type || "FILE"} - optional)
+                          <input
+                            id="file-reference-url-input"
+                            value={form.file_reference_url}
+                            onChange={(event) => setField("file_reference_url", event.target.value)}
+                            disabled={fieldDisabled}
+                            placeholder="https://..."
+                          />
+                        </label>
+                      </div>
+                    </details>
+                  </>
+                ) : null}
+
+                {!form.type ? (
+                  <p className="warning-box">Tipe evidence pada Step 2 belum dipilih.</p>
+                ) : null}
+              </div>
             ) : null}
 
-            {!form.type ? (
-              <p className="warning-box">Tipe evidence pada Step 2 belum dipilih.</p>
+            <div className="wizard-actions">
+              <button type="button" onClick={onBackStep} disabled={step === 1}>
+                Back
+              </button>
+              {step < 3 ? (
+                <button type="button" onClick={onNextStep}>
+                  Next
+                </button>
+              ) : null}
+              {step === 3 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void saveByStatus("DRAFT")}
+                    disabled={writeDisabled}
+                    title="Local draft (prototype, not used in scoring)"
+                  >
+                    Save Draft
+                  </button>
+                  <button
+                    type="button"
+                    className="action-primary"
+                    onClick={() => void saveByStatus("SUBMITTED")}
+                    disabled={writeDisabled}
+                    title="Local draft (prototype, not used in scoring)"
+                  >
+                    Submit for Review
+                  </button>
+                </>
+              ) : null}
+              {!isEditingEvidence ? <Link href={`/projects/${projectId}/evidence/add`}>Kembali ke Card BIM Use</Link> : null}
+              <Link href={`/projects/${projectId}/evidence`}>Go to My Evidence List</Link>
+            </div>
+
+            <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
+            {form.type === "FILE" ? (
+              <p className="inline-note">
+                Upload file biner saat ini disimpan di browser local storage (batas {formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).
+              </p>
             ) : null}
-          </div>
-        ) : null}
-
-        <div className="wizard-actions">
-          <button type="button" onClick={onBackStep} disabled={step === 1}>
-            Back
-          </button>
-          {step < 3 ? (
-            <button type="button" onClick={onNextStep}>
-              Next
-            </button>
-          ) : null}
-          {step === 3 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => void saveByStatus("DRAFT")}
-                disabled={writeDisabled}
-                title="Local draft (prototype, not used in scoring)"
-              >
-                Save Draft
-              </button>
-              <button
-                type="button"
-                className="action-primary"
-                onClick={() => void saveByStatus("SUBMITTED")}
-                disabled={writeDisabled}
-                title="Local draft (prototype, not used in scoring)"
-              >
-                Submit for Review
-              </button>
-            </>
-          ) : null}
-          <Link href={`/projects/${projectId}/evidence`}>Go to My Evidence List</Link>
-        </div>
-
-        <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
-        {form.type === "FILE" ? (
-          <p className="inline-note">
-            Upload file biner saat ini disimpan di browser local storage (batas {formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).
-          </p>
-        ) : null}
-        {form.type === "FILE" && localFileMeta ? (
-          <p className="inline-note">
-            File lokal aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)}).
-          </p>
-        ) : null}
-        {form.type === "FILE" && form.file_reference_url.startsWith("data:") ? (
-          <p className="inline-note">Reference URL saat ini menggunakan binary data URL (local prototype).</p>
-        ) : null}
-        <p className="prototype-badge">Local draft (prototype, not used in scoring)</p>
+            {form.type === "FILE" && localFileMeta ? (
+              <p className="inline-note">
+                File lokal aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)}).
+              </p>
+            ) : null}
+            {form.type === "FILE" && form.file_reference_url.startsWith("data:") ? (
+              <p className="inline-note">Reference URL saat ini menggunakan binary data URL (local prototype).</p>
+            ) : null}
+            <p className="prototype-badge">Local draft (prototype, not used in scoring)</p>
+          </>
+        )}
 
         {submitError ? <p className="error-box">{submitError}</p> : null}
         {submitInfo ? <p className="task-note action-feedback">{submitInfo}</p> : null}

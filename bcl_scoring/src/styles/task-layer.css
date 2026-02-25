@@ -1398,6 +1398,58 @@ a {
   color: var(--task-disabled-ink);
 }
 
+.bim-use-card-grid {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.bim-use-card {
+  border: 1px solid var(--task-line);
+  border-radius: 10px;
+  background: linear-gradient(155deg, #f8fcfa 0%, #ffffff 75%);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.bim-use-card h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.bim-use-card .task-kicker {
+  margin: 0;
+}
+
+.bim-use-card-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bim-use-card-metrics p {
+  margin: 0;
+  border: 1px solid var(--task-line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.bim-use-card-metrics strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.bim-use-card-metrics small {
+  display: block;
+  margin-top: 4px;
+  color: var(--task-muted);
+  font-size: 12px;
+}
+
 .group-section {
   margin-top: 12px;
 }

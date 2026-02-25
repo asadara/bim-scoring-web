@@ -30,6 +30,13 @@ export default function ProjectRole1HomePage() {
   const [evidenceRows, setEvidenceRows] = useState<ReturnType<typeof mapEvidenceRowsWithReview>>([]);
   const [evidenceMode, setEvidenceMode] = useState<DataMode>("backend");
   const [evidenceMessage, setEvidenceMessage] = useState<string | null>(null);
+  const scopedProjectId = useMemo(() => {
+    if (credential.role !== "role1") return null;
+    const scopedIds = Array.isArray(credential.scoped_project_ids)
+      ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    return scopedIds[0] || null;
+  }, [credential.role, credential.scoped_project_ids]);
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string") return;
@@ -55,6 +62,12 @@ export default function ProjectRole1HomePage() {
       mounted = false;
     };
   }, [router.isReady, projectId]);
+
+  useEffect(() => {
+    if (!router.isReady || typeof projectId !== "string") return;
+    if (credential.role !== "role1" || !scopedProjectId || scopedProjectId === projectId) return;
+    void router.replace(`/projects/${scopedProjectId}`);
+  }, [credential.role, projectId, router, router.isReady, scopedProjectId]);
 
   useEffect(() => {
     if (!context || typeof projectId !== "string") return;
@@ -88,18 +101,19 @@ export default function ProjectRole1HomePage() {
   }, [context, projectId]);
 
   const counts = useMemo(() => buildEvidenceCounts(evidenceRows), [evidenceRows]);
-  const scopedProjectId = useMemo(() => {
-    if (credential.role !== "role1") return null;
-    const scopedIds = Array.isArray(credential.scoped_project_ids)
-      ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
-      : [];
-    return scopedIds[0] || null;
-  }, [credential.role, credential.scoped_project_ids]);
 
   if (loading) {
     return (
       <main className="task-shell">
         <section className="task-panel">Loading...</section>
+      </main>
+    );
+  }
+
+  if (credential.role === "role1" && scopedProjectId && typeof projectId === "string" && scopedProjectId !== projectId) {
+    return (
+      <main className="task-shell">
+        <section className="task-panel">Mengarahkan ke workspace project Anda...</section>
       </main>
     );
   }
@@ -124,9 +138,7 @@ export default function ProjectRole1HomePage() {
       : context.period_status_label === "OPEN"
         ? "status-chip status-open"
         : "status-chip status-na";
-  const role1OutOfScopeReadOnly =
-    credential.role === "role1" && Boolean(scopedProjectId) && scopedProjectId !== projectId;
-  const canWriteEvidence = canWriteRole1Evidence(credential.role) && !role1OutOfScopeReadOnly;
+  const canWriteEvidence = canWriteRole1Evidence(credential.role);
   const hasActivePeriod = Boolean(context.active_period?.id);
   const canAddEvidence = canWriteEvidence && !context.period_locked && hasActivePeriod;
   const projectDisplayName = context.project?.name || context.project?.code || projectId;
@@ -147,12 +159,6 @@ export default function ProjectRole1HomePage() {
 
       <section className="task-panel">
         <h2>Aksi Utama</h2>
-        {role1OutOfScopeReadOnly ? (
-          <p className="read-only-banner">
-            Workspace ini berada di luar scope input Role 1 Anda. Halaman tetap bisa dibaca, tetapi semua aksi input
-            evidence dinonaktifkan.
-          </p>
-        ) : null}
         <div className="wizard-actions">
           <button
             type="button"

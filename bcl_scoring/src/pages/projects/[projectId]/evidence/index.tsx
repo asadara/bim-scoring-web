@@ -69,14 +69,13 @@ export default function MyEvidenceListPage() {
   const router = useRouter();
   const { projectId } = router.query;
   const credential = useCredential();
-  const scopedProjectId =
-    credential.role === "role1"
-      ? (
-          Array.isArray(credential.scoped_project_ids)
-            ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
-            : []
-        )[0] || null
-      : null;
+  const scopedProjectId = useMemo(() => {
+    if (credential.role !== "role1") return null;
+    const scopedIds = Array.isArray(credential.scoped_project_ids)
+      ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    return scopedIds[0] || null;
+  }, [credential.role, credential.scoped_project_ids]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +108,12 @@ export default function MyEvidenceListPage() {
       mounted = false;
     };
   }, [router.isReady, projectId]);
+
+  useEffect(() => {
+    if (!router.isReady || typeof projectId !== "string") return;
+    if (credential.role !== "role1" || !scopedProjectId || scopedProjectId === projectId) return;
+    void router.replace(`/projects/${scopedProjectId}/evidence`);
+  }, [credential.role, projectId, router, router.isReady, scopedProjectId]);
 
   useEffect(() => {
     if (!context || typeof projectId !== "string") return;
@@ -178,6 +183,14 @@ export default function MyEvidenceListPage() {
     );
   }
 
+  if (credential.role === "role1" && scopedProjectId && typeof projectId === "string" && scopedProjectId !== projectId) {
+    return (
+      <main className="task-shell">
+        <section className="task-panel">Mengarahkan ke workspace project Anda...</section>
+      </main>
+    );
+  }
+
   if (!context || typeof projectId !== "string") {
     return (
       <main className="task-shell">
@@ -204,9 +217,7 @@ export default function MyEvidenceListPage() {
     if (status === "SUBMITTED") return "Awaiting Review";
     return "Draft";
   };
-  const role1OutOfScopeReadOnly =
-    credential.role === "role1" && Boolean(scopedProjectId) && scopedProjectId !== projectId;
-  const canWrite = canWriteRole1Evidence(credential.role) && !role1OutOfScopeReadOnly;
+  const canWrite = canWriteRole1Evidence(credential.role);
 
   return (
     <Role1Layout
@@ -245,12 +256,6 @@ export default function MyEvidenceListPage() {
             >
               Switch ke BIM Coordinator Project
             </button>
-          </p>
-        ) : null}
-        {role1OutOfScopeReadOnly ? (
-          <p className="read-only-banner">
-            Workspace ini berada di luar scope input Role 1 Anda. Halaman tetap bisa dibaca, tetapi aksi tambah/edit/revisi
-            evidence dinonaktifkan.
           </p>
         ) : null}
         {!canWrite && credential.role !== "admin" ? (

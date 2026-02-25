@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
@@ -70,15 +70,20 @@ export default function ProjectsIndexPage() {
   const [rows, setRows] = useState<ProjectQueueRow[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
-  const scopedProjectId = useMemo(() => {
+  const role1ScopedProjectIds = useMemo(() => {
     if (credential.role !== "role1") return null;
     const scopedIds = Array.isArray(credential.scoped_project_ids)
       ? credential.scoped_project_ids.map((id) => String(id || "").trim()).filter(Boolean)
       : [];
-    return scopedIds[0] || null;
+    return scopedIds;
   }, [credential.role, credential.scoped_project_ids]);
+  const scopedProjectSet = useMemo(
+    () => new Set(role1ScopedProjectIds || []),
+    [role1ScopedProjectIds]
+  );
+  const scopedProjectId = role1ScopedProjectIds?.[0] || null;
 
-  const sortQueueRows = (items: ProjectQueueRow[]): ProjectQueueRow[] => {
+  const sortQueueRows = useCallback((items: ProjectQueueRow[]): ProjectQueueRow[] => {
     const out = [...items];
     out.sort((a, b) => {
       if (credential.role === "role1" && scopedProjectId) {
@@ -97,7 +102,7 @@ export default function ProjectsIndexPage() {
       );
     });
     return out;
-  };
+  }, [credential.role, scopedProjectId]);
 
   const toQueueRowFromSummary = (
     item: ProjectQueueSummaryRecord,
@@ -134,10 +139,17 @@ export default function ProjectsIndexPage() {
         setLoading(true);
         const queueSummaryResult = await fetchProjectQueueSummaryReadMode();
         if (queueSummaryResult.backend_message === null) {
+          const mappedRows = queueSummaryResult.data.map((item) =>
+            toQueueRowFromSummary(item, queueSummaryResult.mode, queueSummaryResult.backend_message)
+          );
+          const scopedRows =
+            credential.role === "role1"
+              ? role1ScopedProjectIds && role1ScopedProjectIds.length > 0
+                ? mappedRows.filter((row) => scopedProjectSet.has(row.project.id))
+                : []
+              : mappedRows;
           const queueRows = sortQueueRows(
-            queueSummaryResult.data.map((item) =>
-              toQueueRowFromSummary(item, queueSummaryResult.mode, queueSummaryResult.backend_message)
-            )
+            scopedRows
           );
           if (!mounted) return;
           setRows(queueRows);
@@ -148,7 +160,12 @@ export default function ProjectsIndexPage() {
         }
 
         const projectsResult = await fetchProjectsReadMode();
-        const projectRows = projectsResult.data;
+        const projectRows =
+          credential.role === "role1"
+            ? role1ScopedProjectIds && role1ScopedProjectIds.length > 0
+              ? projectsResult.data.filter((project) => scopedProjectSet.has(project.id))
+              : []
+            : projectsResult.data;
 
         const fallbackRows = await Promise.all(
           projectRows.map(async (project) => {
@@ -221,7 +238,14 @@ export default function ProjectsIndexPage() {
     return () => {
       mounted = false;
     };
-  }, [credential.role, credential.scoped_project_ids, scopedProjectId]);
+  }, [
+    credential.role,
+    credential.scoped_project_ids,
+    role1ScopedProjectIds,
+    scopedProjectId,
+    scopedProjectSet,
+    sortQueueRows,
+  ]);
 
   const totalProjects = rows.length;
   const projectsNeedAction = useMemo(
@@ -412,12 +436,6 @@ export default function ProjectsIndexPage() {
                       <strong>{row.project.name || row.project.code || NA_TEXT}</strong>
                       <br />
                       <small>Code: {row.project.code || NA_TEXT} | Phase: {row.project.phase || NA_TEXT}</small>
-                      {credential.role === "role1" && scopedProjectId && row.project.id !== scopedProjectId ? (
-                        <>
-                          <br />
-                          <small>Access: read-only workspace</small>
-                        </>
-                      ) : null}
                     </td>
                     <td>
                       {formatPeriodLabel(row.activePeriod)}
