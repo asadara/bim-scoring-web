@@ -136,6 +136,37 @@ function buildFileAccept(type: WizardForm["file_type"]): string | undefined {
   return undefined;
 }
 
+function BimUseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M12 3l7 4-7 4-7-4 7-4z" />
+      <path d="M5 7v6l7 4 7-4V7" />
+      <path d="M12 11v6" />
+    </svg>
+  );
+}
+
+function EvidenceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M7 3h7l5 5v13H7z" />
+      <path d="M14 3v5h5" />
+      <path d="M10 14h6M10 18h6" />
+    </svg>
+  );
+}
+
+function IndicatorIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M4 20h16" />
+      <path d="M7 17V9" />
+      <path d="M12 17V5" />
+      <path d="M17 17v-6" />
+    </svg>
+  );
+}
+
 export default function AddEvidencePage() {
   const router = useRouter();
   const { projectId, evidenceId, mode, bimUseId } = router.query;
@@ -690,14 +721,29 @@ export default function AddEvidencePage() {
                   const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
                   const cardContent = (
                     <>
-                      <h3 className="bim-use-card-title">{group.label}</h3>
+                      <h3 className="bim-use-card-title">
+                        <span>{group.label}</span>
+                        <span className="bim-use-card-icon" aria-hidden="true">
+                          <BimUseIcon />
+                        </span>
+                      </h3>
                       <p className="bim-use-card-stat">
-                        <strong>{evidenceCount}</strong>
-                        <span className="bim-use-card-stat-label">Evidence</span>
+                        <span className="bim-use-card-stat-copy">
+                          <strong>{evidenceCount}</strong>
+                          <span className="bim-use-card-stat-label">Evidence</span>
+                        </span>
+                        <span className="bim-use-card-icon" aria-hidden="true">
+                          <EvidenceIcon />
+                        </span>
                       </p>
                       <p className="bim-use-card-stat">
-                        <strong>{group.indicators.length}</strong>
-                        <span className="bim-use-card-stat-label">Indikator</span>
+                        <span className="bim-use-card-stat-copy">
+                          <strong>{group.indicators.length}</strong>
+                          <span className="bim-use-card-stat-label">Indikator</span>
+                        </span>
+                        <span className="bim-use-card-icon" aria-hidden="true">
+                          <IndicatorIcon />
+                        </span>
                       </p>
                     </>
                   );
