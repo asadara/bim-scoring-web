@@ -1413,7 +1413,6 @@ a {
   display: grid;
   gap: 8px;
   align-content: start;
-  min-height: 152px;
   box-shadow: 0 2px 6px rgba(8, 24, 16, 0.04);
 }
 
@@ -1427,18 +1426,26 @@ a {
 
 .bim-use-card-stat {
   margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  column-gap: 8px;
   color: var(--task-muted);
   font-size: 12px;
   line-height: 1.25;
 }
 
 .bim-use-card-stat strong {
-  display: inline-block;
-  margin-right: 6px;
+  display: block;
   font-size: 26px;
   line-height: 1;
   font-weight: 700;
   color: var(--task-primary);
+}
+
+.bim-use-card-stat-label {
+  justify-self: end;
+  text-align: right;
 }
 
 .bim-use-card-link {
@@ -1475,7 +1482,6 @@ a {
 
 @media (max-width: 720px) {
   .bim-use-card {
-    min-height: 136px;
     padding: 12px;
   }
 

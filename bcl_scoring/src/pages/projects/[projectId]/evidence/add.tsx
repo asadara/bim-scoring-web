@@ -692,10 +692,12 @@ export default function AddEvidencePage() {
                     <>
                       <h3 className="bim-use-card-title">{group.label}</h3>
                       <p className="bim-use-card-stat">
-                        <strong>{evidenceCount}</strong> Evidence
+                        <strong>{evidenceCount}</strong>
+                        <span className="bim-use-card-stat-label">Evidence</span>
                       </p>
                       <p className="bim-use-card-stat">
-                        <strong>{group.indicators.length}</strong> Indikator
+                        <strong>{group.indicators.length}</strong>
+                        <span className="bim-use-card-stat-label">Indikator</span>
                       </p>
                     </>
                   );
