@@ -690,15 +690,12 @@ export default function AddEvidencePage() {
                   const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
                   const cardContent = (
                     <>
-                      <p className="task-kicker">BIM Use</p>
-                      <h3>{group.label}</h3>
-                      <p className="bim-use-card-info">
-                        <span>Evidence ditambahkan</span>
-                        <strong>{evidenceCount}</strong>
+                      <h3 className="bim-use-card-title">{group.label}</h3>
+                      <p className="bim-use-card-stat">
+                        <strong>{evidenceCount}</strong> Evidence
                       </p>
-                      <p className="bim-use-card-info">
-                        <span>Indicator tersedia</span>
-                        <strong>{group.indicators.length}</strong>
+                      <p className="bim-use-card-stat">
+                        <strong>{group.indicators.length}</strong> Indikator
                       </p>
                     </>
                   );
