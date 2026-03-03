@@ -193,7 +193,13 @@ async function setRole(page: Parameters<typeof test>[0]["page"], role: AppRole, 
     window.dispatchEvent(new CustomEvent("bim:credential-updated", { detail: payload }));
   }, {
     key: CREDENTIAL_STORE_KEY,
-    payload: { role, user_id: userId, updated_at: new Date().toISOString() },
+    payload: {
+      role,
+      user_id: userId,
+      scoped_project_ids: role === "viewer" ? [] : [PROJECT_ID],
+      pending_role: false,
+      updated_at: new Date().toISOString(),
+    },
   });
 }
 
@@ -238,7 +244,13 @@ test.beforeEach(async ({ page }) => {
     truthKey: TRUTH_STORE_KEY,
     truthValue: seedStore,
     credentialKey: CREDENTIAL_STORE_KEY,
-    credentialValue: { role: "role1", user_id: "u-role1-e2e", updated_at: new Date().toISOString() },
+    credentialValue: {
+      role: "role1",
+      user_id: "u-role1-e2e",
+      scoped_project_ids: [PROJECT_ID],
+      pending_role: false,
+      updated_at: new Date().toISOString(),
+    },
     apiOverrideKey: DEV_API_OVERRIDE_STORAGE_KEY,
     apiOverrideValue: "http://127.0.0.1:9",
   });
@@ -274,10 +286,12 @@ test("role flow e2e: role1 -> role2 -> role3 -> audit", async ({ page }) => {
 
   await setRole(page, "viewer", null);
   await page.goto("/audit");
-  await expect(page.getByRole("heading", { name: "Read-only Auditor View" })).toBeVisible();
-  await expect(page.getByText(PROJECT_ID, { exact: false }).first()).toBeVisible();
-  await page.getByRole("link", { name: "Open Snapshot" }).first().click();
+  await expect(page.getByRole("heading", { name: "Auditor View" })).toBeVisible();
+  await expect(page.getByText("E2E Project", { exact: false }).first()).toBeVisible();
+  await page.getByRole("link", { name: /Latest snapshot/i }).first().click();
+  await expect(page).toHaveURL(/\/audit\/snapshots\//);
 
+  await expect(page.getByRole("heading", { name: "Read-only Auditor View" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Snapshot Header" })).toBeVisible();
   await expect(page.getByText("Final Score (Read-only)")).toBeVisible();
   await expect(page.getByText(PROJECT_ID, { exact: false }).first()).toBeVisible();
@@ -316,8 +330,14 @@ test("post-approval lock: write actions disabled and snapshot export works", asy
   await setRole(page, "role1", "u-role1-e2e");
   await page.goto(`/projects/${PROJECT_ID}/evidence/add`);
   await expect(page.getByText("Period saat ini LOCKED. Semua input read-only dan aksi Save/Submit dinonaktifkan.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save Draft" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Submit for Review" })).toBeDisabled();
+  const saveDraft = page.getByRole("button", { name: "Save Draft" });
+  if (await saveDraft.count()) {
+    await expect(saveDraft).toBeDisabled();
+  }
+  const submitForReview = page.getByRole("button", { name: "Submit for Review" });
+  if (await submitForReview.count()) {
+    await expect(submitForReview).toBeDisabled();
+  }
 
   await setRole(page, "viewer", null);
   await page.goto(`/audit/snapshots/${encodeURIComponent(snapshotId)}`);

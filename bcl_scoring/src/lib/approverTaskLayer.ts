@@ -16,6 +16,9 @@
   formatPeriodLabel,
   getPrototypePeriodLock,
   isRealBackendWriteEnabled,
+  listPrototypeApprovalDecisions,
+  listPrototypeSnapshots,
+  PROTOTYPE_WRITE_DISABLED_MESSAGE,
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
   selectActivePeriod,
@@ -197,6 +200,54 @@ export async function fetchReadOnlySummary(projectId: string, periodId: string |
   return result.data;
 }
 
+function fallbackSummaryFromPrototypeSnapshots(
+  projectId: string,
+  periodId: string
+): {
+  data: ReadOnlySummary;
+  mode: DataMode;
+  backend_message: string | null;
+  available: boolean;
+} | null {
+  const latest = listSnapshotsForPeriod(projectId, periodId)[0] || null;
+  if (!latest) return null;
+
+  const totalCount =
+    latest.evidence_counts.ACCEPTABLE +
+    latest.evidence_counts.NEEDS_REVISION +
+    latest.evidence_counts.REJECTED +
+    latest.evidence_counts.AWAITING_REVIEW;
+  const reviewedCount =
+    latest.evidence_counts.ACCEPTABLE +
+    latest.evidence_counts.NEEDS_REVISION +
+    latest.evidence_counts.REJECTED;
+  const coverage = totalCount > 0 ? Math.max(0, Math.min(1, reviewedCount / totalCount)) : null;
+
+  return {
+    data: {
+      total_score: latest.final_bim_score ?? null,
+      confidence: {
+        coverage,
+        frequency: null,
+        confidence: null,
+        indicators_with_submission: null,
+        total_active_indicators: null,
+        total_submission: null,
+        target_submission: null,
+      },
+      breakdown: Array.isArray(latest.breakdown)
+        ? latest.breakdown.map((row) => ({
+            perspective_id: row.perspective_id,
+            score: row.score,
+          }))
+        : [],
+    },
+    mode: "prototype",
+    backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+    available: true,
+  };
+}
+
 export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: string | null): Promise<{
   data: ReadOnlySummary;
   mode: DataMode;
@@ -214,6 +265,11 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
       backend_message: "Period is Not available",
       available: false,
     };
+  }
+
+  if (!isRealBackendWriteEnabled()) {
+    const fallback = fallbackSummaryFromPrototypeSnapshots(projectId, periodId);
+    if (fallback) return fallback;
   }
 
   const response = await safeFetchJson<unknown>(
@@ -418,15 +474,27 @@ async function fetchDashboardSummaryReadMode(
 }
 
 export function getLatestApprovalDecision(projectId: string, periodId: string | null): PrototypeApprovalDecisionRecord | null {
-  void projectId;
-  void periodId;
-  return null;
+  const periodKey = normalizePrototypePeriodId(periodId);
+  return (
+    listPrototypeApprovalDecisions()
+      .filter(
+        (row) =>
+          row.project_id === projectId &&
+          normalizePrototypePeriodId(row.period_id) === periodKey
+      )
+      .sort((a, b) => String(b.decided_at).localeCompare(String(a.decided_at)))[0] || null
+  );
 }
 
 export function listSnapshotsForPeriod(projectId: string, periodId: string | null): PrototypeSnapshotRecord[] {
-  void projectId;
-  void periodId;
-  return [];
+  const periodKey = normalizePrototypePeriodId(periodId);
+  return listPrototypeSnapshots()
+    .filter(
+      (row) =>
+        row.project_id === projectId &&
+        normalizePrototypePeriodId(row.period_id) === periodKey
+    )
+    .sort((a, b) => String(b.approved_at).localeCompare(String(a.approved_at)));
 }
 
 export async function fetchApproverHomeContext(): Promise<ApproverHomeContext> {

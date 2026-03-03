@@ -5,6 +5,9 @@ import { AppRole, setStoredCredential } from "@/lib/userCredential";
 
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
 const SUPABASE_ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+const AUTH_SYNC_DISABLED = String(process.env.NEXT_PUBLIC_DISABLE_AUTH_SYNC || "false")
+  .trim()
+  .toLowerCase() === "true";
 const DEFAULT_PASSWORD_EMAIL_DOMAIN = (
   process.env.NEXT_PUBLIC_AUTH_PASSWORD_EMAIL_DOMAIN || "pegawai.local"
 ).trim().toLowerCase();
@@ -243,6 +246,10 @@ export function getSupabaseBrowserClient() {
 }
 
 export async function syncCredentialFromAuth(): Promise<void> {
+  if (AUTH_SYNC_DISABLED) {
+    return;
+  }
+
   if (!isAuthConfigured()) {
     setStoredCredential({ role: "viewer", user_id: null, pending_role: false }, { source: "auth" });
     return;
@@ -307,6 +314,10 @@ export async function syncCredentialFromAuth(): Promise<void> {
 }
 
 export function startAuthCredentialSync(): () => void {
+  if (AUTH_SYNC_DISABLED) {
+    return () => {};
+  }
+
   if (!isAuthConfigured()) {
     return () => {};
   }

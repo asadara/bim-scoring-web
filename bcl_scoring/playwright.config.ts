@@ -22,6 +22,7 @@ export default defineConfig({
       NEXT_PUBLIC_APP_ENV: "development",
       NEXT_PUBLIC_BIM_SCORING_API_BASE_URL_DEVELOPMENT: "http://127.0.0.1:9",
       NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE: "false",
+      NEXT_PUBLIC_DISABLE_AUTH_SYNC: "true",
     },
   },
   projects: [

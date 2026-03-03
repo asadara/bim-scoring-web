@@ -4,9 +4,12 @@ import {
   normalizePrototypePeriodId,
   PrototypeApprovalDecisionRecord,
   PrototypeSnapshotRecord,
+  PROTOTYPE_WRITE_DISABLED_MESSAGE,
   ReviewStatusCount,
   getPrototypePeriodLock,
+  isRealBackendWriteEnabled,
   listPrototypeApprovalDecisions,
+  listPrototypeSnapshots,
 } from "@/lib/role1TaskLayer";
 import { buildApiUrl, safeFetchJson, toUserFacingSafeFetchError } from "@/lib/http";
 import { getPrototypePeriodStatusFromStore } from "@/lib/prototypeStore";
@@ -188,7 +191,7 @@ async function fetchBackendSnapshots(): Promise<{
 }
 
 export function listAuditSnapshots(): AuditSnapshotView[] {
-  const snapshots: PrototypeSnapshotRecord[] = [];
+  const snapshots = listPrototypeSnapshots();
 
   return snapshots
     .map((snapshot, index) => ({
@@ -203,7 +206,18 @@ export async function fetchAuditSnapshotsReadMode(): Promise<{
   mode: DataMode;
   backend_message: string | null;
 }> {
-  return await fetchBackendSnapshots();
+  const backendResult = await fetchBackendSnapshots();
+  if (backendResult.data.length > 0) return backendResult;
+
+  if (!isRealBackendWriteEnabled()) {
+    return {
+      data: listAuditSnapshots(),
+      mode: "prototype",
+      backend_message: backendResult.backend_message || PROTOTYPE_WRITE_DISABLED_MESSAGE,
+    };
+  }
+
+  return backendResult;
 }
 
 function toGovernanceEvent(row: unknown, index: number): AuditGovernanceEvent | null {

@@ -1,8 +1,13 @@
 import {
+  getPrototypePeriodMetaFromStore,
   getPrototypePeriodLockFromStore,
+  getPrototypePeriodStatusFromStore,
+  getPrototypeProjectMetaFromStore,
   listPrototypeApprovalDecisionsFromStore,
   listPrototypeEvidenceItemsFromStore,
+  listPrototypePeriodIdsByProjectFromStore,
   listPrototypePeriodLocksFromStore,
+  listPrototypeProjectIdsFromStore,
   listPrototypeReviewsMapFromStore,
   listPrototypeSnapshotsFromStore,
   normalizePrototypePeriodId,
@@ -556,14 +561,108 @@ export function formatProjectLabel(project: ProjectRecord | null): string {
   return project.id || NA_TEXT;
 }
 
+function parseYearWeekFromPeriodId(periodId: string): { year: number | null; week: number | null } {
+  const text = String(periodId || "").trim();
+  const weekMatch = text.match(/^(\d{4})-W(\d{1,2})$/i);
+  if (weekMatch) {
+    const year = Number(weekMatch[1]);
+    const week = Number(weekMatch[2]);
+    return {
+      year: Number.isFinite(year) ? year : null,
+      week: Number.isFinite(week) ? week : null,
+    };
+  }
+
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const week = Number(isoMatch[2]);
+    return {
+      year: Number.isFinite(year) ? year : null,
+      week: Number.isFinite(week) ? week : null,
+    };
+  }
+
+  return { year: null, week: null };
+}
+
+function fallbackProjectFromPrototype(projectId: string): ProjectRecord {
+  const meta = getPrototypeProjectMetaFromStore(projectId);
+  return {
+    id: projectId,
+    code: meta?.project_code || null,
+    name: meta?.project_name || null,
+    config_key: null,
+    phase: null,
+    is_active: null,
+  };
+}
+
+function fallbackProjectPeriodsFromPrototype(projectId: string): ScoringPeriod[] {
+  const periodIds = listPrototypePeriodIdsByProjectFromStore(projectId).filter(
+    (periodId) => periodId && periodId !== UNKNOWN_ACTIVE_PERIOD_KEY
+  );
+
+  return periodIds
+    .map((periodId) => {
+      const parsed = parseYearWeekFromPeriodId(periodId);
+      return {
+        id: periodId,
+        project_id: projectId,
+        year: parsed.year,
+        week: parsed.week,
+        start_date: null,
+        end_date: null,
+        status: getPrototypePeriodStatusFromStore(projectId, periodId),
+        version: 1,
+      } satisfies ScoringPeriod;
+    })
+    .sort((a, b) => {
+      const yearA = a.year ?? 0;
+      const yearB = b.year ?? 0;
+      if (yearA !== yearB) return yearB - yearA;
+      const weekA = a.week ?? 0;
+      const weekB = b.week ?? 0;
+      if (weekA !== weekB) return weekB - weekA;
+      const labelA = metaSortValue(projectId, a.id);
+      const labelB = metaSortValue(projectId, b.id);
+      return labelB.localeCompare(labelA);
+    });
+
+  function metaSortValue(pid: string, periodId: string): string {
+    const meta = getPrototypePeriodMetaFromStore(pid, periodId);
+    return meta?.updated_at || periodId;
+  }
+}
+
 export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[]>> {
   const response = await safeFetchJson<unknown>(buildApiUrl("/projects"));
   if (!response.ok) {
+    if (!isRealBackendWriteEnabled()) {
+      const fallbackRows = listPrototypeProjectIdsFromStore().map((projectId) =>
+        fallbackProjectFromPrototype(projectId)
+      );
+      return {
+        data: fallbackRows,
+        mode: "prototype",
+        backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+      };
+    }
     return backendReadResult([], toSafeErrorMessage(response));
   }
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
+    if (!isRealBackendWriteEnabled()) {
+      const fallbackRows = listPrototypeProjectIdsFromStore().map((projectId) =>
+        fallbackProjectFromPrototype(projectId)
+      );
+      return {
+        data: fallbackRows,
+        mode: "prototype",
+        backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+      };
+    }
     return backendReadResult([], unwrapped.error);
   }
 
@@ -588,6 +687,17 @@ export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[
       project_name: row.name,
       project_code: row.code,
     });
+  }
+
+  if (!isRealBackendWriteEnabled() && mapped.length === 0) {
+    const fallbackRows = listPrototypeProjectIdsFromStore().map((projectId) =>
+      fallbackProjectFromPrototype(projectId)
+    );
+    return {
+      data: fallbackRows,
+      mode: "prototype",
+      backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+    };
   }
 
   return {
@@ -685,6 +795,13 @@ export async function fetchProjectQueueSummaryReadMode(): Promise<ReadResult<Pro
 export async function fetchProjectReadMode(projectId: string): Promise<ReadResult<ProjectRecord>> {
   const response = await safeFetchJson<unknown>(buildApiUrl(`/projects/${encodeURIComponent(projectId)}`));
   if (!response.ok) {
+    if (!isRealBackendWriteEnabled()) {
+      return {
+        data: fallbackProjectFromPrototype(projectId),
+        mode: "prototype",
+        backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+      };
+    }
     return backendReadResult(
       {
         id: projectId,
@@ -699,6 +816,13 @@ export async function fetchProjectReadMode(projectId: string): Promise<ReadResul
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
+    if (!isRealBackendWriteEnabled()) {
+      return {
+        data: fallbackProjectFromPrototype(projectId),
+        mode: "prototype",
+        backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+      };
+    }
     return backendReadResult(
       {
         id: projectId,
@@ -744,11 +868,25 @@ export async function fetchProjectPeriodsReadMode(projectId: string): Promise<Re
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/periods`)
   );
   if (!response.ok) {
+    if (!isRealBackendWriteEnabled()) {
+      return {
+        data: fallbackProjectPeriodsFromPrototype(projectId),
+        mode: "prototype",
+        backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+      };
+    }
     return backendReadResult([], toSafeErrorMessage(response));
   }
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
+    if (!isRealBackendWriteEnabled()) {
+      return {
+        data: fallbackProjectPeriodsFromPrototype(projectId),
+        mode: "prototype",
+        backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+      };
+    }
     return backendReadResult([], unwrapped.error);
   }
 
@@ -776,6 +914,14 @@ export async function fetchProjectPeriodsReadMode(projectId: string): Promise<Re
       period_id: row.id,
       period_label: label,
     });
+  }
+
+  if (!isRealBackendWriteEnabled() && mapped.length === 0) {
+    return {
+      data: fallbackProjectPeriodsFromPrototype(projectId),
+      mode: "prototype",
+      backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
+    };
   }
 
   return {
