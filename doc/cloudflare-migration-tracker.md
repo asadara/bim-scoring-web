@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 20:22:33 +07:00
+last_updated: 2026-03-06 21:23:03 +07:00
 owner: Engineering / Release
 ---
 
@@ -240,6 +240,15 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - Contract test runtime Worker lulus:
     - `test/contract/cloudflare.readonly-pilot.worker.contract.test.js`
     - skenario lulus: `/version`, method guard (`405`), path guard (`403`), proxy read-only path.
+- [x] A2.3 auth-offload login (tanpa wakeup Render) selesai di gateway:
+  - `cloudflare_api_gateway/src/index.mjs` sekarang menangani native:
+    - `POST /auth/account-request`
+    - `GET /auth/resolve-role/:userId`
+    - `GET /auth/password-email/:employeeNumber`
+  - Worker gateway memakai `SUPABASE_SERVICE_ROLE_KEY` untuk akses Supabase REST di path auth.
+  - Smoke produksi pasca deploy menunjukkan header `X-BCL-Auth-Source: supabase-worker` pada route auth (indikasi tidak diproxy ke Render).
+  - Contract test baru lulus:
+    - `test/contract/cloudflare.gateway.auth-offload.contract.test.js`
 
 ## Evidence
 
@@ -258,6 +267,8 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Entry scoring ESM (A2.3 Wave 3): `bim-scoring-api/src/scoring/runProjectScoring.js`
 - Worker read-only pilot (A2.3 Wave 5): `bim-scoring-api/cloudflare_api_readonly_pilot/src/index.mjs`
 - Contract test Worker read-only pilot: `bim-scoring-api/test/contract/cloudflare.readonly-pilot.worker.contract.test.js`
+- Auth-native gateway offload: `bim-scoring-api/cloudflare_api_gateway/src/index.mjs`
+- Contract test auth offload gateway: `bim-scoring-api/test/contract/cloudflare.gateway.auth-offload.contract.test.js`
 
 ## Update Rule
 
