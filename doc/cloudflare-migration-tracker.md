@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 23:22:00 +07:00
+last_updated: 2026-03-07 00:09:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -273,6 +273,13 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `POST /v2/projects/:projectId/evidence/gdrive/share`
   - Frontend Role 1 write flow (`save/submit evidence URL`) sekarang best-effort memicu auto-share endpoint.
   - Guard contract test route baru lulus (`google-drive.autoshare.guard.contract.test.js`).
+- [x] Offload dashboard route tambahan untuk menutup ketergantungan Render pada landing dashboard:
+  - Gateway `bcl-api-gateway` sekarang handle native via Supabase untuk:
+    - `GET /projects/:projectId/periods`
+    - `GET /projects/:projectId/periods/:periodId/indicator-scores`
+    - `GET /summary/v2/bcl/dashboard`
+  - Contract gateway diperluas dan lulus untuk route baru (`cloudflare.gateway.auth-offload.contract.test.js`, total test 10 pass).
+  - Tujuan: menghilangkan `503 x-render-routing: suspend-by-user` pada dashboard saat Render API disuspend.
 
 ## Evidence
 
@@ -300,6 +307,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Google Drive token schema: `bim-scoring-api/docs/ops/sql/create-user-google-drive-tokens.sql`
 - Google Drive runbook: `bim-scoring-api/docs/ops/google-drive-auto-share.md`
 - Frontend trigger auto-share: `bim-scoring-web/bcl_scoring/src/lib/role1TaskLayer.ts`
+- Dashboard route offload gateway: `bim-scoring-api/cloudflare_api_gateway/src/index.mjs`
 
 ## Update Rule
 
