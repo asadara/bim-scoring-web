@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 19:10:00 +07:00
+last_updated: 2026-03-06 19:22:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -186,6 +186,12 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - [x] Audit script A2.3 diperbaiki agar tidak menghitung komentar sebagai hit:
   - `scripts/cloudflare-runtime-compat-audit.mjs` sekarang skip line comment + block comment.
   - Hasil audit lebih akurat; hit `express-server` turun menjadi 2 (`import express`, `app.listen` di `server.js`).
+- [x] A2.3 Wave 2 dimulai (abstraksi config loader):
+  - `projectConfigProvider.cjs` ditambahkan dengan provider abstraction (`file` + `in-memory`).
+  - `loadProjectConfig.cjs` direfactor untuk membaca config melalui `provider.load(projectId)`.
+  - `runProjectScoring.cjs` menerima `configProvider` opsional (kompatibel mundur untuk path existing).
+  - Unit test baru pass: `test/unit/loadProjectConfig.provider.unit.test.js`.
+  - Audit ulang: `fs-usage` turun dari 6 hit -> 3 hit (akses filesystem terpusat di provider file).
 
 ## Evidence
 
@@ -199,6 +205,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Referensi operasional gateway: `bim-scoring-api/cloudflare_api_gateway/README.md`
 - Audit kompatibilitas Worker runtime (A2.3): `bim-scoring-api/scripts/cloudflare-runtime-compat-audit.mjs`
 - Rencana teknis A2.3: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
+- Provider config scoring (A2.3 Wave 2): `bim-scoring-api/src/scoring/config/projectConfigProvider.cjs`
 
 ## Update Rule
 
