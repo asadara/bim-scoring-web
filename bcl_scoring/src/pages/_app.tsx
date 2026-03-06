@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState } from "react";
 import "@/styles/task-layer.css";
 import MainNav from "@/components/MainNav";
 import { canRoleAccessPath, normalizePath } from "@/lib/accessControl";
-import { startAuthCredentialSync, syncCredentialFromAuth } from "@/lib/authClient";
 import {
   DEFAULT_APP_LANGUAGE,
   applyLanguage,
@@ -63,6 +62,7 @@ export default function App({ Component, pageProps }: AppProps) {
     };
 
     (async () => {
+      const { syncCredentialFromAuth, startAuthCredentialSync } = await import("@/lib/authClient");
       await syncCredentialFromAuth();
       if (!active) return;
       sync();

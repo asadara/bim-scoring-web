@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getMainNavItemsForRole, normalizePath } from "@/lib/accessControl";
-import { isAuthConfigured, signOutAuth } from "@/lib/authClient";
 import {
   getGlobalText,
   getRoleLabelLocalized,
@@ -37,6 +36,12 @@ const DEFAULT_CREDENTIAL: UserCredential = {
   scoped_project_ids: [],
   updated_at: "",
 };
+
+function isAuthConfiguredLite(): boolean {
+  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const key = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+  return Boolean(url && key);
+}
 
 export default function MainNav() {
   const router = useRouter();
@@ -112,6 +117,7 @@ export default function MainNav() {
     setError(null);
     setAccountMenuOpen(false);
     try {
+      const { signOutAuth } = await import("@/lib/authClient");
       await signOutAuth();
       if (currentPath !== "/" && currentPath !== "/audit") {
         await router.push("/auth/sign-in");
@@ -214,7 +220,7 @@ export default function MainNav() {
             </button>
             {accountMenuOpen ? (
               <div className="main-nav-menu-panel" role="menu" aria-label={text.accountMenuAria}>
-                {isAuthConfigured() ? (
+                {isAuthConfiguredLite() ? (
                   credential.user_id ? (
                     <>
                       <Link
