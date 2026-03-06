@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 20:14:17 +07:00
+last_updated: 2026-03-06 20:22:33 +07:00
 owner: Engineering / Release
 ---
 
@@ -228,6 +228,18 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `test/contract/rate-limiting.contract.test.js`
     - `test/contract/evidence.upload.v2.guard.contract.test.js`
     - `test/contract/summary.v2.http.test.js`
+- [x] A2.3 Wave 5 selesai (Worker entry read-only pilot):
+  - Paket Worker baru ditambahkan: `bim-scoring-api/cloudflare_api_readonly_pilot`
+    - `src/index.mjs`
+    - `wrangler.toml`
+    - `README.md`
+  - Policy pilot aktif:
+    - method hanya `GET,HEAD,OPTIONS`
+    - path di luar allowlist pilot ditolak (`403`)
+    - endpoint metadata pilot: `GET /version`
+  - Contract test runtime Worker lulus:
+    - `test/contract/cloudflare.readonly-pilot.worker.contract.test.js`
+    - skenario lulus: `/version`, method guard (`405`), path guard (`403`), proxy read-only path.
 
 ## Evidence
 
@@ -244,6 +256,8 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Rencana teknis A2.3: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
 - Provider config scoring (A2.3 Wave 2): `bim-scoring-api/src/scoring/config/projectConfigProvider.js`
 - Entry scoring ESM (A2.3 Wave 3): `bim-scoring-api/src/scoring/runProjectScoring.js`
+- Worker read-only pilot (A2.3 Wave 5): `bim-scoring-api/cloudflare_api_readonly_pilot/src/index.mjs`
+- Contract test Worker read-only pilot: `bim-scoring-api/test/contract/cloudflare.readonly-pilot.worker.contract.test.js`
 
 ## Update Rule
 
