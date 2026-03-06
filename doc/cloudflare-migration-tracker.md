@@ -1,0 +1,172 @@
+---
+title: Cloudflare Migration Tracker (BIM Scoring Web + API)
+status: IN PROGRESS
+last_updated: 2026-03-06 16:06:00 +07:00
+owner: Engineering / Release
+---
+
+# Cloudflare Migration Tracker
+
+Dokumen ini jadi single source of truth rencana + progress migrasi dari Render ke Cloudflare.
+
+## Objective
+
+1. Tahap 1: pindahkan frontend `bim-scoring-web` ke Cloudflare.
+2. Tahap 2: lepaskan dependency domain `*.onrender.com` untuk API, lalu migrasi API dari Render secara bertahap.
+
+## Current Baseline (2026-03-06)
+
+- Frontend build lokal sukses (`next build`, Next.js 16.1.6).
+- Backend test suite lulus (`node --test`: pass 118, fail 0, skipped 1).
+- Konfigurasi API base URL frontend sudah environment-driven (siap diarahkan ke domain baru API).
+- API belum siap lift-and-shift langsung ke Workers karena masih ada ketergantungan Node/Express + filesystem config loader.
+- Frontend sudah terdeploy ke Cloudflare Workers:
+  - URL: `https://bcl-scoring.asadara83.workers.dev`
+  - Version ID: `2142fe0d-acb9-4eb3-a6d6-19780cd6609b`
+
+## Work Plan
+
+## Phase 1 - Frontend to Cloudflare (Primary)
+
+- [x] P1.0 Assessment readiness frontend + backend dependency selesai.
+- [x] P1.1 Tambah dokumen/konfigurasi deploy Cloudflare untuk frontend (repo changes).
+- [x] P1.2 Buat project Cloudflare dari repo `bim-scoring-web` (mode Workers/OpenNext).
+- [x] P1.3 Set environment variables frontend di Cloudflare.
+- [x] P1.4 Deploy pertama + smoke test route kritikal.
+- [ ] P1.5 Mapping custom domain frontend dan verifikasi TLS/DNS.
+- [ ] P1.6 Cutover traffic frontend ke Cloudflare.
+- [ ] P1.7 Post-cutover monitoring + rollback window close.
+
+## Phase 2 - API De-Render (Staged)
+
+- [x] A2.0 Assessment feasibility migrasi API selesai (bukan lift-and-shift).
+- [x] A2.1 Hilangkan exposure `*.onrender.com` dari sisi client (gunakan custom API domain).
+- [ ] A2.2 Stabilkan lapisan domain/API gateway di Cloudflare (proxy/caching/security baseline).
+- [ ] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
+- [ ] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
+- [ ] A2.5 Cutover endpoint read-only dulu, lalu write-path.
+- [ ] A2.6 Full cutover API + decommission Render.
+
+## Owner Matrix
+
+- `Codex/Engineering`:
+  - Analisis codebase, perubahan repo, skrip smoke, checklist runbook, validasi build/test.
+- `Anda (Dashboard Owner)`:
+  - Setup resource Cloudflare di dashboard (Pages project, env vars/secrets, DNS/custom domain, token/permission).
+
+## Cloudflare Dashboard Actions Required (Anda)
+
+## Immediate (untuk mulai Tahap 1)
+
+- [x] Login Cloudflare account yang akan dipakai produksi.
+- [x] Buka `Workers & Pages` -> `Create` -> `Pages` -> connect ke repo frontend.
+- [x] Siapkan environment variables Pages:
+  - `NEXT_PUBLIC_APP_ENV`
+  - `NEXT_PUBLIC_BIM_SCORING_API_BASE_URL_DEVELOPMENT`
+  - `NEXT_PUBLIC_BIM_SCORING_API_BASE_URL_STAGING`
+  - `NEXT_PUBLIC_BIM_SCORING_API_BASE_URL_PRODUCTION`
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE` (default disarankan `false`)
+- [ ] Siapkan custom domain frontend (mis. `app.<domain-anda>`), update DNS dan aktifkan proxy Cloudflare.
+- [ ] Beri konfirmasi nama project Pages + domain target ke saya untuk saya kunci di tracker.
+
+## Needed Before API De-Render Cutover
+
+- [ ] Siapkan custom API domain (mis. `api.<domain-anda>`) di zone Cloudflare.
+- [ ] Tentukan pola transisi:
+  - Opsi transisi cepat: domain Cloudflare diarahkan dulu ke Render API (tanpa expose `onrender.com` ke client).
+  - Opsi final: API dipindah runtime ke Cloudflare Workers.
+- [ ] Aktifkan security baseline untuk API domain (WAF/rate limit policy sesuai kebutuhan).
+
+## Dashboard Actions - Next (Tanpa Custom Domain Dulu)
+
+- [x] Create Worker baru untuk API gateway (nama disarankan: `bcl-api-gateway`).
+- [ ] Set Worker variable `UPSTREAM_BASE_URL=https://bim-scoring-api.onrender.com`.
+- [ ] Set Worker variable `ALLOWED_ORIGINS=https://bcl-scoring.asadara83.workers.dev`.
+- [x] Deploy Worker dan verifikasi:
+  - `GET https://<worker-api>.workers.dev/health` -> `200`
+  - `GET https://<worker-api>.workers.dev/ready` -> `200`
+- [x] Update env frontend Cloudflare:
+  - `NEXT_PUBLIC_BIM_SCORING_API_BASE_URL_PRODUCTION=https://<worker-api>.workers.dev`
+- [x] Redeploy frontend lalu smoke check lintas route kritikal.
+
+## Finalisasi A2.2 (Handover Device Lain)
+
+Jika lanjut dari device lain, kerjakan urutan ini:
+
+1. Worker `bcl-api-gateway` -> `Settings` -> `Variables and Secrets`, pastikan:
+   - `UPSTREAM_BASE_URL=https://bim-scoring-api.onrender.com`
+   - `ALLOWED_ORIGINS=https://bcl-scoring.asadara83.workers.dev`
+   - `BLOCK_UNKNOWN_ORIGIN=true`
+   - `ALLOWED_PATH_PREFIXES=/health,/ready,/version,/projects,/periods,/admin,/auth,/role2,/summary,/summary_snapshots,/summary-snapshots,/snapshots,/v2`
+   - `ALLOWED_METHODS=GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS`
+2. Redeploy `bcl-api-gateway`.
+3. Verifikasi dari repo web:
+   - `WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev API_BASE_URL=https://bcl-api-gateway.asadara83.workers.dev npm run smoke:cloudflare`
+   - `WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev EXPECTED_API_HOST=bcl-api-gateway.asadara83.workers.dev npm run smoke:live-api-base`
+4. Jika dua smoke pass, tandai A2.2 selesai lalu lanjut A2.3 (runtime compatibility refactor API).
+
+## Progress Log
+
+## 2026-03-06
+
+- [x] Analisis coupling Render pada frontend dan API selesai.
+- [x] Validasi readiness frontend untuk tahap 1 selesai.
+- [x] Validasi test baseline backend selesai.
+- [x] Identifikasi blocker utama migrasi penuh API ke Workers selesai.
+- [x] Tracker migrasi ini dibuat sebagai dokumen jejak utama.
+- [x] Deploy frontend ke Cloudflare sempat gagal karena mismatch service binding (`WORKER_SELF_REFERENCE` target tidak ditemukan), lalu selesai setelah nama Worker diselaraskan ke `bcl-scoring`.
+- [x] Deploy sukses terkonfirmasi dengan URL aktif `https://bcl-scoring.asadara83.workers.dev` dan Version ID `0407f826-bb8c-46e3-a30e-5e7c3e19d48e`.
+- [x] PR auto-config Cloudflare di GitHub sudah di-merge (`Add Cloudflare Workers configuration`, PR #1).
+- [x] Smoke runtime pasca deploy lulus setelah mitigasi import SSR (`authClient` dimuat dinamis di client).
+- [x] Build/deploy pipeline Cloudflare diperbaiki ke `Build command: npm ci` + `Deploy command: npm run deploy`; deploy terbaru sukses (Version ID `2142fe0d-acb9-4eb3-a6d6-19780cd6609b`).
+- [x] Mitigasi code-level disiapkan: validasi env dipindah dari SSR module-scope ke client-side (`src/pages/_app.tsx`) untuk mencegah crash `500` di Worker runtime.
+- [x] Mitigasi konfigurasi Wrangler disiapkan: `keep_vars=true` ditambahkan di `bcl_scoring/wrangler.jsonc` agar deploy tidak menghapus Variables/Secrets yang di-set di Cloudflare Dashboard.
+- [x] Root cause error `500` teridentifikasi dari observability: Worker gagal load external module `@supabase/supabase-js-*` saat SSR.
+- [x] Mitigasi SSR import disiapkan:
+  - `_app.tsx`: import `authClient` diubah menjadi dynamic import di `useEffect`.
+  - `MainNav.tsx`: hapus import statis `authClient`; sign-out pakai dynamic import saat action dijalankan.
+- [x] Verifikasi pengguna: deployment frontend Cloudflare sudah berjalan normal (konfirmasi "berhasil").
+- [x] Script smoke/cutover diperbarui untuk migrasi Cloudflare: fallback default `onrender.com` dihapus; `API_BASE_URL` sekarang wajib eksplisit.
+- [x] README frontend diperbarui untuk command smoke Cloudflare (`smoke:cloudflare`, custom domain smoke, id-route smoke dengan API domain eksplisit).
+- [x] Keputusan operasional sementara: custom domain frontend ditunda; traffic tetap pakai `workers.dev` selama tahap stabilisasi.
+- [x] Paket transisi API gateway disiapkan di repo API (`bim-scoring-api/cloudflare_api_gateway`) untuk menyembunyikan origin Render dari client tanpa menunggu custom domain.
+- [x] Validasi lokal gateway worker lulus (forward path/query + CORS header) sebelum deploy dashboard.
+- [x] Worker `bcl-api-gateway` berhasil terdeploy via Cloudflare build pipeline (Version ID `e474af46-8f32-495d-91ab-e15ddcb01170`).
+- [x] Runtime fallback gateway ditambahkan (`UPSTREAM_BASE_URL` -> `API_BASE_URL` -> `BIM_SCORING_API_BASE_URL` -> default Render API) untuk mencegah `500` saat variable dashboard belum sinkron.
+- [x] Verifikasi eksternal gateway sukses: `GET /health` dan `GET /ready` pada `https://bcl-api-gateway.asadara83.workers.dev` sudah `200`.
+- [x] Verifikasi smoke lintas web+api lulus dengan endpoint Cloudflare:
+  - `WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev`
+  - `API_BASE_URL=https://bcl-api-gateway.asadara83.workers.dev`
+  - Hasil: seluruh check route kritikal + `/health` + `/ready` = `OK`.
+- [x] Script verifikasi live bundle ditambahkan: `bcl_scoring/scripts/check-live-api-base.mjs` (`npm run smoke:live-api-base`).
+- [x] Verifikasi live bundle terbaru: frontend produksi sudah embed host gateway (`bcl-api-gateway.asadara83.workers.dev`) dan tidak lagi memuat `onrender.com` (`smoke:live-api-base` pass).
+- [x] A2.1 dinyatakan selesai: exposure domain API `*.onrender.com` sudah dihapus dari client bundle produksi.
+- [x] Hardening baseline gateway diterapkan di kode:
+  - kontrol opsional `ALLOWED_METHODS`, `ALLOWED_PATH_PREFIXES`, `BLOCK_UNKNOWN_ORIGIN`
+  - tracing `X-BCL-Request-Id` + forward `X-Request-Id` ke upstream
+  - guard observability: `/health`, `/ready`, `/version` selalu allowed
+- [x] Deploy hardening gateway terpublikasi ke `main`:
+  - `39352e2` (`feat(gateway): add hardening controls for origin/method/path and request tracing`)
+  - `6988cc7` (`fix(gateway): always allow health and readiness paths`)
+- [ ] Menunggu aksi dashboard (A2.2): set variable gateway permanen (`UPSTREAM_BASE_URL`, `ALLOWED_ORIGINS`, `ALLOWED_PATH_PREFIXES`, `BLOCK_UNKNOWN_ORIGIN`) lalu verifikasi ulang smoke.
+
+## Evidence
+
+- Frontend runtime env mapping API: `bim-scoring-web/bcl_scoring/src/lib/runtimeEnv.ts`
+- API Node server entrypoint: `bim-scoring-api/src/server.js`
+- API Node/Express app + CJS bridge: `bim-scoring-api/src/app.js`
+- Scoring config loader berbasis filesystem: `bim-scoring-api/src/scoring/config/loadProjectConfig.cjs`
+- Existing phase log: `bim-scoring-web/doc/phase-status-log.md`
+- Build/deploy log terbaru: `cloudeflare_log/build_cloudflare_log.log`
+- API gateway worker (transition): `bim-scoring-api/cloudflare_api_gateway`
+- Write-path audit (Cloudflare API cutover): `cloudflare-api-write-path-audit.md`
+
+## Update Rule
+
+- Setiap perubahan status wajib update:
+  - `last_updated`
+  - Checklist item yang berubah
+  - 1 entri baru di `Progress Log`
+- Jika ada keputusan arsitektur besar, catat ringkas di bagian `Progress Log` dengan tanggal.
