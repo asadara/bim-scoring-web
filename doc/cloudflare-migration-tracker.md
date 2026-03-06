@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 19:22:00 +07:00
+last_updated: 2026-03-06 19:31:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -192,6 +192,14 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - `runProjectScoring.cjs` menerima `configProvider` opsional (kompatibel mundur untuk path existing).
   - Unit test baru pass: `test/unit/loadProjectConfig.provider.unit.test.js`.
   - Audit ulang: `fs-usage` turun dari 6 hit -> 3 hit (akses filesystem terpusat di provider file).
+- [x] A2.3 Wave 3 dimulai (eliminasi CJS bridge di jalur runtime utama):
+  - `createRequire` dihapus dari `src/app.js`; scoring import pindah ke `./scoring/runProjectScoring.js` (ESM).
+  - Modul ESM jalur scoring ditambahkan (`runProjectScoring.js` + dependensi config/preprocess/engine adapter/engine).
+  - Validasi kontrak summary pass:
+    - `summary.v2.http.test.js`
+    - `summary.v2.config-resolution.test.js`
+    - `summary.v2.engine.integration.test.js`
+  - Audit ulang: `cjs-bridge` turun dari 12 hit -> 8 hit (modul `.cjs` legacy masih tersisa untuk kompatibilitas bertahap).
 
 ## Evidence
 
@@ -206,6 +214,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Audit kompatibilitas Worker runtime (A2.3): `bim-scoring-api/scripts/cloudflare-runtime-compat-audit.mjs`
 - Rencana teknis A2.3: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
 - Provider config scoring (A2.3 Wave 2): `bim-scoring-api/src/scoring/config/projectConfigProvider.cjs`
+- Entry scoring ESM (A2.3 Wave 3): `bim-scoring-api/src/scoring/runProjectScoring.js`
 
 ## Update Rule
 
