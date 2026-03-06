@@ -67,19 +67,57 @@ function isSafeAttachmentHref(href: string): { ok: boolean; reason: string | nul
   return { ok: false, reason: "Blocked protocol (allowed: https/http/blob/data).", dataMime: null };
 }
 
+function classifyExternalUrl(href: string): { label: string; host: string | null; isGoogleDrive: boolean } {
+  try {
+    const url = new URL(href);
+    const host = (url.hostname || "").toLowerCase();
+    const isGoogleDrive =
+      host === "drive.google.com" ||
+      host.endsWith(".drive.google.com") ||
+      host === "docs.google.com" ||
+      host.endsWith(".docs.google.com");
+    return {
+      label: isGoogleDrive ? "Google Drive" : "External URL",
+      host: host || null,
+      isGoogleDrive,
+    };
+  } catch {
+    return {
+      label: "External URL",
+      host: null,
+      isGoogleDrive: false,
+    };
+  }
+}
+
 function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvidenceWithReviewById>>) {
   if (item.type === "URL") {
+    const externalUrl = item.external_url || "";
+    const urlMeta = externalUrl ? classifyExternalUrl(externalUrl) : null;
     return (
-      <p>
-        external_url:{" "}
-        {item.external_url ? (
-          <a href={item.external_url} target="_blank" rel="noopener noreferrer">
-            {item.external_url}
-          </a>
-        ) : (
-          NA_TEXT
-        )}
-      </p>
+      <>
+        <p>
+          URL source: <strong>{urlMeta?.label || NA_TEXT}</strong>
+          {urlMeta?.host ? (
+            <>
+              {" "}
+              <span className="inline-note">({urlMeta.host})</span>
+            </>
+          ) : null}
+        </p>
+        <p>external_url: {externalUrl || NA_TEXT}</p>
+        <div className="item-actions">
+          {externalUrl ? (
+            <a href={externalUrl} target="_blank" rel="noopener noreferrer">
+              Open URL
+            </a>
+          ) : (
+            <button type="button" disabled>
+              Open URL
+            </button>
+          )}
+        </div>
+      </>
     );
   }
 

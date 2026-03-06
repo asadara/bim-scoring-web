@@ -72,8 +72,12 @@ export function getApiBaseUrlFromEnv(): string {
 export function getFeatureRealBackendWrite(): boolean {
   const override = parseBoolean(process.env.NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE);
   if (override !== null) return override;
-  // Default OFF in staging/production and also OFF by default in development unless explicitly enabled.
-  return false;
+  // Default ON for production cutover, OFF for non-production unless explicitly enabled.
+  try {
+    return getAppEnvironment() === "production";
+  } catch {
+    return false;
+  }
 }
 
 export function validatePublicRuntimeEnv(): void {

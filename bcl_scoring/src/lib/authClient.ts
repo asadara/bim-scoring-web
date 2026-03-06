@@ -1,6 +1,6 @@
 import { createClient, type User } from "@supabase/supabase-js";
 
-import { buildApiUrl, safeFetchJson } from "@/lib/http";
+import { buildApiUrl, safeFetchJson, toUserFacingSafeFetchError } from "@/lib/http";
 import { AppRole, setStoredCredential } from "@/lib/userCredential";
 
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
@@ -599,7 +599,7 @@ export async function getAuthProfilePhoto(input: { user_id: string }): Promise<A
 
   const result = await safeFetchJson<unknown>(buildApiUrl(`/auth/profile-photo/${encodeURIComponent(user_id)}`));
   if (!result.ok) {
-    throw new Error(result.error || "Gagal memuat foto profil.");
+    throw new Error(toUserFacingSafeFetchError(result, "Gagal memuat foto profil."));
   }
 
   const root = result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};
@@ -634,7 +634,7 @@ export async function uploadAuthProfilePhoto(input: {
     }),
   });
   if (!result.ok) {
-    throw new Error(result.error || "Gagal mengunggah foto profil.");
+    throw new Error(toUserFacingSafeFetchError(result, "Gagal mengunggah foto profil."));
   }
 
   const root = result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};

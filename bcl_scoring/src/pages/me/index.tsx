@@ -203,9 +203,14 @@ export default function MePage() {
         setProfileEmployeeNumber(snapshot.employee_number || "");
         const resolvedUserId = snapshot.user_id || credential.user_id;
         if (resolvedUserId) {
-          const profilePhoto = await getAuthProfilePhoto({ user_id: resolvedUserId });
-          if (!mounted) return;
-          setProfilePhotoDataUrl(profilePhoto.signed_url || null);
+          try {
+            const profilePhoto = await getAuthProfilePhoto({ user_id: resolvedUserId });
+            if (!mounted) return;
+            setProfilePhotoDataUrl(profilePhoto.signed_url || null);
+          } catch {
+            if (!mounted) return;
+            setProfilePhotoDataUrl(null);
+          }
         } else if (mounted) {
           setProfilePhotoDataUrl(null);
         }

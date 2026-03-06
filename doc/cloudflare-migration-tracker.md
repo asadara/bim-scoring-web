@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-07 00:09:00 +07:00
+last_updated: 2026-03-07 21:05:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -67,7 +67,7 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
   - `NEXT_PUBLIC_BIM_SCORING_API_BASE_URL_PRODUCTION`
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE` (default disarankan `false`)
+  - `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE` (opsional override; default runtime kini `true` untuk production)
 - [ ] Siapkan custom domain frontend (mis. `app.<domain-anda>`), update DNS dan aktifkan proxy Cloudflare.
 - [ ] Beri konfirmasi nama project Pages + domain target ke saya untuk saya kunci di tracker.
 
@@ -280,6 +280,21 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `GET /summary/v2/bcl/dashboard`
   - Contract gateway diperluas dan lulus untuk route baru (`cloudflare.gateway.auth-offload.contract.test.js`, total test 10 pass).
   - Tujuan: menghilangkan `503 x-render-routing: suspend-by-user` pada dashboard saat Render API disuspend.
+
+## 2026-03-07
+
+- [x] Role 2 URL evidence UX ditingkatkan:
+  - Evidence type `URL` sekarang menampilkan klasifikasi source (`Google Drive` vs `External URL`) secara read-only.
+  - Aksi akses dipertegas dengan tombol `Open URL`.
+- [x] Runtime default web untuk `FEATURE_REAL_BACKEND_WRITE` diubah:
+  - default menjadi aktif pada environment `production` (tetap bisa dioverride via env var).
+  - dampak: label `Read mode fallback` tidak lagi muncul massal karena default prototype mode.
+- [x] Hardening My Account:
+  - fetch foto profil tidak lagi menjatuhkan seluruh halaman saat endpoint backend lama suspended.
+  - error safe-fetch disanitasi ke pesan user-friendly (tidak menampilkan HTML mentah `Service Suspended`).
+- [x] Gateway offload + CORS hardening untuk warning lintas halaman:
+  - preflight CORS sekarang mengizinkan header custom admin/write (`X-Actor-Role`, `X-Actor-Id`, `Idempotency-Key`, dll) sehingga error browser `Failed to fetch` terselesaikan.
+  - offload read ditambah untuk route Audit/Admin/My Account yang sebelumnya masih bergantung Render.
 
 ## Evidence
 
