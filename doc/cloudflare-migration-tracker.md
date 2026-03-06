@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 21:55:41 +07:00
+last_updated: 2026-03-06 22:02:34 +07:00
 owner: Engineering / Release
 ---
 
@@ -254,6 +254,9 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - Verifikasi runtime OAuth browser:
     - URL authorize Supabase memuat `redirect_to=https://bcl-scoring.asadara83.workers.dev/auth/sign-in`.
     - tidak terdeteksi redirect OAuth ke domain Render.
+- [x] Guard domain legacy frontend ditambahkan:
+  - Middleware web (`bcl_scoring/src/middleware.ts`) memaksa redirect `308` dari host Render legacy (`bim-scoring-web.onrender.com`, `bimscoringnke.onrender.com`) ke host canonical Cloudflare (`bcl-scoring.asadara83.workers.dev`) dengan path/query tetap.
+  - Tujuan: mencegah user kembali masuk ke domain Render setelah login OAuth.
 
 ## Evidence
 
@@ -275,6 +278,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Auth-native gateway offload: `bim-scoring-api/cloudflare_api_gateway/src/index.mjs`
 - Contract test auth offload gateway: `bim-scoring-api/test/contract/cloudflare.gateway.auth-offload.contract.test.js`
 - Verifikasi OAuth redirect (browser trace): Supabase authorize `redirect_to` -> `https://bcl-scoring.asadara83.workers.dev/auth/sign-in`
+- Redirect guard canonical host frontend: `bim-scoring-web/bcl_scoring/src/middleware.ts`
 
 ## Update Rule
 
