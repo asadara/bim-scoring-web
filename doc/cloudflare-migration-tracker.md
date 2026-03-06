@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 22:02:34 +07:00
+last_updated: 2026-03-06 22:47:16 +07:00
 owner: Engineering / Release
 ---
 
@@ -257,6 +257,12 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - [x] Guard domain legacy frontend ditambahkan:
   - Middleware web (`bcl_scoring/src/middleware.ts`) memaksa redirect `308` dari host Render legacy (`bim-scoring-web.onrender.com`, `bimscoringnke.onrender.com`) ke host canonical Cloudflare (`bcl-scoring.asadara83.workers.dev`) dengan path/query tetap.
   - Tujuan: mencegah user kembali masuk ke domain Render setelah login OAuth.
+- [x] Offload read route pasca-login selesai:
+  - `GET /projects` dan `GET /projects/queue-summary` sekarang ditangani native di gateway Worker (Supabase REST) dengan header `X-BCL-Read-Source: supabase-worker`.
+  - Verifikasi gateway:
+    - `/projects?limit=1` -> `200` + tanpa `x-render-origin-server`.
+    - `/projects/queue-summary` -> `200` + tanpa `x-render-origin-server`.
+  - Audit otomatis `npm run audit:render-leak` sekarang PASS (`bundleBlocked=0`, `apiLeak=0`).
 
 ## Evidence
 
@@ -279,6 +285,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Contract test auth offload gateway: `bim-scoring-api/test/contract/cloudflare.gateway.auth-offload.contract.test.js`
 - Verifikasi OAuth redirect (browser trace): Supabase authorize `redirect_to` -> `https://bcl-scoring.asadara83.workers.dev/auth/sign-in`
 - Redirect guard canonical host frontend: `bim-scoring-web/bcl_scoring/src/middleware.ts`
+- Render leak audit command: `bim-scoring-web/bcl_scoring/scripts/render-leak-audit.mjs`
 
 ## Update Rule
 
