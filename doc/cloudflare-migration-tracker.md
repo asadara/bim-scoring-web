@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 19:02:00 +07:00
+last_updated: 2026-03-06 19:10:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -179,6 +179,13 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - Script audit kompatibilitas runtime ditambahkan di repo API: `npm run audit:cloudflare-compat`
   - Hasil audit mengonfirmasi blocker utama: `express-server`, `fs-usage`, `cjs-bridge`, `process.env` direct usage
   - Rencana teknis A2.3 dibuat: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
+- [x] A2.3 Wave 1 dimulai (refactor baseline tanpa ubah perilaku API):
+  - Tambah `configureApp(app, { supabaseFactory })` di `src/app.js` untuk memisahkan wiring middleware/route dari instansiasi Express.
+  - `createApp()` diubah menjadi wrapper yang memanggil `configureApp(...)` (kompatibel dengan test existing).
+  - Validasi lolos: `npm run build`, `node --test test/contract/summary.v2.http.test.js`.
+- [x] Audit script A2.3 diperbaiki agar tidak menghitung komentar sebagai hit:
+  - `scripts/cloudflare-runtime-compat-audit.mjs` sekarang skip line comment + block comment.
+  - Hasil audit lebih akurat; hit `express-server` turun menjadi 2 (`import express`, `app.listen` di `server.js`).
 
 ## Evidence
 
