@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 16:06:00 +07:00
+last_updated: 2026-03-06 18:37:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -41,7 +41,7 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
 
 - [x] A2.0 Assessment feasibility migrasi API selesai (bukan lift-and-shift).
 - [x] A2.1 Hilangkan exposure `*.onrender.com` dari sisi client (gunakan custom API domain).
-- [ ] A2.2 Stabilkan lapisan domain/API gateway di Cloudflare (proxy/caching/security baseline).
+- [x] A2.2 Stabilkan lapisan domain/API gateway di Cloudflare (proxy/caching/security baseline).
 - [ ] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
 - [ ] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
 - [ ] A2.5 Cutover endpoint read-only dulu, lalu write-path.
@@ -105,7 +105,8 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 3. Verifikasi dari repo web:
    - `WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev API_BASE_URL=https://bcl-api-gateway.asadara83.workers.dev npm run smoke:cloudflare`
    - `WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev EXPECTED_API_HOST=bcl-api-gateway.asadara83.workers.dev npm run smoke:live-api-base`
-4. Jika dua smoke pass, tandai A2.2 selesai lalu lanjut A2.3 (runtime compatibility refactor API).
+   - `WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev API_BASE_URL=https://bcl-api-gateway.asadara83.workers.dev npm run smoke:gateway-hardening`
+4. Jika tiga smoke pass, tandai A2.2 selesai lalu lanjut A2.3 (runtime compatibility refactor API).
 
 ## Progress Log
 
@@ -151,6 +152,29 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - `39352e2` (`feat(gateway): add hardening controls for origin/method/path and request tracing`)
   - `6988cc7` (`fix(gateway): always allow health and readiness paths`)
 - [ ] Menunggu aksi dashboard (A2.2): set variable gateway permanen (`UPSTREAM_BASE_URL`, `ALLOWED_ORIGINS`, `ALLOWED_PATH_PREFIXES`, `BLOCK_UNKNOWN_ORIGIN`) lalu verifikasi ulang smoke.
+- [x] Re-run verifikasi lintas endpoint Cloudflare:
+  - `smoke:cloudflare` pass (web route kritikal + `/health` + `/ready` = `OK`).
+  - `smoke:live-api-base` pass (bundle live tetap tidak memuat `onrender.com`).
+- [x] Tambah script verifikasi hardening gateway: `npm run smoke:gateway-hardening`.
+- [ ] Hasil `smoke:gateway-hardening` menunjukkan gap A2.2:
+  - `blocked path` sudah aktif (`403 Path is not allowed`).
+  - `unknown origin` belum diblok (`/ready` dari `https://evil.example` masih `200`).
+  - Implikasi: `BLOCK_UNKNOWN_ORIGIN` dan/atau `ALLOWED_ORIGINS` di dashboard worker belum efektif; perlu set/redeploy lalu smoke ulang.
+- [x] Re-verifikasi pasca build sukses:
+  - `smoke:live-api-base` tetap pass.
+  - `smoke:cloudflare` sempat timeout intermiten di `/health`, namun cek ulang langsung `/health` memberi `200` konsisten.
+- [ ] Gap A2.2 masih terbuka setelah build terbaru:
+  - `smoke:gateway-hardening` masih gagal pada skenario unknown origin.
+  - Request `Origin: https://evil.example` ke `/ready` masih `200`.
+  - Header respons masih `Access-Control-Allow-Origin: *` (indikasi `ALLOWED_ORIGINS` production belum terbaca sebagai allowlist spesifik).
+- [x] Redeploy manual gateway dari dashboard berhasil dengan binding runtime vars terkonfirmasi:
+  - Version ID: `031a2f8d-7508-4eea-b0bf-30269c6bcb16`
+  - Binding terdeteksi: `UPSTREAM_BASE_URL`, `ALLOWED_ORIGINS`, `BLOCK_UNKNOWN_ORIGIN`, `ALLOWED_PATH_PREFIXES`, `ALLOWED_METHODS`
+- [x] Verifikasi final A2.2 lulus:
+  - `smoke:cloudflare` pass
+  - `smoke:live-api-base` pass
+  - `smoke:gateway-hardening` pass
+  - Cek manual: `Origin: https://evil.example` ke `/ready` sekarang `403 Origin is not allowed`
 
 ## Evidence
 
@@ -161,7 +185,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Existing phase log: `bim-scoring-web/doc/phase-status-log.md`
 - Build/deploy log terbaru: `cloudeflare_log/build_cloudflare_log.log`
 - API gateway worker (transition): `bim-scoring-api/cloudflare_api_gateway`
-- Write-path audit (Cloudflare API cutover): `cloudflare-api-write-path-audit.md`
+- Referensi operasional gateway: `bim-scoring-api/cloudflare_api_gateway/README.md`
 
 ## Update Rule
 

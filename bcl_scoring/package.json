@@ -14,6 +14,7 @@
     "smoke:render": "node scripts/render-smoke-check.mjs",
     "smoke:cloudflare": "node scripts/render-smoke-check.mjs",
     "smoke:live-api-base": "node scripts/check-live-api-base.mjs",
+    "smoke:gateway-hardening": "node scripts/gateway-hardening-smoke.mjs",
     "smoke:id-routes": "node scripts/id-route-regression-smoke.mjs",
     "smoke:custom-domain": "node scripts/custom-domain-cutover-check.mjs",
     "e2e": "playwright test",
