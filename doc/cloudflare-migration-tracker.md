@@ -295,6 +295,14 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - [x] Gateway offload + CORS hardening untuk warning lintas halaman:
   - preflight CORS sekarang mengizinkan header custom admin/write (`X-Actor-Role`, `X-Actor-Id`, `Idempotency-Key`, dll) sehingga error browser `Failed to fetch` terselesaikan.
   - offload read ditambah untuk route Audit/Admin/My Account yang sebelumnya masih bergantung Render.
+- [x] Gateway write offload untuk evidence URL (hapus dependency Render pada submit):
+  - Route native Supabase ditambahkan pada `bcl-api-gateway`:
+    - `GET /periods/:periodId/evidences`
+    - `POST /periods/:periodId/evidences`
+    - `PUT /periods/:periodId/evidences/:evidenceId`
+    - `POST /periods/:periodId/evidences/:evidenceId/submit`
+  - Error `503` saat `Submit for Review` URL evidence tidak lagi bergantung upstream Render suspended.
+  - Contract test gateway diperluas untuk route evidence dan lulus.
 
 ## Evidence
 
