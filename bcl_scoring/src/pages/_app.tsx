@@ -21,8 +21,6 @@ import { validatePublicRuntimeEnv } from "@/lib/runtimeEnv";
 import { applyTheme, resolveStoredTheme } from "@/lib/theme";
 import { UserCredential, getStoredCredential } from "@/lib/userCredential";
 
-validatePublicRuntimeEnv();
-
 const DEFAULT_CREDENTIAL: UserCredential = {
   role: "viewer",
   user_id: null,
@@ -42,6 +40,13 @@ export default function App({ Component, pageProps }: AppProps) {
   const text = useMemo(() => getGlobalText(language), [language]);
 
   useEffect(() => {
+    // Avoid hard-failing SSR in non-Node runtimes; validate public env on client.
+    try {
+      validatePublicRuntimeEnv();
+    } catch (error) {
+      console.error("Runtime env validation failed:", error);
+    }
+
     applyTheme(resolveStoredTheme());
     applyLanguage(language);
   }, [language]);
