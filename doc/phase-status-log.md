@@ -31,6 +31,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Checkpoint 2026-02-18: policy Admin untuk mutasi evidence di endpoint legacy dikunci `read-only` (semua role termasuk Admin menerima `403 FORBIDDEN_ROLE`), regression API lulus (`tests=99, pass=98, fail=0, skipped=1`).
 - Checkpoint 2026-02-20: root redirect API (`GET /` dengan `Accept: text/html`) tervalidasi `302` ke `https://bimscoringnke.onrender.com` (gap `WEB_APP_URL` ditutup).
 - Keputusan operasional aktif: Render tetap jalur deploy primary; OCI tetap dicatat sebagai jalur backup.
+- Tracker migrasi Render -> Cloudflare sudah dibuat untuk jejak lintas repo: `../../cloudflare-migration-tracker.md`.
 
 ## Phase Timeline
 
@@ -78,6 +79,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Rollout commit (Web): `6c8d92b` (`Complete blueprint remediation docs and UI score interpretation`)
 - Weekly cumulative + confidence commit (API): `97652ac` (`add weekly cumulative scoring and confidence metrics`)
 - Landing dashboard BCL commit (Web): `4fa9832` (`serve legacy bcl dashboard as main page`)
+- Cloudflare migration tracker (cross-repo): `../../cloudflare-migration-tracker.md`
 
 ## Exit Criteria for Next Phase
 

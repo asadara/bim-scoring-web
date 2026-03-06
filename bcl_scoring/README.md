@@ -93,18 +93,32 @@ npm run start
 Run after DNS + TLS cutover:
 
 ```bash
-CUSTOM_DOMAIN=<domain-custom-anda> API_BASE_URL=https://bim-scoring-api.onrender.com npm run smoke:custom-domain
+CUSTOM_DOMAIN=<domain-custom-anda> API_BASE_URL=https://api.<domain-custom-anda> npm run smoke:custom-domain
 ```
 
-### Render Smoke Timeout Control
-
-`smoke:render` mendukung timeout per request agar fail-fast saat endpoint bermasalah:
+Alternatively, you can pass full web URL directly:
 
 ```bash
-REQUEST_TIMEOUT_MS=15000 npm run smoke:render
+WEB_BASE_URL=https://app.<domain-custom-anda> API_BASE_URL=https://api.<domain-custom-anda> npm run smoke:custom-domain
 ```
 
-### Render Custom Domain Control
+### Cloudflare Smoke Timeout Control
+
+`smoke:cloudflare` mendukung timeout per request agar fail-fast saat endpoint bermasalah:
+
+```bash
+WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev API_BASE_URL=https://api.<domain-custom-anda> REQUEST_TIMEOUT_MS=15000 npm run smoke:cloudflare
+```
+
+### ID Route Regression Smoke
+
+`smoke:id-routes` sekarang mewajibkan `API_BASE_URL` eksplisit (tidak ada fallback `onrender.com`):
+
+```bash
+WEB_BASE_URL=https://app.<domain-custom-anda> API_BASE_URL=https://api.<domain-custom-anda> npm run smoke:id-routes
+```
+
+### Render Custom Domain Control (Legacy / Transition)
 
 Using Render API credentials (`RENDER_API_KEY`, `RENDER_WEB_SERVICE_ID`):
 

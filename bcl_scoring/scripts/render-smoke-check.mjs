@@ -1,5 +1,5 @@
-const webBase = (process.env.WEB_BASE_URL || "https://bim-scoring-web.onrender.com").replace(/\/+$/, "");
-const apiBase = (process.env.API_BASE_URL || "https://bim-scoring-api.onrender.com").replace(/\/+$/, "");
+const webBase = (process.env.WEB_BASE_URL || "https://bcl-scoring.asadara83.workers.dev").replace(/\/+$/, "");
+const apiBase = (process.env.API_BASE_URL || "").replace(/\/+$/, "");
 const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 20_000);
 
 function ok(msg) {
@@ -8,6 +8,10 @@ function ok(msg) {
 
 function fail(msg) {
   console.error(`[FAIL] ${msg}`);
+}
+
+function warn(msg) {
+  console.warn(`[WARN] ${msg}`);
 }
 
 async function fetchWithTimeout(url) {
@@ -74,6 +78,15 @@ async function checkApiHealth(path, expectedFlag = "ok") {
 }
 
 async function main() {
+  if (!apiBase) {
+    fail("API_BASE_URL is required. Example: API_BASE_URL=https://api.example.com");
+    process.exit(1);
+  }
+
+  if (/onrender\.com$/i.test(new URL(apiBase).hostname)) {
+    warn("API_BASE_URL still points to onrender.com. This is acceptable only for temporary transition.");
+  }
+
   const checks = [
     () =>
       checkPage({

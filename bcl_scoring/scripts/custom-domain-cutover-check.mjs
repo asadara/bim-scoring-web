@@ -1,17 +1,42 @@
 import dns from "node:dns/promises";
 import tls from "node:tls";
 
-const customDomain = (process.env.CUSTOM_DOMAIN || "").trim().toLowerCase();
-const apiBase = (process.env.API_BASE_URL || "https://bim-scoring-api.onrender.com").replace(/\/+$/, "");
+const customDomainInput = (process.env.CUSTOM_DOMAIN || "").trim().toLowerCase();
+const webBaseInput = (process.env.WEB_BASE_URL || "").trim();
+const apiBaseRaw = (process.env.API_BASE_URL || "").trim();
 const minTlsDays = Number(process.env.MIN_TLS_DAYS || 14);
 const allowHttp200 = String(process.env.ALLOW_HTTP_200 || "false").toLowerCase() === "true";
 
-if (!customDomain) {
-  console.error("[FAIL] CUSTOM_DOMAIN is required. Example: CUSTOM_DOMAIN=app.example.com");
+if (!customDomainInput && !webBaseInput) {
+  console.error(
+    "[FAIL] CUSTOM_DOMAIN or WEB_BASE_URL is required. Example: CUSTOM_DOMAIN=app.example.com"
+  );
   process.exit(1);
 }
 
-const webBase = `https://${customDomain}`;
+if (!apiBaseRaw) {
+  console.error(
+    "[FAIL] API_BASE_URL is required. Example: API_BASE_URL=https://api.example.com"
+  );
+  process.exit(1);
+}
+
+let customDomain = customDomainInput;
+let webBase = customDomain ? `https://${customDomain}` : "";
+
+if (!customDomain && webBaseInput) {
+  let parsed;
+  try {
+    parsed = new URL(webBaseInput);
+  } catch {
+    console.error(`[FAIL] WEB_BASE_URL is invalid URL: ${webBaseInput}`);
+    process.exit(1);
+  }
+  customDomain = parsed.hostname.toLowerCase();
+  webBase = `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, "");
+}
+
+const apiBase = apiBaseRaw.replace(/\/+$/, "");
 
 function ok(message) {
   console.log(`[OK] ${message}`);
@@ -214,6 +239,9 @@ async function main() {
   console.log(`[INFO] Running custom domain cutover checks for ${customDomain}`);
   console.log(`[INFO] Web base: ${webBase}`);
   console.log(`[INFO] API base: ${apiBase}`);
+  if (/onrender\.com$/i.test(new URL(apiBase).hostname)) {
+    warn("API_BASE_URL still points to onrender.com. This is acceptable only for temporary transition.");
+  }
 
   const checks = [
     () => checkDnsRecords(customDomain),

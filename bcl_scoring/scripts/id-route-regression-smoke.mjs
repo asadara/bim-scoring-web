@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
-const webBase = (process.env.WEB_BASE_URL || "https://bim-scoring-web.onrender.com").replace(/\/+$/, "");
-const apiBase = (process.env.API_BASE_URL || "https://bim-scoring-api.onrender.com").replace(/\/+$/, "");
+const webBase = (process.env.WEB_BASE_URL || "https://bcl-scoring.asadara83.workers.dev").replace(/\/+$/, "");
+const apiBase = (process.env.API_BASE_URL || "").replace(/\/+$/, "");
 const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 30_000);
 const navTimeoutMs = Number(process.env.NAV_TIMEOUT_MS || 30_000);
 const headless = String(process.env.HEADLESS || "true").trim().toLowerCase() !== "false";
@@ -20,6 +20,10 @@ function logOk(message) {
 
 function logInfo(message) {
   console.log(`[INFO] ${message}`);
+}
+
+function logWarn(message) {
+  console.warn(`[WARN] ${message}`);
 }
 
 function logFail(message) {
@@ -155,6 +159,14 @@ async function runRouteCheck(browser, { path, mustContainAny, forbiddenAny }) {
 }
 
 async function main() {
+  if (!apiBase) {
+    throw new Error("API_BASE_URL is required. Example: API_BASE_URL=https://api.example.com");
+  }
+
+  if (/onrender\.com$/i.test(new URL(apiBase).hostname)) {
+    logWarn("API_BASE_URL still points to onrender.com. This is acceptable only for temporary transition.");
+  }
+
   logInfo(`WEB_BASE_URL=${webBase}`);
   logInfo(`API_BASE_URL=${apiBase}`);
   let context = null;
