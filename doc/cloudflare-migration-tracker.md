@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 21:23:03 +07:00
+last_updated: 2026-03-06 21:55:41 +07:00
 owner: Engineering / Release
 ---
 
@@ -249,6 +249,11 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - Smoke produksi pasca deploy menunjukkan header `X-BCL-Auth-Source: supabase-worker` pada route auth (indikasi tidak diproxy ke Render).
   - Contract test baru lulus:
     - `test/contract/cloudflare.gateway.auth-offload.contract.test.js`
+- [x] A2.3 stabilisasi login pasca offload:
+  - `GET /health` dan `GET /version` pada `bcl-api-gateway` dipindah ke edge response langsung (tanpa proxy Render) untuk menghindari wake-up dari backend handshake frontend.
+  - Verifikasi runtime OAuth browser:
+    - URL authorize Supabase memuat `redirect_to=https://bcl-scoring.asadara83.workers.dev/auth/sign-in`.
+    - tidak terdeteksi redirect OAuth ke domain Render.
 
 ## Evidence
 
@@ -269,6 +274,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Contract test Worker read-only pilot: `bim-scoring-api/test/contract/cloudflare.readonly-pilot.worker.contract.test.js`
 - Auth-native gateway offload: `bim-scoring-api/cloudflare_api_gateway/src/index.mjs`
 - Contract test auth offload gateway: `bim-scoring-api/test/contract/cloudflare.gateway.auth-offload.contract.test.js`
+- Verifikasi OAuth redirect (browser trace): Supabase authorize `redirect_to` -> `https://bcl-scoring.asadara83.workers.dev/auth/sign-in`
 
 ## Update Rule
 
