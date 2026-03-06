@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 19:58:00 +07:00
+last_updated: 2026-03-06 20:14:17 +07:00
 owner: Engineering / Release
 ---
 
@@ -212,6 +212,22 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - `express-static` dihapus dari `src/app.js`.
   - middleware CORS sementara yang memaksa `Access-Control-Allow-Origin: *` juga dihapus.
   - Audit ulang menunjukkan blocker `express-static` sudah hilang; total rules matched turun menjadi 5.
+- [x] A2.3 Wave 4 selesai (runtime config adapter):
+  - Adapter env tunggal ditambahkan di `src/runtimeEnv.js` (`Node` + `Worker`).
+  - `runtimeConfig.js` direfactor agar seluruh pembacaan env lewat adapter.
+  - Route/core yang sebelumnya membaca env langsung sudah dipindah:
+    - `src/rateLimit.js`
+    - `src/routes/evidenceSupportRoutes.js`
+    - `src/routes/projectReadRoutes.js`
+    - `src/app.js` (`WEB_APP_URL` melalui `runtimeConfig.webAppUrl`)
+  - Audit ulang: `process-env` turun dari 14 hit -> 1 hit (sisa hanya di adapter Node, bukan route/core).
+- [x] Penutupan Wave 4 tervalidasi:
+  - Build lulus: `npm run build`.
+  - Audit runtime lulus dengan snapshot blocker terbaru: `npm run audit:cloudflare-compat`.
+  - Contract test kunci lulus:
+    - `test/contract/rate-limiting.contract.test.js`
+    - `test/contract/evidence.upload.v2.guard.contract.test.js`
+    - `test/contract/summary.v2.http.test.js`
 
 ## Evidence
 
@@ -224,6 +240,7 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - API gateway worker (transition): `bim-scoring-api/cloudflare_api_gateway`
 - Referensi operasional gateway: `bim-scoring-api/cloudflare_api_gateway/README.md`
 - Audit kompatibilitas Worker runtime (A2.3): `bim-scoring-api/scripts/cloudflare-runtime-compat-audit.mjs`
+- Runtime env adapter (A2.3 Wave 4): `bim-scoring-api/src/runtimeEnv.js`
 - Rencana teknis A2.3: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
 - Provider config scoring (A2.3 Wave 2): `bim-scoring-api/src/scoring/config/projectConfigProvider.js`
 - Entry scoring ESM (A2.3 Wave 3): `bim-scoring-api/src/scoring/runProjectScoring.js`
