@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 19:40:00 +07:00
+last_updated: 2026-03-06 19:58:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -208,13 +208,17 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `test/contract/scoring.engine.scale.contract.test.js`
     - `test/contract/summary.v2.http.test.js`
   - Audit ulang: rule `cjs-bridge` tidak muncul lagi (0 hit).
+- [x] A2.3 blocker cleanup lanjutan:
+  - `express-static` dihapus dari `src/app.js`.
+  - middleware CORS sementara yang memaksa `Access-Control-Allow-Origin: *` juga dihapus.
+  - Audit ulang menunjukkan blocker `express-static` sudah hilang; total rules matched turun menjadi 5.
 
 ## Evidence
 
 - Frontend runtime env mapping API: `bim-scoring-web/bcl_scoring/src/lib/runtimeEnv.ts`
 - API Node server entrypoint: `bim-scoring-api/src/server.js`
-- API Node/Express app + CJS bridge: `bim-scoring-api/src/app.js`
-- Scoring config loader berbasis filesystem: `bim-scoring-api/src/scoring/config/loadProjectConfig.cjs`
+- API Node/Express app adapter: `bim-scoring-api/src/app.js`
+- Scoring config provider filesystem (sementara): `bim-scoring-api/src/scoring/config/projectConfigProvider.js`
 - Existing phase log: `bim-scoring-web/doc/phase-status-log.md`
 - Build/deploy log terbaru: `cloudeflare_log/build_cloudflare_log.log`
 - API gateway worker (transition): `bim-scoring-api/cloudflare_api_gateway`
