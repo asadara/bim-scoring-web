@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 22:47:16 +07:00
+last_updated: 2026-03-06 23:22:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -263,6 +263,16 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `/projects?limit=1` -> `200` + tanpa `x-render-origin-server`.
     - `/projects/queue-summary` -> `200` + tanpa `x-render-origin-server`.
   - Audit otomatis `npm run audit:render-leak` sekarang PASS (`bundleBlocked=0`, `apiLeak=0`).
+- [x] Storage integration pilot (Google Drive auto-share Role 1 -> Role 2) ditambahkan:
+  - Backend API baru:
+    - `GET /v2/integrations/google-drive/status`
+    - `GET /v2/integrations/google-drive/connect-url`
+    - `GET /v2/integrations/google-drive/callback`
+    - `POST /v2/integrations/google-drive/disconnect`
+    - `GET /projects/:projectId/reviewer-role2-emails`
+    - `POST /v2/projects/:projectId/evidence/gdrive/share`
+  - Frontend Role 1 write flow (`save/submit evidence URL`) sekarang best-effort memicu auto-share endpoint.
+  - Guard contract test route baru lulus (`google-drive.autoshare.guard.contract.test.js`).
 
 ## Evidence
 
@@ -286,6 +296,10 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Verifikasi OAuth redirect (browser trace): Supabase authorize `redirect_to` -> `https://bcl-scoring.asadara83.workers.dev/auth/sign-in`
 - Redirect guard canonical host frontend: `bim-scoring-web/bcl_scoring/src/middleware.ts`
 - Render leak audit command: `bim-scoring-web/bcl_scoring/scripts/render-leak-audit.mjs`
+- Google Drive auto-share routes: `bim-scoring-api/src/routes/googleDriveRoutes.js`
+- Google Drive token schema: `bim-scoring-api/docs/ops/sql/create-user-google-drive-tokens.sql`
+- Google Drive runbook: `bim-scoring-api/docs/ops/google-drive-auto-share.md`
+- Frontend trigger auto-share: `bim-scoring-web/bcl_scoring/src/lib/role1TaskLayer.ts`
 
 ## Update Rule
 

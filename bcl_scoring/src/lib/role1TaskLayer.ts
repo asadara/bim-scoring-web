@@ -1334,6 +1334,11 @@ type BackendEvidenceWriteResponse = {
   notes: string | null;
 };
 
+type GoogleDriveAutoShareResponse = {
+  shared_count?: number | null;
+  failed_count?: number | null;
+};
+
 function toStoredEvidenceStatus(raw: unknown): EvidenceStatus {
   const value = asString(raw).trim().toUpperCase();
   if (value === "NEEDS_REVISION" || value === "NEEDS REVISION") return "NEEDS_REVISION";
@@ -1367,6 +1372,53 @@ function resolveEvidenceUri(input: EvidenceDraftInput): string | null {
     );
   }
   return null;
+}
+
+function extractGoogleDriveFileId(input: string | null): string | null {
+  const raw = asNullableString(input);
+  if (!raw) return null;
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(raw)) return raw;
+
+  try {
+    const url = new URL(raw);
+    const fromQuery = asNullableString(url.searchParams.get("id"));
+    if (fromQuery && /^[a-zA-Z0-9_-]{10,}$/.test(fromQuery)) return fromQuery;
+    const byPath = url.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+    if (byPath?.[1]) return byPath[1];
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function tryAutoShareGoogleDriveForRole2(input: EvidenceDraftInput): Promise<void> {
+  if (input.type !== "URL") return;
+  const evidenceUrl = asNullableString(input.external_url);
+  if (!evidenceUrl) return;
+  const fileId = extractGoogleDriveFileId(evidenceUrl);
+  if (!fileId) return;
+
+  try {
+    await callBackendWrite<GoogleDriveAutoShareResponse>({
+      path: `/v2/projects/${encodeURIComponent(input.project_id)}/evidence/gdrive/share`,
+      method: "POST",
+      actorRole: "role1",
+      body: {
+        evidence_url: evidenceUrl,
+        file_id: fileId,
+        role: "reader",
+        send_notification_email: false,
+      },
+      idempotencyScope: "google-drive-share-role2",
+      idempotencyPayload: {
+        project_id: input.project_id,
+        evidence_url: evidenceUrl,
+        file_id: fileId,
+      },
+    });
+  } catch {
+    // Non-blocking by design: evidence write must remain successful even if Drive ACL update fails.
+  }
 }
 
 function resolveEvidenceNotes(input: EvidenceDraftInput): string | null {
@@ -1535,6 +1587,8 @@ export async function saveEvidenceWithBackendWrite(input: EvidenceDraftInput): P
       ? await updateEvidenceToBackend(draftInput, localVersion as number)
       : await createEvidenceToBackend(draftInput);
 
+    await tryAutoShareGoogleDriveForRole2(draftInput);
+
     return syncLocalEvidenceFromBackend({
       draft: input,
       backend: writtenDraft,
@@ -1566,6 +1620,8 @@ export async function submitEvidenceWithBackendWrite(input: EvidenceDraftInput):
     const draftWrite = canUpdateDraft
       ? await updateEvidenceToBackend(draftInput, localVersion as number)
       : await createEvidenceToBackend(draftInput);
+
+    await tryAutoShareGoogleDriveForRole2(draftInput);
 
     const draftSynced = syncLocalEvidenceFromBackend({
       draft: input,
