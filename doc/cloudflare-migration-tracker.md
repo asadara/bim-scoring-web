@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-06 18:37:00 +07:00
+last_updated: 2026-03-06 19:02:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -82,8 +82,8 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
 ## Dashboard Actions - Next (Tanpa Custom Domain Dulu)
 
 - [x] Create Worker baru untuk API gateway (nama disarankan: `bcl-api-gateway`).
-- [ ] Set Worker variable `UPSTREAM_BASE_URL=https://bim-scoring-api.onrender.com`.
-- [ ] Set Worker variable `ALLOWED_ORIGINS=https://bcl-scoring.asadara83.workers.dev`.
+- [x] Set Worker variable `UPSTREAM_BASE_URL=https://bim-scoring-api.onrender.com`.
+- [x] Set Worker variable `ALLOWED_ORIGINS=https://bcl-scoring.asadara83.workers.dev`.
 - [x] Deploy Worker dan verifikasi:
   - `GET https://<worker-api>.workers.dev/health` -> `200`
   - `GET https://<worker-api>.workers.dev/ready` -> `200`
@@ -151,19 +151,19 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - [x] Deploy hardening gateway terpublikasi ke `main`:
   - `39352e2` (`feat(gateway): add hardening controls for origin/method/path and request tracing`)
   - `6988cc7` (`fix(gateway): always allow health and readiness paths`)
-- [ ] Menunggu aksi dashboard (A2.2): set variable gateway permanen (`UPSTREAM_BASE_URL`, `ALLOWED_ORIGINS`, `ALLOWED_PATH_PREFIXES`, `BLOCK_UNKNOWN_ORIGIN`) lalu verifikasi ulang smoke.
+- [x] Menunggu aksi dashboard (A2.2): set variable gateway permanen (`UPSTREAM_BASE_URL`, `ALLOWED_ORIGINS`, `ALLOWED_PATH_PREFIXES`, `BLOCK_UNKNOWN_ORIGIN`) lalu verifikasi ulang smoke.
 - [x] Re-run verifikasi lintas endpoint Cloudflare:
   - `smoke:cloudflare` pass (web route kritikal + `/health` + `/ready` = `OK`).
   - `smoke:live-api-base` pass (bundle live tetap tidak memuat `onrender.com`).
 - [x] Tambah script verifikasi hardening gateway: `npm run smoke:gateway-hardening`.
-- [ ] Hasil `smoke:gateway-hardening` menunjukkan gap A2.2:
+- [x] Hasil `smoke:gateway-hardening` sempat menunjukkan gap A2.2 (status historis, sudah ditutup):
   - `blocked path` sudah aktif (`403 Path is not allowed`).
   - `unknown origin` belum diblok (`/ready` dari `https://evil.example` masih `200`).
   - Implikasi: `BLOCK_UNKNOWN_ORIGIN` dan/atau `ALLOWED_ORIGINS` di dashboard worker belum efektif; perlu set/redeploy lalu smoke ulang.
 - [x] Re-verifikasi pasca build sukses:
   - `smoke:live-api-base` tetap pass.
   - `smoke:cloudflare` sempat timeout intermiten di `/health`, namun cek ulang langsung `/health` memberi `200` konsisten.
-- [ ] Gap A2.2 masih terbuka setelah build terbaru:
+- [x] Gap A2.2 sempat terbuka setelah build terbaru (status historis, sudah ditutup):
   - `smoke:gateway-hardening` masih gagal pada skenario unknown origin.
   - Request `Origin: https://evil.example` ke `/ready` masih `200`.
   - Header respons masih `Access-Control-Allow-Origin: *` (indikasi `ALLOWED_ORIGINS` production belum terbaca sebagai allowlist spesifik).
@@ -175,6 +175,10 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - `smoke:live-api-base` pass
   - `smoke:gateway-hardening` pass
   - Cek manual: `Origin: https://evil.example` ke `/ready` sekarang `403 Origin is not allowed`
+- [x] Kickoff A2.3 dilakukan:
+  - Script audit kompatibilitas runtime ditambahkan di repo API: `npm run audit:cloudflare-compat`
+  - Hasil audit mengonfirmasi blocker utama: `express-server`, `fs-usage`, `cjs-bridge`, `process.env` direct usage
+  - Rencana teknis A2.3 dibuat: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
 
 ## Evidence
 
@@ -186,6 +190,8 @@ Jika lanjut dari device lain, kerjakan urutan ini:
 - Build/deploy log terbaru: `cloudeflare_log/build_cloudflare_log.log`
 - API gateway worker (transition): `bim-scoring-api/cloudflare_api_gateway`
 - Referensi operasional gateway: `bim-scoring-api/cloudflare_api_gateway/README.md`
+- Audit kompatibilitas Worker runtime (A2.3): `bim-scoring-api/scripts/cloudflare-runtime-compat-audit.mjs`
+- Rencana teknis A2.3: `bim-scoring-api/docs/ops/cloudflare-a2.3-runtime-compat-plan-2026-03-06.md`
 
 ## Update Rule
 
