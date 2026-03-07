@@ -18,6 +18,10 @@ const MANUAL_ROLE_SWITCH_ENABLED = String(process.env.NEXT_PUBLIC_AUTH_ALLOW_ROL
   .trim()
   .toLowerCase() === "true";
 
+export function isManualRoleSwitchEnabled(): boolean {
+  return MANUAL_ROLE_SWITCH_ENABLED;
+}
+
 const ROLE_ALIAS_MAP: Record<string, AppRole> = {
   admin: "admin",
   administrator: "admin",

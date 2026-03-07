@@ -15,7 +15,7 @@ import {
   statusLabel,
 } from "@/lib/role1TaskLayer";
 import { useCredential } from "@/lib/useCredential";
-import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
+import { getRoleLabel, isManualRoleSwitchEnabled, setStoredCredential } from "@/lib/userCredential";
 
 export default function ProjectRole1HomePage() {
   const router = useRouter();
@@ -23,6 +23,7 @@ export default function ProjectRole1HomePage() {
   const credential = useCredential();
   const language = useAppLanguage();
   const actionText = useMemo(() => getPrimaryActionText(language), [language]);
+  const manualRoleSwitchEnabled = isManualRoleSwitchEnabled();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,14 +212,24 @@ export default function ProjectRole1HomePage() {
         {credential.role === "admin" ? (
           <p className="inline-note">
             Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence). Gunakan role{" "}
-            <strong>BIM Coordinator Project</strong> untuk menambah evidence.
-            {" "}
-            <button
-              type="button"
-              onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
-            >
-              {actionText.switchRoleNow}
-            </button>
+            <strong>BIM Coordinator Project</strong> yang memang ditetapkan admin untuk menambah evidence.
+            {manualRoleSwitchEnabled ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStoredCredential({
+                      role: "role1",
+                      user_id: credential.user_id,
+                      scoped_project_ids: typeof projectId === "string" ? [projectId] : [],
+                    })
+                  }
+                >
+                  {actionText.switchRoleNow}
+                </button>
+              </>
+            ) : null}
           </p>
         ) : null}
         {!canWriteEvidence && credential.role !== "admin" ? (

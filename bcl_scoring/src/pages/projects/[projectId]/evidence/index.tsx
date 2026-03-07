@@ -15,7 +15,7 @@ import {
   statusLabel,
 } from "@/lib/role1TaskLayer";
 import { useCredential } from "@/lib/useCredential";
-import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
+import { getRoleLabel, isManualRoleSwitchEnabled, setStoredCredential } from "@/lib/userCredential";
 
 type GroupedEvidence = {
   DRAFT: EvidenceViewItem[];
@@ -69,6 +69,7 @@ export default function MyEvidenceListPage() {
   const router = useRouter();
   const { projectId } = router.query;
   const credential = useCredential();
+  const manualRoleSwitchEnabled = isManualRoleSwitchEnabled();
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
     const scopedIds = Array.isArray(credential.scoped_project_ids)
@@ -249,13 +250,24 @@ export default function MyEvidenceListPage() {
         {credential.role === "admin" ? (
           <p className="inline-note">
             Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence).
-            {" "}
-            <button
-              type="button"
-              onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
-            >
-              Switch ke BIM Coordinator Project
-            </button>
+            {" "}Gunakan role <strong>BIM Coordinator Project</strong> yang memang ditetapkan admin untuk input evidence.
+            {manualRoleSwitchEnabled ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStoredCredential({
+                      role: "role1",
+                      user_id: credential.user_id,
+                      scoped_project_ids: typeof projectId === "string" ? [projectId] : [],
+                    })
+                  }
+                >
+                  Switch ke BIM Coordinator Project
+                </button>
+              </>
+            ) : null}
           </p>
         ) : null}
         {!canWrite && credential.role !== "admin" ? (

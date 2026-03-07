@@ -21,7 +21,7 @@ import {
 import type { IndicatorRecord } from "@/lib/role1TaskLayer";
 import { submitRole2BimUseProposal } from "@/lib/role2ProposalClient";
 import { useCredential } from "@/lib/useCredential";
-import { getRoleLabel, setStoredCredential } from "@/lib/userCredential";
+import { getRoleLabel, isManualRoleSwitchEnabled, setStoredCredential } from "@/lib/userCredential";
 
 type WizardForm = {
   evidence_id: string | null;
@@ -239,6 +239,7 @@ export default function AddEvidencePage() {
   const router = useRouter();
   const { projectId, evidenceId, mode, bimUseId } = router.query;
   const credential = useCredential();
+  const manualRoleSwitchEnabled = isManualRoleSwitchEnabled();
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<WizardForm>(INITIAL_FORM);
@@ -801,13 +802,24 @@ export default function AddEvidencePage() {
         {credential.role === "admin" ? (
           <p className="inline-note">
             Anda sedang menggunakan role <strong>Admin</strong> (read-only untuk input evidence).
-            {" "}
-            <button
-              type="button"
-              onClick={() => setStoredCredential({ role: "role1", user_id: credential.user_id })}
-            >
-              Switch ke BIM Coordinator Project
-            </button>
+            {" "}Gunakan role <strong>BIM Coordinator Project</strong> yang memang ditetapkan admin untuk input evidence.
+            {manualRoleSwitchEnabled ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStoredCredential({
+                      role: "role1",
+                      user_id: credential.user_id,
+                      scoped_project_ids: typeof projectId === "string" ? [projectId] : [],
+                    })
+                  }
+                >
+                  Switch ke BIM Coordinator Project
+                </button>
+              </>
+            ) : null}
           </p>
         ) : null}
         {!canWrite && credential.role !== "admin" ? (
