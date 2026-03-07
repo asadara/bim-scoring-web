@@ -362,6 +362,7 @@ export default function AddEvidencePage() {
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState<string | null>(null);
   const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
   const [unmappedBimUseEvidenceCount, setUnmappedBimUseEvidenceCount] = useState(0);
+  const [evidenceRefreshKey, setEvidenceRefreshKey] = useState(0);
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
     const scopedIds = Array.isArray(credential.scoped_project_ids)
@@ -568,7 +569,7 @@ export default function AddEvidencePage() {
     return () => {
       mounted = false;
     };
-  }, [context, projectId]);
+  }, [context, evidenceRefreshKey, projectId]);
 
   const selectedBimUse = useMemo(() => {
     if (!context) return null;
@@ -917,6 +918,7 @@ export default function AddEvidencePage() {
     setForm((prev) => ({ ...prev, evidence_id: saved.id }));
     setLastPersistedStatus(status);
     setLastSavedFingerprint(currentDraftFingerprint);
+    setEvidenceRefreshKey((prev) => prev + 1);
     setSubmitError(null);
     setBannerHint(null);
     setSubmitInfo(
