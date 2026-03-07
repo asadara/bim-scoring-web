@@ -1214,12 +1214,18 @@ function upsertEvidenceReadRowsToStore(rows: LocalEvidenceItem[]): void {
     if (!evidenceId) continue;
 
     const previous = byId.get(evidenceId);
+    const nextBimUseId = asString(row?.bim_use_id).trim();
     byId.set(evidenceId, {
       ...(previous || {}),
       ...row,
       id: evidenceId,
       project_id: row.project_id || previous?.project_id || "",
       period_id: row.period_id ?? previous?.period_id ?? null,
+      bim_use_id: nextBimUseId || previous?.bim_use_id || "",
+      indicator_ids:
+        Array.isArray(row.indicator_ids) && row.indicator_ids.length > 0
+          ? row.indicator_ids
+          : previous?.indicator_ids || [],
     });
   }
 
