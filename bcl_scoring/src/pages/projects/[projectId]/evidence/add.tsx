@@ -538,15 +538,28 @@ export default function AddEvidencePage() {
     fetchEvidenceListReadMode(projectId, context.active_period?.id ?? null)
       .then((result) => {
         if (!mounted) return;
+        const localRows = listLocalEvidence(projectId, context.active_period?.id ?? null);
+        const mergedRowsById = new Map<string, (typeof result.data)[number]>();
+        for (const item of result.data) {
+          const id = String(item.id || "").trim();
+          if (!id) continue;
+          mergedRowsById.set(id, item);
+        }
+        for (const item of localRows) {
+          const id = String(item.id || "").trim();
+          if (!id) continue;
+          mergedRowsById.set(id, item);
+        }
+        const mergedRows = [...mergedRowsById.values()];
         const knownBimUseIds = new Set(context.bim_uses.map((group) => String(group.bim_use_id || "").trim()).filter(Boolean));
         const localBimUseByEvidenceId = new Map<string, string>(
-          listLocalEvidence(projectId, context.active_period?.id ?? null)
+          localRows
             .map((item) => [String(item.id || "").trim(), String(item.bim_use_id || "").trim()] as const)
             .filter((entry) => entry[0] && entry[1] && entry[1] !== NO_BIM_USE_ID)
         );
         const nextCountByBimUse: Record<string, number> = {};
         let nextUnmappedCount = 0;
-        for (const item of result.data) {
+        for (const item of mergedRows) {
           const evidenceId = String(item.id || "").trim();
           const directKey =
             localBimUseByEvidenceId.get(evidenceId) ||
