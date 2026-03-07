@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-08 13:35:00 +07:00
+last_updated: 2026-03-08 14:20:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -45,7 +45,7 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
 - [x] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
 - [x] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
 - [x] A2.5 Cutover endpoint read-only dulu, lalu write-path.
-- [ ] A2.6 Full cutover API + decommission Render.
+- [x] A2.6 Full cutover API + decommission Render.
 
 ## A2.4 Breakdown (Next Active Phase)
 
@@ -384,15 +384,15 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - route `POST /periods/:periodId/evidences/:evidenceId/review` sekarang dioffload native di Worker.
   - contract gateway bertambah menjadi `34` test pass.
   - probe live tidak lagi memantul ke Render; response review sekarang berasal dari `X-BCL-Write-Source: supabase-worker`.
-  - catatan:
-    - gateway masih menyimpan fallback upstream generik untuk path legacy/non-inventoried, sehingga decommission Render final tetap perlu keputusan eksplisit apakah fallback itu dihapus total atau dipertahankan sementara.
 - [x] A2.5 ditutup:
   - seluruh path bisnis aktif yang dipakai frontend saat ini sudah diprobe live dan tidak lagi menunjukkan `X-BCL-Upstream`.
   - cakupan aktif meliputi auth, dashboard, evidence create/update/submit/review, approval, audit, My Account, Admin write, Google Drive integration, dan upload v2.
   - route legacy/non-inventoried tidak lagi dianggap blocker A2.5 selama tidak dipakai flow bisnis aktif.
-- [ ] A2.6 tinggal keputusan operasional terakhir:
-  - hapus fallback upstream generik dari gateway jika ingin decommission Render penuh tanpa escape hatch.
-  - jika fallback dipertahankan sementara untuk legacy path, maka Render belum boleh dipensiunkan total.
+- [x] A2.6 ditutup:
+  - fallback upstream generik di `cloudflare_api_gateway/src/index.mjs` dihapus; route yang belum diimplementasikan kini gagal eksplisit dengan `404 NOT_FOUND` dari Worker.
+  - `cloudflare_api_gateway/wrangler.toml` tidak lagi menyimpan `UPSTREAM_BASE_URL`, sehingga deploy gateway tidak punya jalur default ke Render.
+  - contract test gateway diperbarui untuk memastikan route non-offloaded tidak pernah memanggil upstream.
+  - implikasi operasional: Render dapat dipensiunkan penuh setelah observability window pasca-cutover dinyatakan cukup.
 
 ## Evidence
 
