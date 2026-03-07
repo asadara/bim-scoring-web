@@ -1509,6 +1509,7 @@ async function createEvidenceToBackend(input: EvidenceDraftInput): Promise<Backe
   const periodId = requirePeriodId(input.period_id);
   const payload = {
     period_id: periodId,
+    bim_use_id: input.bim_use_id,
     indicator_ids: [...input.indicator_ids],
     type: input.type,
     title: input.title.trim(),
@@ -1534,6 +1535,7 @@ async function updateEvidenceToBackend(input: EvidenceDraftInput, ifMatchVersion
     evidence_id: evidenceId,
     period_id: periodId,
     if_match_version: ifMatchVersion,
+    bim_use_id: input.bim_use_id,
     indicator_ids: [...input.indicator_ids],
     type: input.type,
     title: input.title.trim(),

@@ -15,6 +15,7 @@ import {
   NO_BIM_USE_ID,
   fetchRole1Context,
   getLocalEvidenceById,
+  listLocalEvidence,
   isRealBackendWriteEnabled,
   resolveIndicatorBimUseTags,
   saveEvidenceWithBackendWrite,
@@ -540,6 +541,11 @@ export default function AddEvidencePage() {
         const concreteBimUseIds = context.bim_uses
           .map((group) => String(group.bim_use_id || "").trim())
           .filter((groupId) => groupId && groupId !== "All BIM Use" && groupId !== NO_BIM_USE_ID);
+        const localBimUseByEvidenceId = new Map<string, string>(
+          listLocalEvidence(projectId, context.active_period?.id ?? null)
+            .map((item) => [String(item.id || "").trim(), String(item.bim_use_id || "").trim()] as const)
+            .filter((entry) => entry[0] && entry[1] && entry[1] !== NO_BIM_USE_ID)
+        );
         const indicatorBimUseTagsById = new Map<string, string[]>(
           context.indicators.map((indicator) => [
             indicator.id,
@@ -552,6 +558,15 @@ export default function AddEvidencePage() {
         );
         const nextCountByBimUse: Record<string, number> = {};
         for (const item of result.data) {
+          const evidenceId = String(item.id || "").trim();
+          const directKey =
+            localBimUseByEvidenceId.get(evidenceId) ||
+            String(item.bim_use_id || "").trim();
+          if (directKey && knownBimUseIds.has(directKey) && directKey !== "All BIM Use") {
+            nextCountByBimUse[directKey] = (nextCountByBimUse[directKey] || 0) + 1;
+            continue;
+          }
+
           const rawDerivedTags = [...new Set(
             (Array.isArray(item.indicator_ids) ? item.indicator_ids : [])
               .flatMap((indicatorId) => indicatorBimUseTagsById.get(String(indicatorId)) || [])
@@ -572,7 +587,6 @@ export default function AddEvidencePage() {
             continue;
           }
 
-          const directKey = String(item.bim_use_id || "").trim();
           if (directKey && knownBimUseIds.has(directKey)) {
             nextCountByBimUse[directKey] = (nextCountByBimUse[directKey] || 0) + 1;
             continue;
