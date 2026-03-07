@@ -528,15 +528,6 @@ export default function AddEvidencePage() {
     if (!context) return null;
     return context.bim_uses.find((item) => item.bim_use_id === form.bim_use_id) || null;
   }, [context, form.bim_use_id]);
-  const evidenceOptionCountByBimUseId = useMemo(() => {
-    const map: Record<string, number> = {};
-    if (!context) return map;
-    for (const group of context.bim_uses) {
-      const options = resolveEvidenceOptionsForBimUse({ label: group.label, indicators: group.indicators });
-      map[group.bim_use_id] = options.length;
-    }
-    return map;
-  }, [context]);
   const selectedBimUseEvidenceOptions = useMemo(() => {
     if (!selectedBimUse) return [] as string[];
     const base = resolveEvidenceOptionsForBimUse({
@@ -949,7 +940,6 @@ export default function AddEvidencePage() {
               <div className="bim-use-card-grid">
                 {context.bim_uses.map((group) => {
                   const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
-                  const evidenceOptionCount = evidenceOptionCountByBimUseId[group.bim_use_id] || 0;
                   const cardContent = (
                     <>
                       <h3 className="bim-use-card-title">
@@ -974,19 +964,6 @@ export default function AddEvidencePage() {
                           </span>
                         </span>
                       </div>
-                      <p className="bim-use-card-meta">
-                        <span className="bim-use-card-meta-item">
-                          <EvidenceIcon />
-                        </span>
-                        <span className="bim-use-card-meta-copy">
-                          {evidenceOptionCount} opsi evidence tersedia
-                        </span>
-                        <span className="bim-use-card-meta-separator" />
-                        <span className="bim-use-card-meta-item">
-                          <BimUseIcon />
-                        </span>
-                        <span className="bim-use-card-meta-copy">BIM Use workspace</span>
-                      </p>
                     </>
                   );
 
