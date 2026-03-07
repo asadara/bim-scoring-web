@@ -980,7 +980,7 @@ export default function AddEvidencePage() {
                       key={group.bim_use_id}
                       href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
                       className="bim-use-card bim-use-card-link"
-                      aria-label={`Buka input evidence untuk BIM Use ${group.label}. ${evidenceCount} evidence tersimpan, ${group.indicators.length} indikator, ${evidenceOptionCount} opsi evidence tersedia.`}
+                      aria-label={`Buka input evidence untuk BIM Use ${group.label}. ${evidenceCount} evidence tersimpan dan ${group.indicators.length} indikator tersedia.`}
                     >
                       {cardContent}
                     </Link>
