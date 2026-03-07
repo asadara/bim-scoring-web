@@ -120,6 +120,16 @@ function normalizeRequestedProjectIds(raw: unknown): string[] {
   return [];
 }
 
+function normalizeAppRoleValue(raw: unknown): AppRole {
+  if (typeof raw !== "string") return "viewer";
+  const value = raw.trim().toLowerCase();
+  if (value === "admin") return "admin";
+  if (value === "role1") return "role1";
+  if (value === "role2") return "role2";
+  if (value === "role3") return "role3";
+  return "viewer";
+}
+
 function isLegacyPerspectiveCode(code: string | null | undefined): boolean {
   const raw = String(code || "")
     .trim()
@@ -829,6 +839,28 @@ export default function AdminControlPanelPage() {
     }, nextLock ? "Kunci konfigurasi diaktifkan." : "Kunci konfigurasi dibuka.");
   }
 
+  async function deactivateUserMappings(
+    userId: string,
+    predicate: (mapping: AdminRoleMapping) => boolean = () => true
+  ) {
+    const activeMappings = roleMappings.filter(
+      (item) => item.user_id === userId && item.is_active !== false && predicate(item)
+    );
+    for (const mapping of activeMappings) {
+      await updateAdminRoleMapping(session, mapping.id, { is_active: false });
+    }
+  }
+
+  async function deactivateHigherPriorityMappings(userId: string, nextRole: AppRole) {
+    const targetIndex = ROLE_PRIORITY.indexOf(nextRole);
+    if (targetIndex <= 0) return;
+    await deactivateUserMappings(userId, (mapping) => {
+      const mappingRole = normalizeAppRoleValue(mapping.role);
+      const mappingIndex = ROLE_PRIORITY.indexOf(mappingRole);
+      return mappingIndex >= 0 && mappingIndex < targetIndex;
+    });
+  }
+
   async function applyGlobalUserRole(userId: string, nextRole: AppRole) {
     const globalMappings = roleMappings.filter(
       (item) => item.user_id === userId && !toNonEmptyString(item.project_id || "")
@@ -836,11 +868,11 @@ export default function AdminControlPanelPage() {
     const activeGlobal = globalMappings.filter((item) => item.is_active !== false);
 
     if (nextRole === "viewer") {
-      for (const mapping of activeGlobal) {
-        await updateAdminRoleMapping(session, mapping.id, { is_active: false });
-      }
+      await deactivateUserMappings(userId);
       return;
     }
+
+    await deactivateHigherPriorityMappings(userId, nextRole);
 
     for (const mapping of activeGlobal) {
       const mappingRole = String(mapping.role || "").trim().toLowerCase();
@@ -870,6 +902,7 @@ export default function AdminControlPanelPage() {
     role: "role2" | "role3",
     requestedProjectIds: string[]
   ) {
+    await deactivateHigherPriorityMappings(userId, role);
     const scopedProjectIds = [...new Set(requestedProjectIds.map((item) => item.trim()).filter(Boolean))];
     if (scopedProjectIds.length === 0) {
       await applyGlobalUserRole(userId, role);
@@ -1350,6 +1383,10 @@ export default function AdminControlPanelPage() {
               <p className="inline-note">
                 Diajukan: <strong>{requestSubmittedAt}</strong> | Status:{" "}
                 <strong>{isRequestAlreadyApplied ? "Disetujui" : "Menunggu"}</strong>
+              </p>
+              <p className="inline-note">
+                `Setujui Sesuai Pengajuan` akan menerapkan role + scope sesuai pengajuan user. `Simpan Role` akan
+                memakai pilihan dropdown; jika memilih Viewer maka seluruh mapping aktif user dinonaktifkan.
               </p>
               <label>
                 Atur Role
