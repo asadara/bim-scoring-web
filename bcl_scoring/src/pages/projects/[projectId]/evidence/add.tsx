@@ -557,6 +557,25 @@ export default function AddEvidencePage() {
     if (!credential.user_id) return null;
     return { actorId: credential.user_id, actorRole: credential.role };
   }, [credential.user_id, credential.role]);
+  const isEditingEvidence = typeof evidenceId === "string";
+  const showBimUseSelectionCards = !isEditingEvidence && !form.bim_use_id;
+  const quickAccessItems = useMemo(() => {
+    const base = [
+      { label: "Project List", href: "/projects" },
+      { label: "Project Home", href: typeof projectId === "string" ? `/projects/${projectId}` : null },
+      { label: "Tambah Evidence", href: typeof projectId === "string" ? `/projects/${projectId}/evidence/add` : null },
+      { label: "Daftar Evidence", href: typeof projectId === "string" ? `/projects/${projectId}/evidence` : null },
+      { label: "Daftar Indicators", href: typeof projectId === "string" ? `/projects/${projectId}/indicators` : null },
+    ];
+    if (!showBimUseSelectionCards && !isEditingEvidence) {
+      return [
+        ...base.slice(0, 3),
+        { label: "Ganti BIM Use", href: typeof projectId === "string" ? `/projects/${projectId}/evidence/add` : null },
+        ...base.slice(3),
+      ];
+    }
+    return base;
+  }, [isEditingEvidence, projectId, showBimUseSelectionCards]);
 
   useEffect(() => {
     if (!showGapProposalForm) return;
@@ -865,26 +884,7 @@ export default function AddEvidencePage() {
   const writeDisabled =
     fieldDisabled || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
   const isRevisionMode = mode === "revisi";
-  const isEditingEvidence = typeof evidenceId === "string";
-  const showBimUseSelectionCards = !isEditingEvidence && !form.bim_use_id;
   const isBimUseCardActionDisabled = fieldDisabled;
-  const quickAccessItems = useMemo(() => {
-    const base = [
-      { label: "Project List", href: "/projects" },
-      { label: "Project Home", href: projectId ? `/projects/${projectId}` : null },
-      { label: "Tambah Evidence", href: projectId ? `/projects/${projectId}/evidence/add` : null },
-      { label: "Daftar Evidence", href: projectId ? `/projects/${projectId}/evidence` : null },
-      { label: "Daftar Indicators", href: projectId ? `/projects/${projectId}/indicators` : null },
-    ];
-    if (!showBimUseSelectionCards && !isEditingEvidence) {
-      return [
-        ...base.slice(0, 3),
-        { label: "Ganti BIM Use", href: projectId ? `/projects/${projectId}/evidence/add` : null },
-        ...base.slice(3),
-      ];
-    }
-    return base;
-  }, [isEditingEvidence, projectId, showBimUseSelectionCards]);
 
   return (
     <Role1Layout
