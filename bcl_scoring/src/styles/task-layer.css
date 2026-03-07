@@ -1403,6 +1403,12 @@ a {
   gap: 8px;
 }
 
+.submit-feedback-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .wizard-actions button,
 .wizard-actions a {
   border: 1px solid var(--task-control-border);

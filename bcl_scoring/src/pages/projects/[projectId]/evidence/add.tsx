@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
@@ -353,6 +353,7 @@ export default function AddEvidencePage() {
   const [gapSubmitting, setGapSubmitting] = useState(false);
   const [gapError, setGapError] = useState<string | null>(null);
   const [gapInfo, setGapInfo] = useState<string | null>(null);
+  const submitFeedbackRef = useRef<HTMLDivElement | null>(null);
   const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
@@ -595,6 +596,11 @@ export default function AddEvidencePage() {
       title: prev.title || selectedBimUseEvidenceOptions[0] || prev.title,
     }));
   }, [form.evidence_option, selectedBimUse, selectedBimUseEvidenceOptions]);
+
+  useEffect(() => {
+    if (!submitError && !submitInfo) return;
+    submitFeedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [submitError, submitInfo]);
 
   function setField<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1331,6 +1337,11 @@ export default function AddEvidencePage() {
               </div>
             ) : null}
 
+            <div ref={submitFeedbackRef} className="submit-feedback-stack" aria-live="polite">
+              {submitError ? <p className="error-box">{submitError}</p> : null}
+              {submitInfo ? <p className="task-note action-feedback">{submitInfo}</p> : null}
+            </div>
+
             <div className="wizard-actions">
               <button type="button" onClick={onBackStep} disabled={step === 1}>
                 Back
@@ -1383,8 +1394,6 @@ export default function AddEvidencePage() {
           </>
         )}
 
-        {submitError ? <p className="error-box">{submitError}</p> : null}
-        {submitInfo ? <p className="task-note action-feedback">{submitInfo}</p> : null}
       </section>
     </Role1Layout>
   );
