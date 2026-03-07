@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-07 22:05:00 +07:00
+last_updated: 2026-03-07 23:35:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -43,17 +43,17 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
 - [x] A2.1 Hilangkan exposure `*.onrender.com` dari sisi client (gunakan custom API domain).
 - [x] A2.2 Stabilkan lapisan domain/API gateway di Cloudflare (proxy/caching/security baseline).
 - [x] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
-- [ ] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
+- [x] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
 - [ ] A2.5 Cutover endpoint read-only dulu, lalu write-path.
 - [ ] A2.6 Full cutover API + decommission Render.
 
 ## A2.4 Breakdown (Next Active Phase)
 
-- [ ] A2.4.1 Pindahkan state rate limit ke storage terdistribusi lintas instance.
-- [ ] A2.4.2 Pindahkan registry idempotency write-path ke storage terdistribusi + TTL.
-- [ ] A2.4.3 Inventaris dan klasifikasikan cache process-local yang masih tersisa.
-- [ ] A2.4.4 Tambahkan adapter storage tunggal untuk Node runtime dan Worker runtime.
-- [ ] A2.4.5 Tambahkan contract/smoke test untuk failure mode storage stateful.
+- [x] A2.4.1 Pindahkan state rate limit ke storage terdistribusi lintas instance.
+- [x] A2.4.2 Pindahkan registry idempotency write-path ke storage terdistribusi + TTL.
+- [x] A2.4.3 Inventaris dan klasifikasikan cache process-local yang masih tersisa.
+- [x] A2.4.4 Tambahkan adapter storage tunggal untuk Node runtime dan Worker runtime.
+- [x] A2.4.5 Tambahkan contract/smoke test untuk failure mode storage stateful.
 
 ## Owner Matrix
 
@@ -360,6 +360,26 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `cloudflare.gateway.auth-offload.contract.test.js`
   - catatan rollout:
     - fase `A2.4` belum ditandai selesai karena tabel Supabase baru masih perlu diterapkan di environment target, lalu API/gateway dideploy ulang agar distributed state aktif penuh.
+- [x] A2.4 rollout production selesai:
+  - SQL `runtime_state_kv` dan `runtime_rate_limit_events` sudah dijalankan di Supabase production.
+  - API repo dan tracker sudah di-push ke `origin/main`.
+  - `bcl-api-gateway` sudah redeploy dengan distributed runtime state aktif.
+- [x] Offload lanjutan A2.5 untuk sisa route yang masih memantul ke Render sudah ditambahkan di gateway:
+  - read offload native Supabase:
+    - `GET /evidence/:evidenceId`
+    - `GET /projects/:projectId/reviewer-role2-emails`
+  - integration/write offload native Worker:
+    - `GET /v2/integrations/google-drive/status`
+    - `GET /v2/integrations/google-drive/connect-url`
+    - `GET /v2/integrations/google-drive/callback`
+    - `POST /v2/integrations/google-drive/disconnect`
+    - `POST /v2/projects/:projectId/evidence/gdrive/share`
+    - `POST /v2/projects/:projectId/evidence/upload/request`
+    - `POST /v2/projects/:projectId/evidence/upload/finalize`
+  - contract test gateway diperluas dan lulus (`33` test pass).
+  - probe live pasca deploy mengonfirmasi route di atas tidak lagi mengirim header `X-BCL-Upstream`.
+  - catatan parity environment:
+    - Cloudflare Worker production belum memiliki env Google Drive / upload v2 yang setara dengan backend lama (`FEATURE_GOOGLE_DRIVE_AUTO_SHARE`, `GOOGLE_OAUTH_*`, `FEATURE_EVIDENCE_UPLOAD_V2`), sehingga route sekarang bersih dari Render tetapi fitur terkait masih `FEATURE_DISABLED` / `oauth_configured=false` sampai env dilengkapi.
 
 ## Evidence
 
