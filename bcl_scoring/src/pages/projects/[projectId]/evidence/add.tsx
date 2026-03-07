@@ -39,6 +39,8 @@ type WizardForm = {
   file_reference_url: string;
 };
 
+type PersistedEvidenceState = "DRAFT" | "SUBMITTED" | "NEEDS_REVISION" | null;
+
 const LOCAL_FILE_SIZE_LIMIT_BYTES = 2 * 1024 * 1024; // 2 MB (localStorage-safe for prototype)
 
 const STEP_LABELS = [
@@ -354,6 +356,8 @@ export default function AddEvidencePage() {
   const [gapError, setGapError] = useState<string | null>(null);
   const [gapInfo, setGapInfo] = useState<string | null>(null);
   const submitFeedbackRef = useRef<HTMLDivElement | null>(null);
+  const [lastPersistedStatus, setLastPersistedStatus] = useState<PersistedEvidenceState>(null);
+  const [lastSavedFingerprint, setLastSavedFingerprint] = useState<string | null>(null);
   const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
@@ -445,6 +449,24 @@ export default function AddEvidencePage() {
           file_reference_url: hit.file_reference_url || "",
         });
         setLocalFileMeta(null);
+        setLastPersistedStatus(hit.status || null);
+        setLastSavedFingerprint(
+          JSON.stringify({
+            evidence_id: hit.id,
+            bim_use_id: hit.bim_use_id || NO_BIM_USE_ID,
+            indicator_ids: hit.indicator_ids.slice(0, 1),
+            evidence_option: hit.title || "",
+            type: hit.type,
+            file_type: hit.type === "FILE" ? inferFileTypeFromEvidence(hit) : "",
+            title: hit.title,
+            description: hit.description,
+            external_url: hit.external_url || "",
+            text_content: hit.text_content || "",
+            file_view_url: hit.file_view_url || "",
+            file_download_url: hit.file_download_url || "",
+            file_reference_url: hit.file_reference_url || "",
+          })
+        );
       } catch (fetchErr) {
         if (cancelled) return;
         setSubmitError(fetchErr instanceof Error ? fetchErr.message : "Gagal memuat evidence dari backend.");
@@ -478,6 +500,8 @@ export default function AddEvidencePage() {
       setLocalFileMeta(null);
       setShowGapProposalForm(false);
       setSubmitError(null);
+      setLastPersistedStatus(null);
+      setLastSavedFingerprint(null);
       return;
     }
 
@@ -492,6 +516,8 @@ export default function AddEvidencePage() {
     setStep(1);
     setLocalFileMeta(null);
     setShowGapProposalForm(false);
+    setLastPersistedStatus(null);
+    setLastSavedFingerprint(null);
     setForm((prev) => {
       if (prev.bim_use_id === selectedBimUseIdFromQuery) return prev;
       return {
@@ -578,6 +604,25 @@ export default function AddEvidencePage() {
     }
     return base;
   }, [isEditingEvidence, projectId, showBimUseSelectionCards]);
+  const currentDraftFingerprint = useMemo(
+    () =>
+      JSON.stringify({
+        evidence_id: form.evidence_id || null,
+        bim_use_id: form.bim_use_id,
+        indicator_ids: form.indicator_ids,
+        evidence_option: form.evidence_option,
+        type: form.type,
+        file_type: form.file_type,
+        title: form.title,
+        description: form.description,
+        external_url: form.external_url,
+        text_content: form.text_content,
+        file_view_url: form.file_view_url,
+        file_download_url: form.file_download_url,
+        file_reference_url: form.file_reference_url,
+      }),
+    [form]
+  );
 
   useEffect(() => {
     if (!showGapProposalForm) return;
@@ -848,10 +893,14 @@ export default function AddEvidencePage() {
     }
 
     setForm((prev) => ({ ...prev, evidence_id: saved.id }));
+    setLastPersistedStatus(status);
+    setLastSavedFingerprint(currentDraftFingerprint);
     setSubmitError(null);
     setBannerHint(null);
     setSubmitInfo(
-      status === "DRAFT" ? "Draft evidence tersimpan." : "Evidence berhasil submit untuk review."
+      status === "DRAFT"
+        ? "Draft evidence berhasil tersimpan. Tombol Save Draft akan aktif kembali jika ada perubahan baru."
+        : "Evidence berhasil submit untuk review. Form sekarang read-only sampai masuk mode revisi."
     );
   }
 
@@ -887,11 +936,17 @@ export default function AddEvidencePage() {
 
   const isLocked = context.period_locked;
   const canWrite = canWriteRole1Evidence(credential.role) && canRole1WriteProject(projectId);
-  const fieldDisabled = isLocked || !canWrite;
+  const isRevisionMode = mode === "revisi";
+  const isSubmittedReadOnly = lastPersistedStatus === "SUBMITTED" && !isRevisionMode;
+  const fieldDisabled = isLocked || !canWrite || isSubmittedReadOnly;
   const writeDisabled =
     fieldDisabled || isSubmitting || (isRealBackendWriteEnabled() && context.data_mode === "prototype");
-  const isRevisionMode = mode === "revisi";
   const isBimUseCardActionDisabled = fieldDisabled;
+  const hasPendingChanges = lastSavedFingerprint === null || currentDraftFingerprint !== lastSavedFingerprint;
+  const draftActionDisabled =
+    writeDisabled || isSubmittedReadOnly || (!hasPendingChanges && lastPersistedStatus === "DRAFT");
+  const submitActionDisabled =
+    writeDisabled || isSubmittedReadOnly || (!hasPendingChanges && lastPersistedStatus === "SUBMITTED");
 
   return (
     <Role1Layout
@@ -1340,6 +1395,12 @@ export default function AddEvidencePage() {
             <div ref={submitFeedbackRef} className="submit-feedback-stack" aria-live="polite">
               {submitError ? <p className="error-box">{submitError}</p> : null}
               {submitInfo ? <p className="task-note action-feedback">{submitInfo}</p> : null}
+              {lastPersistedStatus ? (
+                <p className="inline-note">
+                  Status tersimpan: <strong>{lastPersistedStatus}</strong>
+                  {!hasPendingChanges ? " | Tidak ada perubahan baru." : " | Ada perubahan yang belum disimpan."}
+                </p>
+              ) : null}
             </div>
 
             <div className="wizard-actions">
@@ -1356,7 +1417,7 @@ export default function AddEvidencePage() {
                   <button
                     type="button"
                     onClick={() => void saveByStatus("DRAFT")}
-                    disabled={writeDisabled}
+                    disabled={draftActionDisabled}
                     title="Local draft (prototype, not used in scoring)"
                   >
                     Save Draft
@@ -1365,7 +1426,7 @@ export default function AddEvidencePage() {
                     type="button"
                     className="action-primary"
                     onClick={() => void saveByStatus("SUBMITTED")}
-                    disabled={writeDisabled}
+                    disabled={submitActionDisabled}
                     title="Local draft (prototype, not used in scoring)"
                   >
                     Submit for Review
