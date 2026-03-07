@@ -868,6 +868,23 @@ export default function AddEvidencePage() {
   const isEditingEvidence = typeof evidenceId === "string";
   const showBimUseSelectionCards = !isEditingEvidence && !form.bim_use_id;
   const isBimUseCardActionDisabled = fieldDisabled;
+  const quickAccessItems = useMemo(() => {
+    const base = [
+      { label: "Project List", href: "/projects" },
+      { label: "Project Home", href: projectId ? `/projects/${projectId}` : null },
+      { label: "Tambah Evidence", href: projectId ? `/projects/${projectId}/evidence/add` : null },
+      { label: "Daftar Evidence", href: projectId ? `/projects/${projectId}/evidence` : null },
+      { label: "Daftar Indicators", href: projectId ? `/projects/${projectId}/indicators` : null },
+    ];
+    if (!showBimUseSelectionCards && !isEditingEvidence) {
+      return [
+        ...base.slice(0, 3),
+        { label: "Ganti BIM Use", href: projectId ? `/projects/${projectId}/evidence/add` : null },
+        ...base.slice(3),
+      ];
+    }
+    return base;
+  }, [isEditingEvidence, projectId, showBimUseSelectionCards]);
 
   return (
     <Role1Layout
@@ -879,6 +896,7 @@ export default function AddEvidencePage() {
       periodStatusLabel={context.period_status_label}
       backendMode={context.data_mode}
       backendMessage={bannerHint || context.backend_message}
+      quickAccessItems={quickAccessItems}
     >
       <section className="task-panel">
         {isLocked ? (
@@ -1018,11 +1036,6 @@ export default function AddEvidencePage() {
                 <p>
                   BIM Use terpilih: <strong>{selectedBimUseLabel}</strong>
                 </p>
-                {!isEditingEvidence ? (
-                  <div className="wizard-actions">
-                    <Link href={`/projects/${projectId}/evidence/add`}>Ganti BIM Use</Link>
-                  </div>
-                ) : null}
                 <p>Pilih satu indikator yang paling relevan untuk evidence ini.</p>
                 {form.bim_use_id ? (
                   <>

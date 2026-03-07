@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
-import QuickAccessNav from "@/components/QuickAccessNav";
+import QuickAccessNav, { type QuickAccessItem } from "@/components/QuickAccessNav";
 import { NA_TEXT, ProjectRecord, ScoringPeriod, formatPeriodLabel, formatProjectLabel } from "@/lib/role1TaskLayer";
 
 type Role1LayoutProps = {
@@ -14,6 +14,7 @@ type Role1LayoutProps = {
   periodStatusLabel: string;
   backendMode?: "backend" | "prototype";
   backendMessage?: string | null;
+  quickAccessItems?: QuickAccessItem[];
   children: ReactNode;
 };
 
@@ -26,6 +27,7 @@ export default function Role1Layout(props: Role1LayoutProps) {
     activePeriod,
     periodStatusLabel,
     backendMode,
+    quickAccessItems,
     children,
   } = props;
   const periodChipClass =
@@ -45,6 +47,13 @@ export default function Role1Layout(props: Role1LayoutProps) {
     { label: "Project", value: formatProjectLabel(project) },
     { label: "Active period", value: formatPeriodLabel(activePeriod) },
     { label: "Period status", value: periodStatusLabel || NA_TEXT },
+  ];
+  const defaultQuickAccessItems: QuickAccessItem[] = [
+    { label: "Project List", href: "/projects" },
+    { label: "Project Home", href: projectId ? `/projects/${projectId}` : null },
+    { label: "Tambah Evidence", href: projectId ? `/projects/${projectId}/evidence/add` : null },
+    { label: "Daftar Evidence", href: projectId ? `/projects/${projectId}/evidence` : null },
+    { label: "Daftar Indicators", href: projectId ? `/projects/${projectId}/indicators` : null },
   ];
 
   return (
@@ -69,13 +78,7 @@ export default function Role1Layout(props: Role1LayoutProps) {
 
       <QuickAccessNav
         ariaLabel="Project task shortcuts"
-        items={[
-          { label: "Project List", href: "/projects" },
-          { label: "Project Home", href: projectId ? `/projects/${projectId}` : null },
-          { label: "Tambah Evidence", href: projectId ? `/projects/${projectId}/evidence/add` : null },
-          { label: "Daftar Evidence", href: projectId ? `/projects/${projectId}/evidence` : null },
-          { label: "Daftar Indicators", href: projectId ? `/projects/${projectId}/indicators` : null },
-        ]}
+        items={quickAccessItems || defaultQuickAccessItems}
       />
 
       {children}
