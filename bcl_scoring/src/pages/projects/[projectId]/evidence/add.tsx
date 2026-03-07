@@ -553,6 +553,7 @@ export default function AddEvidencePage() {
   const selectedEvidenceTypeLabel = form.type || "Belum dipilih";
   const selectedFileTypeLabel =
     form.type === "FILE" ? form.file_type || "Belum dipilih" : "N/A (bukan tipe FILE)";
+  const selectedBimUseEvidenceCount = selectedBimUse ? bimUseEvidenceCountById[selectedBimUse.bim_use_id] || 0 : 0;
   const proposalActor = useMemo(() => {
     if (!credential.user_id) return null;
     return { actorId: credential.user_id, actorRole: credential.role };
@@ -1021,22 +1022,45 @@ export default function AddEvidencePage() {
               ))}
             </div>
             <div className="task-note">
-              <p>
-                <strong>Ringkasan Pilihan Saat Ini</strong>
-              </p>
-              <p>Step 1 - BIM Use: {selectedBimUseLabel}</p>
-              <p>Step 1 - Indicator: {selectedIndicatorLabel}</p>
-              <p>Step 1 - Evidence: {selectedEvidenceOptionLabel}</p>
-              <p>Step 2 - Evidence Type: {selectedEvidenceTypeLabel}</p>
-              <p>Step 2 - Jenis File: {selectedFileTypeLabel}</p>
+              <div className="wizard-summary-grid">
+                <div className="wizard-summary-column">
+                  <p>
+                    <strong>Ringkasan Pilihan Saat Ini</strong>
+                  </p>
+                  <p>Step 1 - BIM Use: {selectedBimUseLabel}</p>
+                  <p>Step 1 - Indicator: {selectedIndicatorLabel}</p>
+                  <p>Step 1 - Evidence: {selectedEvidenceOptionLabel}</p>
+                  <p>Step 2 - Evidence Type: {selectedEvidenceTypeLabel}</p>
+                  <p>Step 2 - Jenis File: {selectedFileTypeLabel}</p>
+                </div>
+                <div className="wizard-summary-column wizard-summary-column-compact">
+                  <p>
+                    <strong>Resume BIM Use Terpilih</strong>
+                  </p>
+                  <div className="wizard-summary-stats" aria-label="Resume BIM Use terpilih">
+                    <div className="wizard-summary-stat">
+                      <span className="wizard-summary-stat-label">BIM Use</span>
+                      <strong>{selectedBimUseLabel}</strong>
+                    </div>
+                    <div className="wizard-summary-stat">
+                      <span className="wizard-summary-stat-label">Evidence</span>
+                      <strong>{selectedBimUseEvidenceCount}</strong>
+                    </div>
+                    <div className="wizard-summary-stat">
+                      <span className="wizard-summary-stat-label">Indikator</span>
+                      <strong>{selectedBimUse?.indicators.length || 0}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {step === 1 ? (
               <div className="field-grid">
                 <p>
-                  BIM Use terpilih: <strong>{selectedBimUseLabel}</strong>
+                  BIM Use terpilih: <strong>{selectedBimUseLabel}</strong> | Pilih satu indikator yang paling relevan
+                  untuk evidence ini.
                 </p>
-                <p>Pilih satu indikator yang paling relevan untuk evidence ini.</p>
                 {form.bim_use_id ? (
                   <>
                     <label htmlFor="indicator-select">
@@ -1099,27 +1123,23 @@ export default function AddEvidencePage() {
                   <p className="warning-box">Indicator untuk BIM Use ini Not available.</p>
                 ) : null}
 
-                <div className="task-note">
-                  <p>
-                    <strong>Tidak menemukan BIM Use/Indicator yang cocok?</strong>
-                  </p>
-                  <p className="inline-note">
-                    Ajukan kebutuhan mapping ke Role 2. Role 1 tidak dapat menambah indikator secara langsung.
-                  </p>
-                  <div className="wizard-actions">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowGapProposalForm((prev) => !prev);
-                        setGapError(null);
-                        setGapInfo(null);
-                      }}
-                      disabled={credential.role !== "role1" || !proposalActor || gapSubmitting}
-                    >
-                      {showGapProposalForm ? "Tutup Form Pengajuan" : "Ajukan ke Role 2"}
-                    </button>
-                  </div>
-                  {showGapProposalForm ? (
+                <details className="collapsible-section" open={showGapProposalForm}>
+                  <summary
+                    className="collapsible-summary"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setShowGapProposalForm((prev) => !prev);
+                      setGapError(null);
+                      setGapInfo(null);
+                    }}
+                  >
+                    Tidak menemukan BIM Use/Indicator yang cocok? | Ajukan mapping ke Role 2
+                  </summary>
+                  <div className="collapsible-content">
+                    <p className="inline-note">
+                      Role 1 tidak dapat menambah indikator secara langsung. Gunakan form ini untuk mengajukan BIM Use
+                      atau mapping baru.
+                    </p>
                     <form className="field-grid" onSubmit={(event) => void onSubmitGapProposal(event)}>
                       <label>
                         Usulan BIM Use
@@ -1127,7 +1147,7 @@ export default function AddEvidencePage() {
                           value={gapProposedBimUse}
                           onChange={(event) => setGapProposedBimUse(event.target.value)}
                           placeholder="Contoh: Clash Coordination - Structural"
-                          disabled={gapSubmitting}
+                          disabled={gapSubmitting || credential.role !== "role1" || !proposalActor}
                         />
                       </label>
                       <label>
@@ -1137,19 +1157,23 @@ export default function AddEvidencePage() {
                           onChange={(event) => setGapReason(event.target.value)}
                           placeholder="Jelaskan kenapa evidence tidak cocok dengan BIM Use/Indicator yang tersedia."
                           rows={4}
-                          disabled={gapSubmitting}
+                          disabled={gapSubmitting || credential.role !== "role1" || !proposalActor}
                         />
                       </label>
                       <div className="wizard-actions">
-                        <button type="submit" className="action-primary" disabled={gapSubmitting}>
+                        <button
+                          type="submit"
+                          className="action-primary"
+                          disabled={gapSubmitting || credential.role !== "role1" || !proposalActor}
+                        >
                           {gapSubmitting ? "Mengirim..." : "Kirim Pengajuan"}
                         </button>
                       </div>
                     </form>
-                  ) : null}
+                  </div>
+                </details>
                   {gapError ? <p className="error-box">{gapError}</p> : null}
                   {gapInfo ? <p className="task-note action-feedback">{gapInfo}</p> : null}
-                </div>
               </div>
             ) : null}
 

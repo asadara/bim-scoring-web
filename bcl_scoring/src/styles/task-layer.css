@@ -813,6 +813,43 @@ a {
   margin-top: 10px;
 }
 
+.wizard-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.9fr);
+  gap: 12px 18px;
+  align-items: start;
+}
+
+.wizard-summary-column {
+  display: grid;
+  gap: 4px;
+}
+
+.wizard-summary-column p {
+  margin: 0;
+}
+
+.wizard-summary-column-compact {
+  border-left: 1px solid rgba(47, 111, 90, 0.18);
+  padding-left: 16px;
+}
+
+.wizard-summary-stats {
+  display: grid;
+  gap: 8px;
+}
+
+.wizard-summary-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizard-summary-stat-label {
+  color: var(--task-muted);
+}
+
 .task-panel-inline-help {
   display: flex;
   justify-content: flex-end;
@@ -1170,7 +1207,7 @@ a {
   padding: 12px 14px;
   font-weight: 700;
   background: #f4faf7;
-  border-bottom: 1px solid var(--task-line);
+  border-bottom: 1px solid transparent;
 }
 
 .collapsible-summary::-webkit-details-marker {
@@ -1186,6 +1223,10 @@ a {
 
 .collapsible-section[open] .collapsible-summary::before {
   transform: rotate(90deg);
+}
+
+.collapsible-section[open] .collapsible-summary {
+  border-bottom-color: var(--task-line);
 }
 
 .collapsible-content {
@@ -1320,6 +1361,18 @@ a {
 }
 
 @media (max-width: 720px) {
+  .wizard-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .wizard-summary-column-compact {
+    border-left: 0;
+    border-top: 1px solid rgba(47, 111, 90, 0.18);
+    padding-left: 0;
+    padding-top: 10px;
+  }
+
   .math-panel-reference .math-title {
     font-size: 20px;
   }
