@@ -9,12 +9,14 @@ import {
   EvidenceType,
   fetchEvidenceListReadMode,
   fetchProjectPeriodsReadMode,
+  formatBimUseDisplay,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
   NO_BIM_USE_ID,
   fetchRole1Context,
   getLocalEvidenceById,
   isRealBackendWriteEnabled,
+  resolveIndicatorBimUseTags,
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
 } from "@/lib/role1TaskLayer";
@@ -534,10 +536,49 @@ export default function AddEvidencePage() {
     fetchEvidenceListReadMode(projectId, context.active_period?.id ?? null)
       .then((result) => {
         if (!mounted) return;
+        const knownBimUseIds = new Set(context.bim_uses.map((group) => String(group.bim_use_id || "").trim()).filter(Boolean));
+        const concreteBimUseIds = context.bim_uses
+          .map((group) => String(group.bim_use_id || "").trim())
+          .filter((groupId) => groupId && groupId !== "All BIM Use" && groupId !== NO_BIM_USE_ID);
+        const indicatorBimUseTagsById = new Map<string, string[]>(
+          context.indicators.map((indicator) => [
+            indicator.id,
+            resolveIndicatorBimUseTags({
+              code: indicator.code,
+              bim_use_id: indicator.bim_use_id,
+              bim_use_tags: indicator.bim_use_tags,
+            }),
+          ])
+        );
         const nextCountByBimUse: Record<string, number> = {};
         for (const item of result.data) {
-          const key = String(item.bim_use_id || "").trim() || NO_BIM_USE_ID;
-          nextCountByBimUse[key] = (nextCountByBimUse[key] || 0) + 1;
+          const rawDerivedTags = [...new Set(
+            (Array.isArray(item.indicator_ids) ? item.indicator_ids : [])
+              .flatMap((indicatorId) => indicatorBimUseTagsById.get(String(indicatorId)) || [])
+              .map((value) => String(value || "").trim())
+              .filter(Boolean)
+          )];
+          const nonAllTags = rawDerivedTags.filter((tag) => tag !== "All BIM Use");
+          const derivedKeys = nonAllTags.length > 0
+            ? nonAllTags
+            : rawDerivedTags.includes("All BIM Use")
+              ? (concreteBimUseIds.length > 0 ? concreteBimUseIds : ["All BIM Use"])
+              : [];
+
+          if (derivedKeys.length > 0) {
+            for (const key of derivedKeys) {
+              nextCountByBimUse[key] = (nextCountByBimUse[key] || 0) + 1;
+            }
+            continue;
+          }
+
+          const directKey = String(item.bim_use_id || "").trim();
+          if (directKey && knownBimUseIds.has(directKey)) {
+            nextCountByBimUse[directKey] = (nextCountByBimUse[directKey] || 0) + 1;
+            continue;
+          }
+
+          nextCountByBimUse[NO_BIM_USE_ID] = (nextCountByBimUse[NO_BIM_USE_ID] || 0) + 1;
         }
         setBimUseEvidenceCountById(nextCountByBimUse);
       })

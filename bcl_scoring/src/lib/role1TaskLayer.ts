@@ -416,7 +416,7 @@ function parseBimUseTagsFromUnknown(value: unknown): string[] {
   return parseBimUseTagsFromRaw(asNullableString(value));
 }
 
-function resolveIndicatorBimUseTags(item: {
+export function resolveIndicatorBimUseTags(item: {
   code: string;
   bim_use_id: string | null;
   bim_use_tags: unknown;
