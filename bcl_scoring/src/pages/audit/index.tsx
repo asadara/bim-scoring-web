@@ -488,7 +488,7 @@ export default function AuditHomePage() {
         {!loading && !error && snapshots.length === 0 ? (
           <div className="empty-state">
             <p>No immutable snapshot found yet.</p>
-            <p>Snapshot akan muncul setelah period mendapat keputusan <strong>APPROVE PERIOD</strong> (Role 3).</p>
+            <p>Snapshot akan muncul setelah period mendapat keputusan <strong>APPROVE PERIOD</strong> (BIM Manager).</p>
             <p>Audit page tetap menampilkan coverage project/period agar status governance tetap terbaca.</p>
           </div>
         ) : null}

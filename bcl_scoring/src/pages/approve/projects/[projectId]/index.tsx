@@ -236,7 +236,7 @@ export default function ProjectApprovalContextPage() {
             <div className="task-panel-inline-help">
               <InfoTooltip
                 id="role3-project-snapshot-info"
-                label="Informasi snapshot approval Role 3"
+                label="Informasi snapshot approval BIM Manager"
                 lines={[
                   "Snapshot terbentuk dari keputusan approval level period.",
                   "Snapshot bersifat read-only sebagai jejak keputusan final.",

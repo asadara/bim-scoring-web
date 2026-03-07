@@ -250,7 +250,7 @@ export default function ApproverHomePage() {
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role3-home-approval-info"
-            label="Informasi alur approval Role 3"
+            label="Informasi alur approval BIM Manager"
             lines={[
               "BIM Manager memproses approve/reject period setelah review evidence selesai.",
               "Review tidak mengubah skor dan bukan approval period.",

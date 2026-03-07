@@ -272,7 +272,7 @@ export default function HoReviewHomePage() {
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role2-home-review-info"
-            label="Informasi alur review Role 2"
+            label="Informasi alur review BIM Coordinator HO"
             lines={[
               "BIM Coordinator HO memproses evidence SUBMITTED -> tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.",
               "Review tidak mengubah skor dan bukan approval period.",
@@ -288,8 +288,8 @@ export default function HoReviewHomePage() {
           <>
             <p className="empty-state">No submitted evidence available.</p>
             <p className="inline-note">
-              Scope Role 2 saat ini: <strong>{scopedProjectSummary}</strong>.
-              Pastikan evidence sudah <strong>SUBMITTED</strong> oleh Role 1 pada period aktif workspace.
+              Scope BIM Coordinator HO saat ini: <strong>{scopedProjectSummary}</strong>.
+              Pastikan evidence sudah <strong>SUBMITTED</strong> oleh BIM Coordinator Project pada period aktif workspace.
             </p>
           </>
         ) : null}

@@ -318,7 +318,7 @@ export default function ProjectsIndexPage() {
             <h1>{headerTitle}</h1>
             <p className="task-subtitle">Prioritas utama: tambah evidence pada workspace Anda, lalu monitor queue lintas project.</p>
             {credential.role === "role1" && !scopedProjectId ? (
-              <p className="warning-box">Workspace input Role 1 Anda belum ditetapkan admin. Saat ini mode hanya read-only.</p>
+              <p className="warning-box">Workspace input BIM Coordinator Project Anda belum ditetapkan admin. Saat ini mode hanya read-only.</p>
             ) : null}
             <div className="landing-chip-row">
               <span className="status-chip status-na">Total projects: {totalProjects}</span>
@@ -343,7 +343,7 @@ export default function ProjectsIndexPage() {
         </div>
       </header>
 
-      <section className="task-grid-3" aria-label="Role 1 operational summary">
+      <section className="task-grid-3" aria-label="BIM Coordinator Project operational summary">
         <article className="summary-card">
           <span>Total Projects</span>
           <strong>{totalProjects}</strong>

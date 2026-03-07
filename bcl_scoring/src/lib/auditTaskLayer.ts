@@ -508,19 +508,19 @@ export function buildPrintableAuditSnapshot(input: {
     },
     narrative_audit_trail: [
       {
-        title: "Evidence Submission (Role 1)",
+        title: "Evidence Submission (BIM Coordinator Project)",
         role: "BIM Koordinator Proyek",
         meaning: `Proyek submit evidence untuk indikator terkait (submitted count: ${submittedCountText}).`,
         not_done: "Tidak melakukan review, approval, atau locking period.",
       },
       {
-        title: "Review Eligibility (Role 2)",
+        title: "Review Eligibility (BIM Coordinator HO)",
         role: "HO Reviewer",
         meaning: "Menilai kelayakan evidence (Acceptable/Needs Revision/Rejected) berdasarkan konteks review.",
         not_done: "Tidak melakukan approval period dan tidak mengubah skor.",
       },
       {
-        title: "Approval Decision (Role 3)",
+        title: "Approval Decision (BIM Manager)",
         role: "BIM Manager/KaDiv BIM",
         meaning: `Keputusan level period: ${decisionText}. Reason: ${reasonText}.`,
         not_done: "Tidak melakukan edit evidence, indikator, atau score entry.",

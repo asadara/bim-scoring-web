@@ -129,7 +129,7 @@ export default function HoProjectReviewPage() {
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role2-project-review-info"
-            label="Informasi alur review Role 2"
+            label="Informasi alur review BIM Coordinator HO"
             lines={[
               "BIM Coordinator HO memproses evidence SUBMITTED -> tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.",
               "Review tidak mengubah skor dan bukan approval period.",

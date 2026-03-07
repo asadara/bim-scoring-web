@@ -1012,7 +1012,7 @@ export default function AdminControlPanelPage() {
     }
     const targetRole1ProjectId = isRole1WorkspaceSwitchToTest ? testWorkspaceId : requestedRole1ProjectId;
     if (requestedRole === "role1" && !targetRole1ProjectId) {
-      setError("Pengajuan Role 1 belum memiliki target workspace yang valid.");
+      setError("Pengajuan BIM Coordinator Project belum memiliki target workspace yang valid.");
       return;
     }
     const userLabel = user.name || user.email || user.id;
@@ -1069,7 +1069,7 @@ export default function AdminControlPanelPage() {
       });
       const rows = await listRole2BimUseProposals(session);
       setRole2Proposals(rows);
-    }, status === "APPROVED" ? "Proposal Role 2 disetujui." : "Proposal Role 2 ditolak.");
+    }, status === "APPROVED" ? "Proposal BIM Coordinator HO disetujui." : "Proposal BIM Coordinator HO ditolak.");
   }
 
   function handleChangeIndicatorPerspective(nextPerspectiveId: string) {
@@ -1507,7 +1507,7 @@ export default function AdminControlPanelPage() {
               onChange={(event) => setCleanupIncludeRole2Proposals(event.target.checked)}
             />
             {" "}
-            Hapus proposal Role 2
+            Hapus proposal BIM Coordinator HO
           </label>
           <label>
             <input
@@ -1575,16 +1575,16 @@ export default function AdminControlPanelPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Antrian Proposal BIM Use Role 2</h2>
+        <h2>Antrian Proposal BIM Use BIM Coordinator HO</h2>
         <p className="task-subtitle">
-          Alur proposal-only. Role 2 mengajukan perubahan BIM Use / pemetaan indikator, keputusan akhir tetap di Admin.
+          Alur proposal-only. BIM Coordinator HO mengajukan perubahan BIM Use / pemetaan indikator, keputusan akhir tetap di Admin.
         </p>
         <p className="inline-note">
           Setujui/Tolak di sini tidak otomatis mengubah master perspektif/indikator. Perubahan master tetap dikendalikan admin.
         </p>
         <div className="admin-table-wrap">
           <table className="audit-table responsive-stack-table admin-role2-proposal-table">
-            <caption className="sr-only">Antrian proposal BIM Use Role 2</caption>
+            <caption className="sr-only">Antrian proposal BIM Use BIM Coordinator HO</caption>
             <thead>
               <tr>
                 <th scope="col">Pemohon</th>
@@ -1600,7 +1600,7 @@ export default function AdminControlPanelPage() {
             <tbody>
               {role2Proposals.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>Belum ada proposal Role 2.</td>
+                  <td colSpan={8}>Belum ada proposal BIM Coordinator HO.</td>
                 </tr>
               ) : (
                 role2Proposals.map((item) => {
@@ -1695,7 +1695,7 @@ export default function AdminControlPanelPage() {
           Untuk keamanan, aksi hapus workspace dinonaktifkan. Gunakan Nonaktifkan untuk menonaktifkan workspace tanpa menghapus data.
         </p>
         <p className="inline-note">
-          Catatan: queue Role 2 hanya menampilkan evidence berstatus <strong>SUBMITTED</strong> pada period aktif dan workspace yang masuk scope role2.
+          Catatan: queue BIM Coordinator HO hanya menampilkan evidence berstatus <strong>SUBMITTED</strong> pada period aktif dan workspace yang masuk scope review.
         </p>
         <p className="inline-note">Klik baris workspace untuk membuka editor setting.</p>
         <div className="wizard-actions">
@@ -1961,7 +1961,7 @@ export default function AdminControlPanelPage() {
           <p className="inline-note">
             Zona waktu periode: <strong>Asia/Jakarta</strong>, mulai jam <strong>00:00</strong>. Sistem akan membuat dan
             mengganti periode otomatis setiap <strong>7 hari</strong> berdasarkan anchor di atas. Periode lama otomatis
-            read-only untuk Role 1 (review/approval tetap mengikuti kebijakan gate).
+            read-only untuk BIM Coordinator Project (review/approval tetap mengikuti kebijakan gate).
           </p>
         ) : null}
         {selectedPeriodProject ? (

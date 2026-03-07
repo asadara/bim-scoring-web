@@ -128,7 +128,7 @@ export default function AwaitingReviewQueuePage() {
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role3-awaiting-review-info"
-            label="Informasi queue awaiting review Role 3"
+            label="Informasi queue awaiting review BIM Manager"
             lines={[
               "Queue ini bersifat monitoring untuk BIM Manager.",
               "Proses review detail tetap dilakukan oleh BIM Coordinator HO.",

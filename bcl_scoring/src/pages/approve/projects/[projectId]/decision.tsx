@@ -214,7 +214,7 @@ export default function ApprovalDecisionPage() {
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role3-decision-snapshot-info"
-            label="Informasi keputusan approval Role 3"
+            label="Informasi keputusan approval BIM Manager"
             lines={[
               "Keputusan approval/reject diproses pada level period.",
               "Jika APPROVE PERIOD lolos gate, snapshot final akan direkam.",

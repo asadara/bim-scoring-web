@@ -255,9 +255,9 @@ function assertRole1WritableProject(projectId: string): void {
   const credential = getStoredCredential();
   if (credential.role !== "role1") return;
   const scopedProjectId = resolveRole1ScopedProjectId();
-  if (!scopedProjectId) throw new Error("Workspace project untuk Role 1 belum ditetapkan admin.");
+  if (!scopedProjectId) throw new Error("Workspace project untuk BIM Coordinator Project belum ditetapkan admin.");
   if (projectId !== scopedProjectId) {
-    throw new Error("Role 1 hanya dapat menulis evidence pada workspace project miliknya.");
+    throw new Error("BIM Coordinator Project hanya dapat menulis evidence pada workspace project miliknya.");
   }
 }
 

@@ -726,7 +726,7 @@ export default function AddEvidencePage() {
       return;
     }
     if (credential.role !== "role1") {
-      setGapError("Fitur ini khusus Role 1.");
+      setGapError("Fitur ini khusus BIM Coordinator Project.");
       return;
     }
     if (!proposalActor) {
@@ -767,9 +767,9 @@ export default function AddEvidencePage() {
       });
       setGapReason("");
       setShowGapProposalForm(false);
-      setGapInfo("Pengajuan berhasil dikirim ke antrean Role 2. Lanjutkan input evidence setelah mapping tersedia.");
+      setGapInfo("Pengajuan berhasil dikirim ke antrean BIM Coordinator HO. Lanjutkan input evidence setelah mapping tersedia.");
     } catch (err) {
-      setGapError(err instanceof Error ? err.message : "Gagal mengirim pengajuan ke Role 2.");
+      setGapError(err instanceof Error ? err.message : "Gagal mengirim pengajuan ke BIM Coordinator HO.");
     } finally {
       setGapSubmitting(false);
     }
@@ -778,7 +778,7 @@ export default function AddEvidencePage() {
   async function saveByStatus(status: "DRAFT" | "SUBMITTED") {
     if (!context || typeof projectId !== "string") return;
     if (!canRole1WriteProject(projectId)) {
-      setSubmitError("Workspace ini read-only untuk Role 1 Anda. Tambah evidence hanya bisa di workspace scope Anda.");
+      setSubmitError("Workspace ini read-only untuk BIM Coordinator Project Anda. Tambah evidence hanya bisa di workspace scope Anda.");
       return;
     }
     if (!canWriteRole1Evidence(credential.role)) {
@@ -936,7 +936,7 @@ export default function AddEvidencePage() {
         ) : null}
         {credential.role === "role1" && !scopedProjectId ? (
           <p className="warning-box">
-            Workspace input Role 1 Anda belum ditetapkan admin. Halaman ini hanya read-only sampai scope ditetapkan.
+            Workspace input BIM Coordinator Project Anda belum ditetapkan admin. Halaman ini hanya read-only sampai scope ditetapkan.
           </p>
         ) : null}
 
@@ -1133,11 +1133,11 @@ export default function AddEvidencePage() {
                       setGapInfo(null);
                     }}
                   >
-                    Tidak menemukan BIM Use/Indicator yang cocok? | Ajukan mapping ke Role 2
+                    Tidak menemukan BIM Use/Indicator yang cocok? | Ajukan mapping ke BIM Coordinator HO
                   </summary>
                   <div className="collapsible-content">
                     <p className="inline-note">
-                      Role 1 tidak dapat menambah indikator secara langsung. Gunakan form ini untuk mengajukan BIM Use
+                      BIM Coordinator Project tidak dapat menambah indikator secara langsung. Gunakan form ini untuk mengajukan BIM Use
                       atau mapping baru.
                     </p>
                     <form className="field-grid" onSubmit={(event) => void onSubmitGapProposal(event)}>

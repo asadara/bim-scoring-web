@@ -409,7 +409,7 @@ export default function HoEvidenceReviewPage() {
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role2-evidence-review-info"
-            label="Informasi alur review Role 2"
+            label="Informasi alur review BIM Coordinator HO"
             lines={[
               "BIM Coordinator HO memproses evidence SUBMITTED -> tetapkan ACCEPTABLE/NEEDS REVISION/REJECTED dengan reason.",
               "Review tidak mengubah skor dan bukan approval period.",
@@ -427,8 +427,8 @@ export default function HoEvidenceReviewPage() {
           <p className="warning-box">
             Apply Review hanya untuk status SUBMITTED. Status saat ini: <strong>{currentLifecycleLabel}</strong>.
             {evidence.latest_review_outcome
-              ? " Evidence ini sudah direview; minta Role 1 update/resubmit jika perlu review ulang."
-              : " Minta Role 1 submit evidence terlebih dahulu."}
+              ? " Evidence ini sudah direview; minta BIM Coordinator Project update/resubmit jika perlu review ulang."
+              : " Minta BIM Coordinator Project submit evidence terlebih dahulu."}
           </p>
         ) : null}
       </section>

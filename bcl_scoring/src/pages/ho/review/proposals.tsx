@@ -371,7 +371,7 @@ export default function Role2ProposalPage() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!actor) {
-      setError("Silakan sign in sebagai Role 2.");
+      setError("Silakan sign in sebagai BIM Coordinator HO.");
       return;
     }
     if (!selectedProjectId) {
@@ -422,7 +422,7 @@ export default function Role2ProposalPage() {
   return (
     <Role2Layout
       title="Proposal BIM Use & Indicator Mapping"
-      subtitle="Role 2 memproses gap dari Role 1 dan mengajukan proposal ke Admin untuk perubahan master."
+      subtitle="BIM Coordinator HO memproses gap dari BIM Coordinator Project dan mengajukan proposal ke Admin untuk perubahan master."
       projectId={selectedProjectId || null}
       project={selectedProject}
       periodStatusLabel="OPEN"
@@ -433,7 +433,7 @@ export default function Role2ProposalPage() {
       <section className="task-panel">
         <h2>Referensi Perspektif & Indicator Default (Database)</h2>
         <p className="task-subtitle">
-          Section ini bersifat reference-only untuk Role 2. Default dalam keadaan tertutup, buka jika dibutuhkan.
+          Section ini bersifat reference-only untuk BIM Coordinator HO. Default dalam keadaan tertutup, buka jika dibutuhkan.
         </p>
         <div className="wizard-actions">
           <button
@@ -552,7 +552,7 @@ export default function Role2ProposalPage() {
 
       <section className="task-panel">
         <p className="inline-note">
-          Guardrail aktif: Role 2 tidak dapat menambah indikator/perspektif secara langsung. Semua perubahan melalui proposal queue.
+          Guardrail aktif: BIM Coordinator HO tidak dapat menambah indikator/perspektif secara langsung. Semua perubahan melalui proposal queue.
         </p>
         {error ? <p className="error-box">{error}</p> : null}
         {notice ? <p className="task-note action-feedback">{notice}</p> : null}
@@ -792,11 +792,11 @@ export default function Role2ProposalPage() {
               <p className="auth-hint">Keterangan: n_indikator = jumlah indikator relevan pada perspektif terkait.</p>
             </div>
 
-            <h3>Batasan Peran Role 2 (Governance)</h3>
+            <h3>Batasan Peran BIM Coordinator HO (Governance)</h3>
             <ul className="formula-list">
-              <li>Role 2 melakukan review evidence dan menetapkan outcome review sesuai kewenangan.</li>
-              <li>Role 2 dapat mengajukan proposal BIM Use/mapping untuk diputuskan oleh Admin.</li>
-              <li>Role 2 tidak berwenang mengubah formula, bobot, maupun metodologi scoring.</li>
+              <li>BIM Coordinator HO melakukan review evidence dan menetapkan outcome review sesuai kewenangan.</li>
+              <li>BIM Coordinator HO dapat mengajukan proposal BIM Use/mapping untuk diputuskan oleh Admin.</li>
+              <li>BIM Coordinator HO tidak berwenang mengubah formula, bobot, maupun metodologi scoring.</li>
             </ul>
           </div>
         </details>

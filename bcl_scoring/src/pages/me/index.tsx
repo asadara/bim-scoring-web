@@ -441,11 +441,11 @@ export default function MePage() {
     event.preventDefault();
     if (busyAction) return;
     if (requestRequiresSingleScope && requestProjectIdsDraft.length !== 1) {
-      setError("Untuk pengajuan Role 1, pilih tepat 1 workspace project.");
+      setError("Untuk pengajuan BIM Coordinator Project, pilih tepat 1 workspace project.");
       return;
     }
     if (requestRequiresScope && requestProjectIdsDraft.length === 0) {
-      setError("Untuk pengajuan Role 2, pilih minimal 1 scope workspace.");
+      setError("Untuk pengajuan BIM Coordinator HO, pilih minimal 1 scope workspace.");
       return;
     }
 
@@ -683,9 +683,9 @@ export default function MePage() {
                   <legend>Scope Workspace Diajukan</legend>
                   <p className="auth-hint">
                     {requestRequiresSingleScope
-                      ? "Role 1 wajib 1 workspace."
+                      ? "BIM Coordinator Project wajib 1 workspace."
                       : requestRequiresScope
-                        ? "Role 2 wajib minimal 1 workspace. Tambahkan workspace baru sesuai tugas review."
+                        ? "BIM Coordinator HO wajib minimal 1 workspace. Tambahkan workspace baru sesuai tugas review."
                         : "Opsional. Admin akan menetapkan scope final."}
                   </p>
                   {activeProjectOptions.length === 0 ? (

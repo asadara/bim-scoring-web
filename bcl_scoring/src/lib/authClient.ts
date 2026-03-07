@@ -549,10 +549,10 @@ export async function submitAuthRoleScopeRequest(input: {
   }
   const requestedProjectIds = normalizeRequestedProjectIds(input.requested_project_ids);
   if (requestedRole === "role1" && requestedProjectIds.length !== 1) {
-    throw new Error("Pengajuan Role 1 wajib memilih tepat 1 workspace project.");
+    throw new Error("Pengajuan BIM Coordinator Project wajib memilih tepat 1 workspace project.");
   }
   if (requestedRole === "role2" && requestedProjectIds.length === 0) {
-    throw new Error("Pengajuan Role 2 wajib memilih minimal 1 workspace project.");
+    throw new Error("Pengajuan BIM Coordinator HO wajib memilih minimal 1 workspace project.");
   }
 
   const { data, error } = await supabase.auth.getUser();
