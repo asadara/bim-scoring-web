@@ -1145,10 +1145,10 @@ export async function fetchEvidenceListReadMode(
   const periodQuery = `?period_id=${encodeURIComponent(periodKey)}`;
   const projectQuery = `?project_id=${encodeURIComponent(projectId)}`;
   const candidates = [
-    buildApiUrl(`/periods/${encodeURIComponent(periodKey)}/evidences${projectQuery}`),
     buildApiUrl(
       `/projects/${encodeURIComponent(projectId)}/periods/${encodeURIComponent(periodKey)}/indicator-evidence`
     ),
+    buildApiUrl(`/periods/${encodeURIComponent(periodKey)}/evidences${projectQuery}`),
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/periods/${encodeURIComponent(periodKey)}/evidence`),
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/evidence${periodQuery}`),
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/evidence`),
