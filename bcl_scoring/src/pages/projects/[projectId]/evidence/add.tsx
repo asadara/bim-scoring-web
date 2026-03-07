@@ -955,29 +955,37 @@ export default function AddEvidencePage() {
                       <h3 className="bim-use-card-title">
                         <span>{group.label}</span>
                       </h3>
-                      <div className="bim-use-card-title-accent" aria-hidden="true">
-                        <span className="bim-use-card-title-icon">
+                      <div className="bim-use-card-metrics" aria-hidden="true">
+                        <span className="bim-use-card-metric-hero">
                           {resolveBimUseIllustration(group.label)}
                         </span>
-                        <span className="bim-use-card-title-rule" />
+                        <strong className="bim-use-card-metric-value">{evidenceCount}</strong>
+                        <span className="bim-use-card-metric-label">
+                          <span>Evidence</span>
+                          <span className="bim-use-card-stat-icon">
+                            <EvidenceIcon />
+                          </span>
+                        </span>
+                        <strong className="bim-use-card-metric-value">{group.indicators.length}</strong>
+                        <span className="bim-use-card-metric-label">
+                          <span>Indikator</span>
+                          <span className="bim-use-card-stat-icon">
+                            <IndicatorIcon />
+                          </span>
+                        </span>
                       </div>
-                      <p className="bim-use-card-stat">
-                        <span className="bim-use-card-stat-icon" aria-hidden="true">
+                      <p className="bim-use-card-meta">
+                        <span className="bim-use-card-meta-item">
                           <EvidenceIcon />
                         </span>
-                        <span className="bim-use-card-stat-copy">
-                          <strong>{evidenceCount}</strong>
-                          <span className="bim-use-card-stat-label">Evidence</span>
+                        <span className="bim-use-card-meta-copy">
+                          {evidenceOptionCount} opsi evidence tersedia
                         </span>
-                      </p>
-                      <p className="bim-use-card-stat">
-                        <span className="bim-use-card-stat-icon" aria-hidden="true">
-                          <IndicatorIcon />
+                        <span className="bim-use-card-meta-separator" />
+                        <span className="bim-use-card-meta-item">
+                          <BimUseIcon />
                         </span>
-                        <span className="bim-use-card-stat-copy">
-                          <strong>{group.indicators.length}</strong>
-                          <span className="bim-use-card-stat-label">Indikator</span>
-                        </span>
+                        <span className="bim-use-card-meta-copy">BIM Use workspace</span>
                       </p>
                     </>
                   );
