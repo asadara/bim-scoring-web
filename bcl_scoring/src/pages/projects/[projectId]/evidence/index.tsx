@@ -25,6 +25,45 @@ type GroupedEvidence = {
 
 type EvidenceViewItem = LocalEvidenceWithReview;
 
+function classifyExternalUrl(href: string): { label: string; host: string | null; isGoogleDrive: boolean } {
+  try {
+    const url = new URL(href);
+    const host = (url.hostname || "").toLowerCase();
+    const isGoogleDrive =
+      host === "drive.google.com" ||
+      host.endsWith(".drive.google.com") ||
+      host === "docs.google.com" ||
+      host.endsWith(".docs.google.com");
+    return {
+      label: isGoogleDrive ? "Google Drive" : "External URL",
+      host: host || null,
+      isGoogleDrive,
+    };
+  } catch {
+    return {
+      label: "External URL",
+      host: null,
+      isGoogleDrive: false,
+    };
+  }
+}
+
+function renderOpenUrlAction(href: string | null | undefined, label: string) {
+  const value = String(href || "").trim();
+  if (!value) {
+    return (
+      <button type="button" disabled>
+        {label}
+      </button>
+    );
+  }
+  return (
+    <a href={value} target="_blank" rel="noopener noreferrer">
+      {label}
+    </a>
+  );
+}
+
 function renderEvidenceValue(item: LocalEvidenceWithReview) {
   if (item.type === "TEXT") {
     return (
@@ -35,32 +74,45 @@ function renderEvidenceValue(item: LocalEvidenceWithReview) {
   }
 
   if (item.type === "URL") {
+    const externalUrl = item.external_url || "";
+    const urlMeta = externalUrl ? classifyExternalUrl(externalUrl) : null;
     return (
-      <p>
-        URL: {item.external_url ? <a href={item.external_url} target="_blank" rel="noopener noreferrer">{item.external_url}</a> : NA_TEXT}
-      </p>
+      <>
+        <p>
+          URL source: <strong>{urlMeta?.label || NA_TEXT}</strong>
+          {urlMeta?.host ? (
+            <>
+              {" "}
+              <span className="inline-note">({urlMeta.host})</span>
+            </>
+          ) : null}
+        </p>
+        <p>external_url: {externalUrl || NA_TEXT}</p>
+        <div className="item-actions">{renderOpenUrlAction(externalUrl, "Open URL")}</div>
+      </>
     );
   }
 
   return (
     <>
-      <p>
-        view_url: {item.file_view_url ? <a href={item.file_view_url} target="_blank" rel="noopener noreferrer">{item.file_view_url}</a> : NA_TEXT}
-      </p>
-      <p>
-        download_url: {item.file_download_url ? <a href={item.file_download_url} target="_blank" rel="noopener noreferrer">{item.file_download_url}</a> : NA_TEXT}
-      </p>
+      <p>view_url: {item.file_view_url || NA_TEXT}</p>
+      <p>download_url: {item.file_download_url || NA_TEXT}</p>
       <p>
         reference_url: {item.file_reference_url ? (
-          item.file_reference_url.startsWith("data:") ? (
-            <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">
-              Local binary file (data URL)
-            </a>
-          ) : (
-            <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">{item.file_reference_url}</a>
-          )
+          item.file_reference_url.startsWith("data:") ? "Local binary file (data URL)" : item.file_reference_url
         ) : NA_TEXT}
       </p>
+      <div className="item-actions">
+        {renderOpenUrlAction(item.file_view_url, "Open File")}
+        {renderOpenUrlAction(item.file_download_url, "Download File")}
+        {item.file_reference_url?.startsWith("data:") ? (
+          <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">
+            Open Local File
+          </a>
+        ) : (
+          renderOpenUrlAction(item.file_reference_url, "Open Reference URL")
+        )}
+      </div>
     </>
   );
 }
