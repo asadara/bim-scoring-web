@@ -1447,7 +1447,7 @@ a {
 
 .bim-use-card-metric-value {
   margin: 0;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
   font-weight: 700;
   color: var(--task-primary);
@@ -1536,7 +1536,7 @@ a {
   }
 
   .bim-use-card-metric-value {
-    font-size: 21px;
+    font-size: 19px;
   }
 }
 
