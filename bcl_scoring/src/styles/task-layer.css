@@ -1418,37 +1418,54 @@ a {
 
 .bim-use-card-title {
   margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
   font-size: 26px;
   line-height: 1.2;
   font-weight: 700;
   color: var(--task-ink);
 }
 
+.bim-use-card-title-accent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.bim-use-card-title-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(22, 84, 64, 0.08);
+  color: #2f6f5a;
+}
+
+.bim-use-card-title-rule {
+  height: 1px;
+  flex: 1 1 auto;
+  background: linear-gradient(90deg, rgba(58, 118, 97, 0.28), rgba(58, 118, 97, 0));
+}
+
 .bim-use-card-stat {
   margin: 0;
   display: flex;
-  align-items: end;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   color: var(--task-muted);
   font-size: 12px;
   line-height: 1.25;
 }
 
 .bim-use-card-stat-copy {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: end;
-  column-gap: 8px;
-  flex: 1 1 auto;
-  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .bim-use-card-stat strong {
-  display: block;
   font-size: 26px;
   line-height: 1;
   font-weight: 700;
@@ -1456,8 +1473,6 @@ a {
 }
 
 .bim-use-card-stat-label {
-  justify-self: end;
-  text-align: right;
   white-space: nowrap;
 }
 
@@ -1469,7 +1484,21 @@ a {
   color: #6d8392;
 }
 
+.bim-use-card-stat-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  color: #6d8392;
+}
+
 .bim-use-card-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.bim-use-card-title-icon svg,
+.bim-use-card-stat-icon svg {
   width: 100%;
   height: 100%;
 }
@@ -1503,8 +1532,18 @@ a {
 .bim-use-card-disabled .bim-use-card-title,
 .bim-use-card-disabled .bim-use-card-stat,
 .bim-use-card-disabled .bim-use-card-stat strong,
-.bim-use-card-disabled .bim-use-card-icon {
+.bim-use-card-disabled .bim-use-card-icon,
+.bim-use-card-disabled .bim-use-card-stat-icon,
+.bim-use-card-disabled .bim-use-card-title-icon {
   color: var(--task-disabled-ink);
+}
+
+.bim-use-card-disabled .bim-use-card-title-icon {
+  background: rgba(140, 151, 146, 0.14);
+}
+
+.bim-use-card-disabled .bim-use-card-title-rule {
+  background: linear-gradient(90deg, rgba(140, 151, 146, 0.3), rgba(140, 151, 146, 0));
 }
 
 @media (max-width: 720px) {

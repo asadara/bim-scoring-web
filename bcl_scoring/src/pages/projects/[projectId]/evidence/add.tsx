@@ -235,6 +235,102 @@ function IndicatorIcon() {
   );
 }
 
+function TimelineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M5 6h14" />
+      <path d="M5 12h14" />
+      <path d="M5 18h14" />
+      <circle cx="9" cy="6" r="1.8" />
+      <circle cx="15" cy="12" r="1.8" />
+      <circle cx="11" cy="18" r="1.8" />
+    </svg>
+  );
+}
+
+function AssetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="5" rx="1.5" />
+      <rect x="4" y="14" width="16" height="5" rx="1.5" />
+      <path d="M8 8h.01" />
+      <path d="M8 17h.01" />
+      <path d="M12 8h4" />
+      <path d="M12 17h4" />
+    </svg>
+  );
+}
+
+function IssueIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M6 6h12v9H9l-3 3z" />
+      <path d="M9 10h6" />
+      <path d="M9 13h4" />
+    </svg>
+  );
+}
+
+function ClashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="9" cy="12" r="4" />
+      <circle cx="15" cy="12" r="4" />
+      <path d="M10.5 9.5l3 5" />
+      <path d="M13.5 9.5l-3 5" />
+    </svg>
+  );
+}
+
+function CoordinationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="6" cy="7" r="2" />
+      <circle cx="18" cy="7" r="2" />
+      <circle cx="12" cy="17" r="2" />
+      <path d="M7.7 8.2l2.9 6.1" />
+      <path d="M16.3 8.2l-2.9 6.1" />
+      <path d="M8 7h8" />
+    </svg>
+  );
+}
+
+function DesignIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M4 19l6-6" />
+      <path d="M14 5l5 5" />
+      <path d="M9 20h11" />
+      <path d="M15 4l-8 8 5 5 8-8z" />
+    </svg>
+  );
+}
+
+function DeliveryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M12 3l7 4-7 4-7-4 7-4z" />
+      <path d="M5 7v6l7 4 7-4V7" />
+      <path d="M12 11v10" />
+      <path d="M9 18l3 3 3-3" />
+    </svg>
+  );
+}
+
+function resolveBimUseIllustration(label: string) {
+  const normalized = String(label || "").toLowerCase();
+  if (normalized.includes("4d") || normalized.includes("progress")) return <TimelineIcon />;
+  if (normalized.includes("5d") || normalized.includes("asset")) return <AssetIcon />;
+  if (normalized.includes("bcf") || normalized.includes("issue")) return <IssueIcon />;
+  if (normalized.includes("clash")) return <ClashIcon />;
+  if (normalized.includes("coordination")) return <CoordinationIcon />;
+  if (normalized.includes("design")) return <DesignIcon />;
+  if (normalized.includes("delivery") || normalized.includes("publishing") || normalized.includes("model")) {
+    return <DeliveryIcon />;
+  }
+  return <BimUseIcon />;
+}
+
 export default function AddEvidencePage() {
   const router = useRouter();
   const { projectId, evidenceId, mode, bimUseId } = router.query;
@@ -858,26 +954,29 @@ export default function AddEvidencePage() {
                     <>
                       <h3 className="bim-use-card-title">
                         <span>{group.label}</span>
-                        <span className="bim-use-card-icon" aria-hidden="true">
-                          <BimUseIcon />
-                        </span>
                       </h3>
+                      <div className="bim-use-card-title-accent" aria-hidden="true">
+                        <span className="bim-use-card-title-icon">
+                          {resolveBimUseIllustration(group.label)}
+                        </span>
+                        <span className="bim-use-card-title-rule" />
+                      </div>
                       <p className="bim-use-card-stat">
+                        <span className="bim-use-card-stat-icon" aria-hidden="true">
+                          <EvidenceIcon />
+                        </span>
                         <span className="bim-use-card-stat-copy">
                           <strong>{evidenceCount}</strong>
                           <span className="bim-use-card-stat-label">Evidence</span>
                         </span>
-                        <span className="bim-use-card-icon" aria-hidden="true">
-                          <EvidenceIcon />
-                        </span>
                       </p>
                       <p className="bim-use-card-stat">
+                        <span className="bim-use-card-stat-icon" aria-hidden="true">
+                          <IndicatorIcon />
+                        </span>
                         <span className="bim-use-card-stat-copy">
                           <strong>{group.indicators.length}</strong>
                           <span className="bim-use-card-stat-label">Indikator</span>
-                        </span>
-                        <span className="bim-use-card-icon" aria-hidden="true">
-                          <IndicatorIcon />
                         </span>
                       </p>
                     </>
