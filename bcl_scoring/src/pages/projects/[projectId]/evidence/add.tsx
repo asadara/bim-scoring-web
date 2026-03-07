@@ -44,6 +44,7 @@ type WizardForm = {
 type PersistedEvidenceState = "DRAFT" | "SUBMITTED" | "NEEDS_REVISION" | null;
 
 const LOCAL_FILE_SIZE_LIMIT_BYTES = 2 * 1024 * 1024; // 2 MB (localStorage-safe for prototype)
+const LOCAL_EVIDENCE_SHADOW_TTL_MS = 2 * 60 * 1000;
 
 const STEP_LABELS = [
   "Step 1 - Select indicator",
@@ -193,6 +194,13 @@ function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function isRecentTimestamp(value: string | null | undefined, windowMs: number): boolean {
+  if (!value) return false;
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return false;
+  return Math.abs(Date.now() - time) <= windowMs;
 }
 
 function buildFileAccept(type: WizardForm["file_type"]): string | undefined {
@@ -539,13 +547,24 @@ export default function AddEvidencePage() {
       .then((result) => {
         if (!mounted) return;
         const localRows = listLocalEvidence(projectId, context.active_period?.id ?? null);
+        const backendIds = new Set(
+          result.data
+            .map((item) => String(item.id || "").trim())
+            .filter(Boolean)
+        );
+        const localRowsForTracking = localRows.filter((item) => {
+          const id = String(item.id || "").trim();
+          if (!id) return false;
+          if (backendIds.has(id)) return true;
+          return isRecentTimestamp(item.updated_at, LOCAL_EVIDENCE_SHADOW_TTL_MS);
+        });
         const mergedRowsById = new Map<string, (typeof result.data)[number]>();
         for (const item of result.data) {
           const id = String(item.id || "").trim();
           if (!id) continue;
           mergedRowsById.set(id, item);
         }
-        for (const item of localRows) {
+        for (const item of localRowsForTracking) {
           const id = String(item.id || "").trim();
           if (!id) continue;
           mergedRowsById.set(id, item);
@@ -553,7 +572,7 @@ export default function AddEvidencePage() {
         const mergedRows = [...mergedRowsById.values()];
         const knownBimUseIds = new Set(context.bim_uses.map((group) => String(group.bim_use_id || "").trim()).filter(Boolean));
         const localBimUseByEvidenceId = new Map<string, string>(
-          localRows
+          localRowsForTracking
             .map((item) => [String(item.id || "").trim(), String(item.bim_use_id || "").trim()] as const)
             .filter((entry) => entry[0] && entry[1] && entry[1] !== NO_BIM_USE_ID)
         );
