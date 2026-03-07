@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-07 21:05:00 +07:00
+last_updated: 2026-03-07 22:05:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -42,10 +42,18 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
 - [x] A2.0 Assessment feasibility migrasi API selesai (bukan lift-and-shift).
 - [x] A2.1 Hilangkan exposure `*.onrender.com` dari sisi client (gunakan custom API domain).
 - [x] A2.2 Stabilkan lapisan domain/API gateway di Cloudflare (proxy/caching/security baseline).
-- [ ] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
+- [x] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
 - [ ] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
 - [ ] A2.5 Cutover endpoint read-only dulu, lalu write-path.
 - [ ] A2.6 Full cutover API + decommission Render.
+
+## A2.4 Breakdown (Next Active Phase)
+
+- [ ] A2.4.1 Pindahkan state rate limit ke storage terdistribusi lintas instance.
+- [ ] A2.4.2 Pindahkan registry idempotency write-path ke storage terdistribusi + TTL.
+- [ ] A2.4.3 Inventaris dan klasifikasikan cache process-local yang masih tersisa.
+- [ ] A2.4.4 Tambahkan adapter storage tunggal untuk Node runtime dan Worker runtime.
+- [ ] A2.4.5 Tambahkan contract/smoke test untuk failure mode storage stateful.
 
 ## Owner Matrix
 
@@ -327,6 +335,31 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `PUT /admin/role2/bim-use-proposals/:proposalId/status`
     - `POST /admin/test-data/cleanup`
   - route perspektif admin tetap ditolak native di Worker sebagai `READ_ONLY_ENTITY`, sesuai kontrak backend lama.
+- [x] A2.3 ditutup secara administratif di tracker:
+  - seluruh wave runtime compatibility (`Wave 1` sampai `Wave 5`) sudah selesai dan tervalidasi.
+  - blocker kritikal untuk path pilot Cloudflare tidak lagi terbuka pada scope A2.3.
+  - fokus fase berikutnya dipindahkan ke `A2.4` (stateful storage: rate limit, idempotency, cache).
+- [x] Implementasi repo untuk A2.4 disiapkan:
+  - adapter storage runtime tunggal ditambahkan untuk Node API dan Cloudflare Worker gateway, dengan backend Supabase + fallback memory.
+  - state yang sebelumnya process-local dipindahkan ke adapter:
+    - rate limit
+    - idempotency response cache
+    - summary cache
+    - project metadata cache
+    - scoring period column metadata cache
+    - upload session token
+    - Google OAuth state token
+    - indicator description mapping cache
+  - file SQL rollout ditambahkan:
+    - `bim-scoring-api/docs/ops/sql/create-runtime-state-tables.sql`
+  - validasi lulus:
+    - `runtimeState.unit.test.js`
+    - `rate-limiting.contract.test.js`
+    - `summary.v2.http.test.js`
+    - `evidence.write/review/approval` contract tests
+    - `cloudflare.gateway.auth-offload.contract.test.js`
+  - catatan rollout:
+    - fase `A2.4` belum ditandai selesai karena tabel Supabase baru masih perlu diterapkan di environment target, lalu API/gateway dideploy ulang agar distributed state aktif penuh.
 
 ## Evidence
 
