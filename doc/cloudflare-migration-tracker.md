@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-07 23:35:00 +07:00
+last_updated: 2026-03-08 13:20:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -379,7 +379,13 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - contract test gateway diperluas dan lulus (`33` test pass).
   - probe live pasca deploy mengonfirmasi route di atas tidak lagi mengirim header `X-BCL-Upstream`.
   - catatan parity environment:
-    - Cloudflare Worker production belum memiliki env Google Drive / upload v2 yang setara dengan backend lama (`FEATURE_GOOGLE_DRIVE_AUTO_SHARE`, `GOOGLE_OAUTH_*`, `FEATURE_EVIDENCE_UPLOAD_V2`), sehingga route sekarang bersih dari Render tetapi fitur terkait masih `FEATURE_DISABLED` / `oauth_configured=false` sampai env dilengkapi.
+    - env runtime Cloudflare Worker untuk Google Drive dan upload v2 sekarang sudah dilengkapi; live probe menunjukkan `oauth_configured=true`, `connect-url` Google valid, dan `upload/request` berhasil `201`.
+- [x] Blocker review Role 2 untuk A2.6 ditutup:
+  - route `POST /periods/:periodId/evidences/:evidenceId/review` sekarang dioffload native di Worker.
+  - contract gateway bertambah menjadi `34` test pass.
+  - probe live tidak lagi memantul ke Render; response review sekarang berasal dari `X-BCL-Write-Source: supabase-worker`.
+  - catatan:
+    - gateway masih menyimpan fallback upstream generik untuk path legacy/non-inventoried, sehingga decommission Render final tetap perlu keputusan eksplisit apakah fallback itu dihapus total atau dipertahankan sementara.
 
 ## Evidence
 
