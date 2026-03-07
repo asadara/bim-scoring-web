@@ -315,6 +315,18 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - Role 2 review tidak lagi fallback ke upstream saat membuka daftar evidence per indikator.
     - Role 3 approval dan Audit snapshot detail tidak lagi membutuhkan Render untuk summary period.
   - Contract gateway diperluas dan lulus (`cloudflare.gateway.auth-offload.contract.test.js`, `25` test pass).
+- [x] Hardening lanjutan My Account upload + Admin write:
+  - auth offload native ditambah untuk `POST /auth/profile-photo`.
+  - admin non-GET yang dipakai UI tidak lagi dibiarkan proxy ke Render:
+    - `PUT /admin/config-lock`
+    - `POST /admin/projects`, `PUT /admin/projects/:projectId`, `DELETE /admin/projects/:projectId` (tetap `READ_ONLY_ENTITY` sesuai kontrak)
+    - `POST /admin/role-mappings`, `PUT /admin/role-mappings/:mappingId`
+    - `POST /admin/indicators`, `PUT /admin/indicators/:indicatorId`, `DELETE /admin/indicators/:indicatorId`
+    - `POST /admin/projects/:projectId/periods`
+    - `POST /admin/projects/:projectId/periods/bulk-generate`
+    - `PUT /admin/role2/bim-use-proposals/:proposalId/status`
+    - `POST /admin/test-data/cleanup`
+  - route perspektif admin tetap ditolak native di Worker sebagai `READ_ONLY_ENTITY`, sesuai kontrak backend lama.
 
 ## Evidence
 
