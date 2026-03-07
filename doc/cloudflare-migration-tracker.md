@@ -303,6 +303,18 @@ Jika lanjut dari device lain, kerjakan urutan ini:
     - `POST /periods/:periodId/evidences/:evidenceId/submit`
   - Error `503` saat `Submit for Review` URL evidence tidak lagi bergantung upstream Render suspended.
   - Contract test gateway diperluas untuk route evidence dan lulus.
+- [x] Hardening lanjutan role review/approval/audit di gateway:
+  - read offload native Supabase ditambah untuk:
+    - `GET /projects/:projectId/periods/:periodId/indicator-evidence`
+    - `GET /projects/:projectId/periods/:periodId/indicator-audit`
+    - `GET /projects/:projectId/periods/:periodId/summary`
+  - write offload native Supabase ditambah untuk:
+    - `POST /periods/:periodId/approve`
+    - `POST /periods/:periodId/reject`
+  - tujuan:
+    - Role 2 review tidak lagi fallback ke upstream saat membuka daftar evidence per indikator.
+    - Role 3 approval dan Audit snapshot detail tidak lagi membutuhkan Render untuk summary period.
+  - Contract gateway diperluas dan lulus (`cloudflare.gateway.auth-offload.contract.test.js`, `25` test pass).
 
 ## Evidence
 
