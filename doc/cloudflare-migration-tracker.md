@@ -1,7 +1,7 @@
 ---
 title: Cloudflare Migration Tracker (BIM Scoring Web + API)
 status: IN PROGRESS
-last_updated: 2026-03-08 13:20:00 +07:00
+last_updated: 2026-03-08 13:35:00 +07:00
 owner: Engineering / Release
 ---
 
@@ -44,7 +44,7 @@ Dokumen ini jadi single source of truth rencana + progress migrasi dari Render k
 - [x] A2.2 Stabilkan lapisan domain/API gateway di Cloudflare (proxy/caching/security baseline).
 - [x] A2.3 Refactor API untuk kompatibilitas runtime Cloudflare (Express/Node-specific parts).
 - [x] A2.4 Migrasi komponen stateful (rate limit/idempotency/cache) ke storage terdistribusi.
-- [ ] A2.5 Cutover endpoint read-only dulu, lalu write-path.
+- [x] A2.5 Cutover endpoint read-only dulu, lalu write-path.
 - [ ] A2.6 Full cutover API + decommission Render.
 
 ## A2.4 Breakdown (Next Active Phase)
@@ -386,6 +386,13 @@ Jika lanjut dari device lain, kerjakan urutan ini:
   - probe live tidak lagi memantul ke Render; response review sekarang berasal dari `X-BCL-Write-Source: supabase-worker`.
   - catatan:
     - gateway masih menyimpan fallback upstream generik untuk path legacy/non-inventoried, sehingga decommission Render final tetap perlu keputusan eksplisit apakah fallback itu dihapus total atau dipertahankan sementara.
+- [x] A2.5 ditutup:
+  - seluruh path bisnis aktif yang dipakai frontend saat ini sudah diprobe live dan tidak lagi menunjukkan `X-BCL-Upstream`.
+  - cakupan aktif meliputi auth, dashboard, evidence create/update/submit/review, approval, audit, My Account, Admin write, Google Drive integration, dan upload v2.
+  - route legacy/non-inventoried tidak lagi dianggap blocker A2.5 selama tidak dipakai flow bisnis aktif.
+- [ ] A2.6 tinggal keputusan operasional terakhir:
+  - hapus fallback upstream generik dari gateway jika ingin decommission Render penuh tanpa escape hatch.
+  - jika fallback dipertahankan sementara untuk legacy path, maka Render belum boleh dipensiunkan total.
 
 ## Evidence
 
