@@ -17,7 +17,6 @@ import {
   getLocalEvidenceById,
   listLocalEvidence,
   isRealBackendWriteEnabled,
-  resolveIndicatorBimUseTags,
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
 } from "@/lib/role1TaskLayer";
@@ -362,6 +361,7 @@ export default function AddEvidencePage() {
   const [lastPersistedStatus, setLastPersistedStatus] = useState<PersistedEvidenceState>(null);
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState<string | null>(null);
   const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
+  const [unmappedBimUseEvidenceCount, setUnmappedBimUseEvidenceCount] = useState(0);
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
     const scopedIds = Array.isArray(credential.scoped_project_ids)
@@ -538,67 +538,31 @@ export default function AddEvidencePage() {
       .then((result) => {
         if (!mounted) return;
         const knownBimUseIds = new Set(context.bim_uses.map((group) => String(group.bim_use_id || "").trim()).filter(Boolean));
-        const concreteBimUseIds = context.bim_uses
-          .map((group) => String(group.bim_use_id || "").trim())
-          .filter((groupId) => groupId && groupId !== "All BIM Use" && groupId !== NO_BIM_USE_ID);
         const localBimUseByEvidenceId = new Map<string, string>(
           listLocalEvidence(projectId, context.active_period?.id ?? null)
             .map((item) => [String(item.id || "").trim(), String(item.bim_use_id || "").trim()] as const)
             .filter((entry) => entry[0] && entry[1] && entry[1] !== NO_BIM_USE_ID)
         );
-        const indicatorBimUseTagsById = new Map<string, string[]>(
-          context.indicators.map((indicator) => [
-            indicator.id,
-            resolveIndicatorBimUseTags({
-              code: indicator.code,
-              bim_use_id: indicator.bim_use_id,
-              bim_use_tags: indicator.bim_use_tags,
-            }),
-          ])
-        );
         const nextCountByBimUse: Record<string, number> = {};
+        let nextUnmappedCount = 0;
         for (const item of result.data) {
           const evidenceId = String(item.id || "").trim();
           const directKey =
             localBimUseByEvidenceId.get(evidenceId) ||
             String(item.bim_use_id || "").trim();
-          if (directKey && knownBimUseIds.has(directKey) && directKey !== "All BIM Use") {
+          if (directKey && knownBimUseIds.has(directKey) && directKey !== "All BIM Use" && directKey !== NO_BIM_USE_ID) {
             nextCountByBimUse[directKey] = (nextCountByBimUse[directKey] || 0) + 1;
             continue;
           }
-
-          const rawDerivedTags = [...new Set(
-            (Array.isArray(item.indicator_ids) ? item.indicator_ids : [])
-              .flatMap((indicatorId) => indicatorBimUseTagsById.get(String(indicatorId)) || [])
-              .map((value) => String(value || "").trim())
-              .filter(Boolean)
-          )];
-          const nonAllTags = rawDerivedTags.filter((tag) => tag !== "All BIM Use");
-          const derivedKeys = nonAllTags.length > 0
-            ? nonAllTags
-            : rawDerivedTags.includes("All BIM Use")
-              ? (concreteBimUseIds.length > 0 ? concreteBimUseIds : ["All BIM Use"])
-              : [];
-
-          if (derivedKeys.length > 0) {
-            for (const key of derivedKeys) {
-              nextCountByBimUse[key] = (nextCountByBimUse[key] || 0) + 1;
-            }
-            continue;
-          }
-
-          if (directKey && knownBimUseIds.has(directKey)) {
-            nextCountByBimUse[directKey] = (nextCountByBimUse[directKey] || 0) + 1;
-            continue;
-          }
-
-          nextCountByBimUse[NO_BIM_USE_ID] = (nextCountByBimUse[NO_BIM_USE_ID] || 0) + 1;
+          nextUnmappedCount += 1;
         }
         setBimUseEvidenceCountById(nextCountByBimUse);
+        setUnmappedBimUseEvidenceCount(nextUnmappedCount);
       })
       .catch(() => {
         if (!mounted) return;
         setBimUseEvidenceCountById({});
+        setUnmappedBimUseEvidenceCount(0);
       });
 
     return () => {
@@ -853,7 +817,10 @@ export default function AddEvidencePage() {
     const contextLines = [
       "[ROLE1_EVIDENCE_GAP]",
       `project_id=${projectId}`,
+      `evidence_id=${form.evidence_id || "not_created"}`,
+      `selected_bim_use_key=${form.bim_use_id || NA_TEXT}`,
       `selected_bim_use=${selectedBimUseLabel}`,
+      `selected_indicator_id=${form.indicator_ids[0] || NA_TEXT}`,
       `selected_indicator=${selectedIndicatorLabel}`,
       `selected_evidence_option=${selectedEvidenceOptionLabel}`,
       `draft_type=${selectedEvidenceTypeLabel}`,
@@ -1072,56 +1039,64 @@ export default function AddEvidencePage() {
             {context.bim_uses.length === 0 ? (
               <p className="warning-box">BIM Use belum tersedia dari endpoint. Not available.</p>
             ) : (
-              <div className="bim-use-card-grid">
-                {context.bim_uses.map((group) => {
-                  const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
-                  const cardContent = (
-                    <>
-                      <h3 className="bim-use-card-title">
-                        <span>{group.label}</span>
-                      </h3>
-                      <div className="bim-use-card-metrics" aria-hidden="true">
-                        <span className="bim-use-card-metric-hero">
-                          {resolveBimUseIllustration(group.label)}
-                        </span>
-                        <strong className="bim-use-card-metric-value">{evidenceCount}</strong>
-                        <span className="bim-use-card-metric-label">
-                          <span>Evidence</span>
-                          <span className="bim-use-card-stat-icon">
-                            <EvidenceIcon />
+              <>
+                {unmappedBimUseEvidenceCount > 0 ? (
+                  <p className="warning-box">
+                    {unmappedBimUseEvidenceCount} evidence sudah tersimpan tetapi belum punya BIM Use yang cocok dengan card workspace ini.
+                    Evidence tersebut tidak dihitung ke card mana pun sampai mapping BIM Use-nya eksplisit.
+                  </p>
+                ) : null}
+                <div className="bim-use-card-grid">
+                  {context.bim_uses.map((group) => {
+                    const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
+                    const cardContent = (
+                      <>
+                        <h3 className="bim-use-card-title">
+                          <span>{group.label}</span>
+                        </h3>
+                        <div className="bim-use-card-metrics" aria-hidden="true">
+                          <span className="bim-use-card-metric-hero">
+                            {resolveBimUseIllustration(group.label)}
                           </span>
-                        </span>
-                        <strong className="bim-use-card-metric-value">{group.indicators.length}</strong>
-                        <span className="bim-use-card-metric-label">
-                          <span>Indikator</span>
-                          <span className="bim-use-card-stat-icon">
-                            <IndicatorIcon />
+                          <strong className="bim-use-card-metric-value">{evidenceCount}</strong>
+                          <span className="bim-use-card-metric-label">
+                            <span>Evidence</span>
+                            <span className="bim-use-card-stat-icon">
+                              <EvidenceIcon />
+                            </span>
                           </span>
-                        </span>
-                      </div>
-                    </>
-                  );
-
-                  if (isBimUseCardActionDisabled) {
-                    return (
-                      <article key={group.bim_use_id} className="bim-use-card bim-use-card-disabled">
-                        {cardContent}
-                      </article>
+                          <strong className="bim-use-card-metric-value">{group.indicators.length}</strong>
+                          <span className="bim-use-card-metric-label">
+                            <span>Indikator</span>
+                            <span className="bim-use-card-stat-icon">
+                              <IndicatorIcon />
+                            </span>
+                          </span>
+                        </div>
+                      </>
                     );
-                  }
 
-                  return (
-                    <Link
-                      key={group.bim_use_id}
-                      href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
-                      className="bim-use-card bim-use-card-link"
-                      aria-label={`Buka input evidence untuk BIM Use ${group.label}. ${evidenceCount} evidence tersimpan dan ${group.indicators.length} indikator tersedia.`}
-                    >
-                      {cardContent}
-                    </Link>
-                  );
-                })}
-              </div>
+                    if (isBimUseCardActionDisabled) {
+                      return (
+                        <article key={group.bim_use_id} className="bim-use-card bim-use-card-disabled">
+                          {cardContent}
+                        </article>
+                      );
+                    }
+
+                    return (
+                      <Link
+                        key={group.bim_use_id}
+                        href={`/projects/${projectId}/evidence/add?bimUseId=${encodeURIComponent(group.bim_use_id)}`}
+                        className="bim-use-card bim-use-card-link"
+                        aria-label={`Buka input evidence untuk BIM Use ${group.label}. ${evidenceCount} evidence tersimpan dan ${group.indicators.length} indikator tersedia.`}
+                      >
+                        {cardContent}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </>
         ) : (
