@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import ApproverLayout from "@/components/ApproverLayout";
 import InfoTooltip from "@/components/InfoTooltip";
 import { canWriteRole3Approval } from "@/lib/accessControl";
-import { NA_TEXT, formatProjectLabel } from "@/lib/role1TaskLayer";
+import { NA_TEXT, formatBimUseDisplay, formatProjectLabel } from "@/lib/role1TaskLayer";
 import { ApproverProjectContext, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
 import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel } from "@/lib/userCredential";
@@ -196,6 +196,34 @@ export default function ProjectApprovalContextPage() {
               <strong>{context.evidence_counts.AWAITING_REVIEW}</strong>
               <small>No pending review items</small>
             </article>
+          )}
+        </div>
+
+        <div className="task-panel-stack">
+          <h3>Reviewed Evidence</h3>
+          {context.reviewed_evidence.length === 0 ? (
+            <p className="empty-state">Belum ada evidence yang selesai direview oleh BIM Coordinator HO.</p>
+          ) : (
+            <div className="evidence-list">
+              {context.reviewed_evidence.map((item) => (
+                <article className="evidence-item" key={item.id}>
+                  <p>
+                    <strong>{item.title || NA_TEXT}</strong>
+                  </p>
+                  <p>{item.description || NA_TEXT}</p>
+                  <p>
+                    BIM Use: {formatBimUseDisplay(item.bim_use_id)} | Type: {item.type}
+                  </p>
+                  <p>
+                    Outcome: <strong>{item.latest_review_outcome || NA_TEXT}</strong> | Reviewer: {item.reviewed_by || NA_TEXT}
+                  </p>
+                  <p>
+                    Reviewed at: {item.reviewed_at || NA_TEXT} | Evidence status: {item.effective_status || item.status}
+                  </p>
+                  <p>Reason: {item.latest_review_reason || item.review_reason || NA_TEXT}</p>
+                </article>
+              ))}
+            </div>
           )}
         </div>
       </section>

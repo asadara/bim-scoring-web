@@ -1,6 +1,7 @@
 ﻿import {
   DataMode,
   LOCKED_READ_ONLY_ERROR,
+  LocalEvidenceWithReview,
   NA_TEXT,
   ProjectRecord,
   PrototypeApprovalDecisionRecord,
@@ -18,6 +19,7 @@
   isRealBackendWriteEnabled,
   listPrototypeApprovalDecisions,
   listPrototypeSnapshots,
+  mapEvidenceRowsWithReview,
   PROTOTYPE_WRITE_DISABLED_MESSAGE,
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
@@ -77,6 +79,7 @@ export type ApproverProjectContext = {
   summary: ReadOnlySummary;
   summary_available: boolean;
   evidence_counts: ReviewStatusCount;
+  reviewed_evidence: LocalEvidenceWithReview[];
   latest_decision: PrototypeApprovalDecisionRecord | null;
   snapshots: PrototypeSnapshotRecord[];
   data_mode: DataMode;
@@ -592,6 +595,9 @@ export async function fetchApproverProjectContext(
   let summarySourceMode: DataMode = summaryResult.mode;
 
   const evidenceResult = await fetchEvidenceListReadMode(projectId, periodId);
+  const reviewedEvidence = mapEvidenceRowsWithReview(evidenceResult.data).filter(
+    (item) => item.latest_review_outcome !== null
+  );
   const evidenceCounts = buildReviewStatusCounts(evidenceResult.data);
   const latestDecision = getLatestApprovalDecision(projectId, periodId);
   const snapshots = listSnapshotsForPeriod(projectId, periodId);
@@ -628,6 +634,7 @@ export async function fetchApproverProjectContext(
     summary,
     summary_available: summaryAvailable,
     evidence_counts: evidenceCounts,
+    reviewed_evidence: reviewedEvidence,
     latest_decision: latestDecision,
     snapshots,
     data_mode: dataMode,
