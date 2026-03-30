@@ -9,6 +9,7 @@ import {
   signInWithGoogleOAuth,
   updateAuthProfile,
 } from "@/lib/authClient";
+import { toUserFacingErrorMessage } from "@/lib/http";
 import { useCredential } from "@/lib/useCredential";
 
 function EyeIcon({ visible }: { visible: boolean }) {
@@ -75,7 +76,7 @@ export default function SignInPage() {
       setInfo("Berhasil masuk.");
       await router.push(defaultRedirect);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal masuk.");
+      setError(toUserFacingErrorMessage(err, "Gagal masuk."));
     } finally {
       setBusy(false);
     }
@@ -88,7 +89,7 @@ export default function SignInPage() {
     try {
       await signInWithGoogleOAuth();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal masuk dengan Google.");
+      setError(toUserFacingErrorMessage(err, "Gagal masuk dengan Google."));
       setBusy(false);
     }
   }
@@ -102,7 +103,7 @@ export default function SignInPage() {
       await updateAuthProfile({ employee_number: profileEmployeeNumber });
       setInfo("Nomor pegawai berhasil disimpan.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal menyimpan nomor pegawai");
+      setError(toUserFacingErrorMessage(err, "Gagal menyimpan nomor pegawai."));
     } finally {
       setBusy(false);
     }
