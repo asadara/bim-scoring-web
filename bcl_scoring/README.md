@@ -14,6 +14,7 @@ Required:
 Optional:
 - `NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=true|false`
 - `NEXT_PUBLIC_SUPABASE_AUTH_REDIRECT_URL` (opsional override callback OAuth)
+- `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true|false` (default `true`)
 - `NEXT_PUBLIC_AUTH_PASSWORD_EMAIL_DOMAIN` (default: `pegawai.local`)
 - `NEXT_PUBLIC_AUTH_ALLOW_ROLE_SWITCH=false` (manual role switch default disabled)
 

@@ -42,7 +42,7 @@ function EyeIcon({ visible }: { visible: boolean }) {
 export default function SignInPage() {
   const router = useRouter();
   const credential = useCredential();
-  const [employeeNumber, setEmployeeNumber] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [profileEmployeeNumber, setProfileEmployeeNumber] = useState(credential.employee_number || "");
@@ -69,7 +69,7 @@ export default function SignInPage() {
     setInfo(null);
     try {
       await signInWithEmployeePassword({
-        employee_number: employeeNumber,
+        identifier,
         password,
       });
       setInfo("Berhasil masuk.");
@@ -116,7 +116,7 @@ export default function SignInPage() {
       <main className="task-shell auth-shell">
         <section className="task-panel">
           <h1>Masuk</h1>
-          <p className="task-subtitle">Masuk dengan nomor pegawai + password, atau Google OAuth.</p>
+          <p className="task-subtitle">Masuk dengan nomor pegawai atau email akun, serta password. Google OAuth tetap tersedia.</p>
 
           {!isConfigured ? (
             <p className="error-box">
@@ -161,14 +161,17 @@ export default function SignInPage() {
             <div className="auth-stack">
               <form className="auth-stack" onSubmit={onCredentialSignIn}>
                 <label className="auth-field">
-                  Nomor Pegawai
+                  Nomor Pegawai atau Email Akun
                   <input
-                    value={employeeNumber}
-                    onChange={(event) => setEmployeeNumber(event.target.value)}
-                    placeholder="mis. 20240017"
+                    value={identifier}
+                    onChange={(event) => setIdentifier(event.target.value)}
+                    placeholder="mis. 20240017 atau nama@domain.com"
                     required
                   />
                 </label>
+                <p className="auth-hint">
+                  Jika login dengan nomor pegawai gagal, coba gunakan email yang dipakai saat pendaftaran akun.
+                </p>
                 <label className="auth-field">
                   Password
                   <div className="auth-password-wrap">

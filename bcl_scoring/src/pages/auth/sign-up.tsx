@@ -100,6 +100,7 @@ export default function SignUpPage() {
       .filter((item) => item.is_active !== false)
       .sort((a, b) => String(a.name || a.code || a.id).localeCompare(String(b.name || b.code || b.id)));
   }, [projectOptions]);
+  const scopeSelectionUnavailable = Boolean(projectLoadError) || activeProjectOptions.length === 0;
 
   useEffect(() => {
     let mounted = true;
@@ -159,11 +160,11 @@ export default function SignUpPage() {
       setError("Password dan konfirmasi password harus sama.");
       return;
     }
-    if (requiresSingleScope && selectedProjectIds.length !== 1) {
+    if (requiresSingleScope && !scopeSelectionUnavailable && selectedProjectIds.length !== 1) {
       setError("Untuk pengajuan role BIM Coordinator Project, pilih tepat 1 workspace project.");
       return;
     }
-    if (requiresScope && selectedProjectIds.length === 0) {
+    if (requiresScope && !scopeSelectionUnavailable && selectedProjectIds.length === 0) {
       setError("Untuk pengajuan role BIM Coordinator HO, pilih minimal 1 scope project.");
       return;
     }
@@ -179,7 +180,11 @@ export default function SignUpPage() {
         employee_number: employeeNumber,
         password,
         requested_role: requestedRole,
-        requested_project_ids: requiresSingleScope ? selectedProjectIds.slice(0, 1) : selectedProjectIds,
+        requested_project_ids: scopeSelectionUnavailable
+          ? []
+          : requiresSingleScope
+            ? selectedProjectIds.slice(0, 1)
+            : selectedProjectIds,
       });
       if (result.requires_email_verification) {
         if (result.likely_new_registration) {
@@ -224,6 +229,9 @@ export default function SignUpPage() {
           <p className="task-subtitle">
             Buat akun pribadi dengan nama, email, nomor pegawai, dan password. Setelah itu akun masuk antrean penetapan role
             oleh admin.
+          </p>
+          <p className="auth-hint">
+            Gunakan email yang sama ini saat login password jika login via nomor pegawai belum sinkron.
           </p>
 
           {!isConfigured ? (
@@ -300,6 +308,12 @@ export default function SignUpPage() {
                         : "Opsional. Bisa dipakai sebagai preferensi saat admin menetapkan role."}
                   </p>
                   {projectLoadError ? <p className="error-box">{projectLoadError}</p> : null}
+                  {scopeSelectionUnavailable && (requiresSingleScope || requiresScope) ? (
+                    <p className="auth-hint">
+                      Daftar project belum tersedia saat ini. Pengajuan akun tetap bisa dikirim tanpa scope default, dan admin
+                      dapat menetapkan scope project setelah akun aktif.
+                    </p>
+                  ) : null}
                   {activeProjectOptions.length === 0 ? (
                     <p className="auth-hint">Belum ada project aktif.</p>
                   ) : (

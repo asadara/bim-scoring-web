@@ -8,12 +8,16 @@ const SUPABASE_ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim
 const AUTH_SYNC_DISABLED = String(process.env.NEXT_PUBLIC_DISABLE_AUTH_SYNC || "false")
   .trim()
   .toLowerCase() === "true";
+const GOOGLE_AUTH_ENABLED = String(process.env.NEXT_PUBLIC_AUTH_GOOGLE_ENABLED || "true")
+  .trim()
+  .toLowerCase() !== "false";
 const DEFAULT_PASSWORD_EMAIL_DOMAIN = (
   process.env.NEXT_PUBLIC_AUTH_PASSWORD_EMAIL_DOMAIN || "pegawai.local"
 ).trim().toLowerCase();
 const OAUTH_REDIRECT_URL = (process.env.NEXT_PUBLIC_SUPABASE_AUTH_REDIRECT_URL || "").trim();
 const PENDING_REQUESTED_ROLE_STORAGE_KEY = "bim_pending_requested_role_v1";
 const PENDING_REQUESTED_PROJECTS_STORAGE_KEY = "bim_pending_requested_project_ids_v1";
+const PASSWORD_EMAIL_CACHE_STORAGE_KEY = "bim_password_email_cache_v1";
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
 export type RequestedRole = "role1" | "role2" | "role3" | "viewer";
@@ -76,6 +80,10 @@ function normalizeEmail(value: unknown): string | null {
   const raw = normalizeText(value);
   if (!raw) return null;
   return raw.toLowerCase();
+}
+
+function isEmailLike(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function normalizeEmployeeNumber(value: string): string {
@@ -173,6 +181,47 @@ function getPendingRequestedProjectIds(): string[] {
   }
 }
 
+function readPasswordEmailCache(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const raw = window.localStorage.getItem(PASSWORD_EMAIL_CACHE_STORAGE_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const entries = Object.entries(parsed || {}).map(([key, value]) => [
+      normalizeEmployeeNumber(key),
+      normalizeEmail(value),
+    ] as const);
+    return Object.fromEntries(entries.filter(([key, value]) => Boolean(key) && Boolean(value))) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function writePasswordEmailCache(nextCache: Record<string, string>): void {
+  if (typeof window === "undefined") return;
+  const normalized = Object.fromEntries(
+    Object.entries(nextCache)
+      .map(([key, value]) => [normalizeEmployeeNumber(key), normalizeEmail(value)] as const)
+      .filter(([key, value]) => Boolean(key) && Boolean(value))
+  );
+  window.localStorage.setItem(PASSWORD_EMAIL_CACHE_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+function cachePasswordEmail(employeeNumber: string | null, email: string | null): void {
+  const normalizedEmployeeNumber = employeeNumber ? normalizeEmployeeNumber(employeeNumber) : "";
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmployeeNumber || !normalizedEmail) return;
+  const current = readPasswordEmailCache();
+  if (current[normalizedEmployeeNumber] === normalizedEmail) return;
+  writePasswordEmailCache({ ...current, [normalizedEmployeeNumber]: normalizedEmail });
+}
+
+function getCachedPasswordEmail(employeeNumber: string): string | null {
+  const normalizedEmployeeNumber = normalizeEmployeeNumber(employeeNumber);
+  if (!normalizedEmployeeNumber) return null;
+  return normalizeEmail(readPasswordEmailCache()[normalizedEmployeeNumber]);
+}
+
 async function callAccountRequest(payload: {
   user_id: string;
   email: string | null;
@@ -215,17 +264,61 @@ async function resolveRole(user_id: string): Promise<{ role: AppRole; assigned: 
 async function resolvePasswordEmailByEmployee(employee_number: string): Promise<string | null> {
   const normalized = normalizeEmployeeNumber(employee_number);
   if (!normalized) return null;
+  const cached = getCachedPasswordEmail(normalized);
+  if (cached) return cached;
   const result = await safeFetchJson<unknown>(
     buildApiUrl(`/auth/password-email/${encodeURIComponent(normalized)}`)
   );
   if (!result.ok) return null;
   const root = isObject(result.data) ? result.data : {};
   const data = isObject(root.data) ? root.data : {};
-  return normalizeEmail(data.email);
+  const email = normalizeEmail(data.email);
+  cachePasswordEmail(normalized, email);
+  return email;
+}
+
+type PasswordSignInResolution = {
+  email: string;
+  source: "direct_email" | "cached_employee_mapping" | "directory_lookup" | "derived_alias";
+};
+
+async function resolvePasswordSignInEmail(identifier: string): Promise<PasswordSignInResolution> {
+  const normalizedIdentifier = normalizeText(identifier);
+  if (!normalizedIdentifier) {
+    throw new Error("Nomor pegawai atau email wajib diisi.");
+  }
+
+  if (isEmailLike(normalizedIdentifier)) {
+    const email = normalizeEmail(normalizedIdentifier);
+    if (!email) {
+      throw new Error("Format email tidak valid.");
+    }
+    return { email, source: "direct_email" };
+  }
+
+  const normalizedEmployeeNumber = normalizeEmployeeNumber(normalizedIdentifier);
+  const cachedEmail = getCachedPasswordEmail(normalizedEmployeeNumber);
+  if (cachedEmail) {
+    return { email: cachedEmail, source: "cached_employee_mapping" };
+  }
+
+  const resolvedEmail = await resolvePasswordEmailByEmployee(normalizedEmployeeNumber);
+  if (resolvedEmail) {
+    return { email: resolvedEmail, source: "directory_lookup" };
+  }
+
+  return {
+    email: toPasswordEmail(normalizedEmployeeNumber),
+    source: "derived_alias",
+  };
 }
 
 export function isAuthConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+}
+
+export function isGoogleAuthEnabled(): boolean {
+  return isAuthConfigured() && GOOGLE_AUTH_ENABLED;
 }
 
 export function getSupabaseBrowserClient() {
@@ -271,6 +364,8 @@ export async function syncCredentialFromAuth(): Promise<void> {
   const provider = readProvider(user);
   const full_name = readUserName(user);
   const employee_number = readEmployeeNumber(user);
+  const account_email = normalizeEmail(user.email);
+  cachePasswordEmail(employee_number, account_email);
   const requested_role = readRequestedRole(user) || getPendingRequestedRole();
   const requested_project_ids = (() => {
     const fromMetadata = readRequestedProjectIds(user);
@@ -333,17 +428,23 @@ export function startAuthCredentialSync(): () => void {
 }
 
 export async function signInWithEmployeePassword(input: {
-  employee_number: string;
+  identifier: string;
   password: string;
 }): Promise<void> {
   const supabase = getSupabaseBrowserClient();
-  const resolvedEmail = await resolvePasswordEmailByEmployee(input.employee_number);
-  const email = resolvedEmail || toPasswordEmail(input.employee_number);
+  const resolved = await resolvePasswordSignInEmail(input.identifier);
   const { error } = await supabase.auth.signInWithPassword({
-    email,
+    email: resolved.email,
     password: input.password,
   });
-  if (error) throw new Error(error.message || "Sign in gagal");
+  if (error) {
+    if (resolved.source === "derived_alias") {
+      throw new Error(
+        "Login dengan nomor pegawai sedang fallback. Coba masuk menggunakan email akun yang dipakai saat pendaftaran."
+      );
+    }
+    throw new Error(error.message || "Sign in gagal");
+  }
   await syncCredentialFromAuth();
 }
 
@@ -378,6 +479,7 @@ export async function signUpWithEmployeePassword(input: {
     },
   });
   if (error) throw new Error(error.message || "Sign up gagal");
+  cachePasswordEmail(normalizedEmployeeNumber, email);
   const signedUser = data?.user || null;
   const signedSession = data?.session || null;
   const user_id = normalizeText(signedUser?.id);
@@ -417,6 +519,9 @@ export async function signInWithGoogleOAuth(input?: {
   requested_role?: RequestedRole | null;
   requested_project_ids?: string[];
 }): Promise<void> {
+  if (!GOOGLE_AUTH_ENABLED) {
+    throw new Error("Login Google belum diaktifkan pada environment ini.");
+  }
   const supabase = getSupabaseBrowserClient();
   const redirectTo = getAuthRedirectUrl();
   const requestedRole = normalizeRequestedRole(input?.requested_role);
