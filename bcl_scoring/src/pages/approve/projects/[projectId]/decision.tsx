@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
 import { canWriteRole3Approval } from "@/lib/accessControl";
 import {
   ApprovalDecision,
@@ -112,6 +113,7 @@ export default function ApprovalDecisionPage() {
     breakdown: contextValue.summary.breakdown,
     confidence_coverage: contextValue.summary.confidence?.coverage ?? null,
     evidence_counts: contextValue.evidence_counts,
+    pmp_area15: contextValue.summary.compliance,
   });
   const approveBlockedByPolicy = !approvalGate.is_eligible;
   const periodKey = normalizePrototypePeriodId(contextValue.period_id);
@@ -170,6 +172,7 @@ export default function ApprovalDecisionPage() {
         breakdown: contextValue.summary.breakdown,
         summary_confidence_coverage: contextValue.summary.confidence?.coverage ?? null,
         evidence_counts: contextValue.evidence_counts,
+        pmp_area15: contextValue.summary.compliance,
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to apply decision.";
@@ -264,6 +267,11 @@ export default function ApprovalDecisionPage() {
             <small>Must be 0</small>
           </article>
           <article className="summary-card">
+            <span>PMP Hold Point</span>
+            <strong>{approvalGate.metrics.pmp_hold_point_ready ? "Ready" : "Blocked"}</strong>
+            <small>{approvalGate.metrics.pmp_bridge_available ? "Bridge active" : "Bridge unavailable"}</small>
+          </article>
+          <article className="summary-card">
             <span>Gate Status</span>
             <strong>{approvalGate.is_eligible ? "Eligible" : "Blocked"}</strong>
             <small>{approvalGate.is_eligible ? "Approval dapat diproses" : "Periode tetap OPEN"}</small>
@@ -277,6 +285,12 @@ export default function ApprovalDecisionPage() {
           </div>
         ) : null}
       </section>
+
+      <PmpArea15CompliancePanel
+        summary={contextValue.summary.compliance}
+        title="PMP Area 15 Readiness Before Decision"
+        showControls={false}
+      />
 
       <section className="task-panel">
         <h2>Konfirmasi Keputusan</h2>

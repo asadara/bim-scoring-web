@@ -51,10 +51,63 @@ export type SummaryConfidence = {
   target_submission: number | null;
 };
 
+export type PmpArea15Status = "OK" | "MINOR" | "NOT_OK" | "INCOMPLETE" | "NOT_MAPPED" | "NOT_CONFIGURED";
+
+export type PmpArea15ControlSummary = {
+  control_id: string;
+  phase: string;
+  title: string;
+  description: string | null;
+  mandatory: boolean;
+  matched_indicator_count: number;
+  scored_indicator_count: number;
+  evidence_ready_count: number;
+  average_score_0_5: number | null;
+  score_100: number | null;
+  status: PmpArea15Status;
+  export_status: string;
+  blockers: string[];
+};
+
+export type PmpArea15PhaseSummary = {
+  phase: string;
+  status: PmpArea15Status;
+  export_status: string;
+  score_100: number | null;
+  mandatory_count: number;
+  mapped_count: number;
+  ok_count: number;
+  minor_count: number;
+  not_ok_count: number;
+  incomplete_count: number;
+  not_mapped_count: number;
+};
+
+export type PmpArea15ComplianceSummary = {
+  version: string | null;
+  source_of_truth: string | null;
+  intent: string | null;
+  overall_status: PmpArea15Status;
+  overall_export_status: string;
+  overall_score_100: number | null;
+  export_ready: boolean;
+  hold_point_ready: boolean;
+  total_bim_score_100: number | null;
+  phase_summaries: PmpArea15PhaseSummary[];
+  controls: PmpArea15ControlSummary[];
+  mapping_status: {
+    configured_control_count: number;
+    mandatory_control_count: number;
+    mapped_control_count: number;
+    unmapped_control_count: number;
+  };
+};
+
 export type ReadOnlySummary = {
   total_score: number | null;
   confidence: SummaryConfidence | null;
   breakdown: SummaryBreakdownRow[];
+  compliance: PmpArea15ComplianceSummary | null;
 };
 
 export type ApproverProjectRow = {
@@ -103,6 +156,8 @@ export type ApprovalGateEvaluation = {
     reviewed_evidence_count: number;
     scored_perspectives_count: number;
     awaiting_review_count: number;
+    pmp_bridge_available: boolean;
+    pmp_hold_point_ready: boolean;
   };
 };
 
@@ -192,6 +247,84 @@ function toSummaryConfidence(value: unknown): SummaryConfidence | null {
   return hasAnyValue ? parsed : null;
 }
 
+function toPmpArea15Status(value: unknown): PmpArea15Status {
+  const text = asString(value).trim().toUpperCase();
+  if (
+    text === "OK" ||
+    text === "MINOR" ||
+    text === "NOT_OK" ||
+    text === "INCOMPLETE" ||
+    text === "NOT_MAPPED" ||
+    text === "NOT_CONFIGURED"
+  ) {
+    return text as PmpArea15Status;
+  }
+  return "NOT_CONFIGURED";
+}
+
+function toPmpArea15ComplianceSummary(value: unknown): PmpArea15ComplianceSummary | null {
+  const root = safeObject(value);
+  if (Object.keys(root).length === 0) return null;
+
+  const mappingStatusRoot = safeObject(root.mapping_status);
+  const phaseRows = Array.isArray(root.phase_summaries) ? root.phase_summaries : [];
+  const controlRows = Array.isArray(root.controls) ? root.controls : [];
+
+  return {
+    version: asString(root.version).trim() || null,
+    source_of_truth: asString(root.source_of_truth).trim() || null,
+    intent: asString(root.intent).trim() || null,
+    overall_status: toPmpArea15Status(root.overall_status),
+    overall_export_status: asString(root.overall_export_status).trim() || NA_TEXT,
+    overall_score_100: asNumber(root.overall_score_100),
+    export_ready: root.export_ready === true,
+    hold_point_ready: root.hold_point_ready === true,
+    total_bim_score_100: asNumber(root.total_bim_score_100),
+    phase_summaries: phaseRows.map((entry) => {
+      const item = safeObject(entry);
+      return {
+        phase: asString(item.phase).trim() || NA_TEXT,
+        status: toPmpArea15Status(item.status),
+        export_status: asString(item.export_status).trim() || NA_TEXT,
+        score_100: asNumber(item.score_100),
+        mandatory_count: asNumber(item.mandatory_count) ?? 0,
+        mapped_count: asNumber(item.mapped_count) ?? 0,
+        ok_count: asNumber(item.ok_count) ?? 0,
+        minor_count: asNumber(item.minor_count) ?? 0,
+        not_ok_count: asNumber(item.not_ok_count) ?? 0,
+        incomplete_count: asNumber(item.incomplete_count) ?? 0,
+        not_mapped_count: asNumber(item.not_mapped_count) ?? 0,
+      } satisfies PmpArea15PhaseSummary;
+    }),
+    controls: controlRows.map((entry) => {
+      const item = safeObject(entry);
+      return {
+        control_id: asString(item.control_id).trim() || "UNDEFINED_CONTROL",
+        phase: asString(item.phase).trim() || NA_TEXT,
+        title: asString(item.title).trim() || "Untitled control",
+        description: asString(item.description).trim() || null,
+        mandatory: item.mandatory !== false,
+        matched_indicator_count: asNumber(item.matched_indicator_count) ?? 0,
+        scored_indicator_count: asNumber(item.scored_indicator_count) ?? 0,
+        evidence_ready_count: asNumber(item.evidence_ready_count) ?? 0,
+        average_score_0_5: asNumber(item.average_score_0_5),
+        score_100: asNumber(item.score_100),
+        status: toPmpArea15Status(item.status),
+        export_status: asString(item.export_status).trim() || NA_TEXT,
+        blockers: Array.isArray(item.blockers)
+          ? item.blockers.map((entry) => asString(entry).trim()).filter(Boolean)
+          : [],
+      } satisfies PmpArea15ControlSummary;
+    }),
+    mapping_status: {
+      configured_control_count: asNumber(mappingStatusRoot.configured_control_count) ?? 0,
+      mandatory_control_count: asNumber(mappingStatusRoot.mandatory_control_count) ?? 0,
+      mapped_control_count: asNumber(mappingStatusRoot.mapped_control_count) ?? 0,
+      unmapped_control_count: asNumber(mappingStatusRoot.unmapped_control_count) ?? 0,
+    },
+  };
+}
+
 export async function fetchReadOnlySummary(projectId: string, periodId: string | null): Promise<ReadOnlySummary> {
   const result = await fetchReadOnlySummaryReadMode(projectId, periodId);
   if (result.mode === "prototype") {
@@ -224,9 +357,9 @@ function fallbackSummaryFromPrototypeSnapshots(
   const coverage = totalCount > 0 ? Math.max(0, Math.min(1, reviewedCount / totalCount)) : null;
 
   return {
-    data: {
-      total_score: latest.final_bim_score ?? null,
-      confidence: {
+      data: {
+        total_score: latest.final_bim_score ?? null,
+        confidence: {
         coverage,
         frequency: null,
         confidence: null,
@@ -241,6 +374,7 @@ function fallbackSummaryFromPrototypeSnapshots(
             score: row.score,
           }))
         : [],
+      compliance: null,
     },
     mode: "prototype",
     backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,
@@ -260,6 +394,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
         total_score: null,
         confidence: null,
         breakdown: [],
+        compliance: null,
       },
       mode: "backend",
       backend_message: "Period is Not available",
@@ -283,6 +418,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
         total_score: null,
         confidence: null,
         breakdown: [],
+        compliance: null,
       },
       mode: "backend",
       backend_message: toSafeErrorMessage(response),
@@ -296,11 +432,14 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
     const totalScore = asNumber(root.total_score);
     const confidence = toSummaryConfidence(root.confidence);
     const breakdown = toSummaryBreakdown(root.perspectives);
+    const complianceRoot = safeObject(root.compliance);
+    const compliance = toPmpArea15ComplianceSummary(complianceRoot.pmp_area15);
     return {
       data: {
         total_score: totalScore,
         confidence,
         breakdown,
+        compliance,
       },
       mode: "backend",
       backend_message: null,
@@ -312,6 +451,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
         total_score: null,
         confidence: null,
         breakdown: [],
+        compliance: null,
       },
       mode: "backend",
       backend_message: e instanceof Error ? e.message : "Invalid backend payload",
@@ -330,6 +470,7 @@ export function evaluateApprovalGates(input: {
   breakdown: SummaryBreakdownRow[];
   confidence_coverage: number | null;
   evidence_counts: ReviewStatusCount;
+  pmp_area15: PmpArea15ComplianceSummary | null;
 }): ApprovalGateEvaluation {
   const coverageRatio = normalizeCoverageRatio(input.confidence_coverage);
   const reviewedEvidenceCount =
@@ -340,8 +481,17 @@ export function evaluateApprovalGates(input: {
     (row) => row.score !== null && Number.isFinite(row.score) && row.score > 0
   ).length;
   const awaitingReviewCount = input.evidence_counts.AWAITING_REVIEW;
+  const pmpBridgeAvailable = Boolean(input.pmp_area15);
+  const pmpHoldPointReady = input.pmp_area15?.hold_point_ready === true;
 
   const failures: string[] = [];
+  if (!pmpBridgeAvailable) {
+    failures.push("Bridge PMP Area 15 belum tersedia.");
+  } else if (!pmpHoldPointReady) {
+    failures.push(
+      `Hold point PMP Area 15 belum ready (status ${input.pmp_area15?.overall_status || NA_TEXT}).`
+    );
+  }
   if (awaitingReviewCount > 0) {
     failures.push(`Awaiting review harus 0 (saat ini ${awaitingReviewCount})`);
   }
@@ -370,6 +520,8 @@ export function evaluateApprovalGates(input: {
       reviewed_evidence_count: reviewedEvidenceCount,
       scored_perspectives_count: scoredPerspectivesCount,
       awaiting_review_count: awaitingReviewCount,
+      pmp_bridge_available: pmpBridgeAvailable,
+      pmp_hold_point_ready: pmpHoldPointReady,
     },
   };
 }
@@ -390,6 +542,7 @@ async function fetchDashboardSummaryReadMode(
         total_score: null,
         confidence: null,
         breakdown: [],
+        compliance: null,
       },
       mode: "backend",
       backend_message: "Period label is Not available",
@@ -413,6 +566,7 @@ async function fetchDashboardSummaryReadMode(
         total_score: null,
         confidence: null,
         breakdown: [],
+        compliance: null,
       },
       mode: "backend",
       backend_message: toSafeErrorMessage(response),
@@ -442,6 +596,7 @@ async function fetchDashboardSummaryReadMode(
           total_score: null,
           confidence: null,
           breakdown: [],
+          compliance: null,
         },
         mode: "backend",
         backend_message: "Dashboard summary not available",
@@ -454,6 +609,7 @@ async function fetchDashboardSummaryReadMode(
         total_score: totalScore,
         confidence: null,
         breakdown,
+        compliance: null,
       },
       mode: "backend",
       backend_message: null,
@@ -465,6 +621,7 @@ async function fetchDashboardSummaryReadMode(
         total_score: null,
         confidence: null,
         breakdown: [],
+        compliance: null,
       },
       mode: "backend",
       backend_message: e instanceof Error ? e.message : "Invalid dashboard payload",
@@ -584,6 +741,7 @@ export async function fetchApproverProjectContext(
       total_score: null,
       confidence: null,
       breakdown: [],
+      compliance: null,
     },
     mode: "backend",
     backend_message: null,
@@ -675,6 +833,7 @@ export async function applyApproverDecision(input: {
   breakdown: SummaryBreakdownRow[];
   summary_confidence_coverage: number | null;
   evidence_counts: ReviewStatusCount;
+  pmp_area15: PmpArea15ComplianceSummary | null;
 }): Promise<{
   decision_record: PrototypeApprovalDecisionRecord;
   lock_record: ReturnType<typeof getPrototypePeriodLock>;
@@ -689,6 +848,7 @@ export async function applyApproverDecision(input: {
       breakdown: input.breakdown,
       confidence_coverage: input.summary_confidence_coverage,
       evidence_counts: input.evidence_counts,
+      pmp_area15: input.pmp_area15,
     });
     if (!gates.is_eligible) {
       throw new Error(`Tidak dapat APPROVE PERIOD karena gating policy belum terpenuhi: ${gates.failures.join(" | ")}`);

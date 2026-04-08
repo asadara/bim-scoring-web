@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuditorLayout from "@/components/AuditorLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
 import {
   AuditSnapshotView,
   buildAuditExportPayload,
@@ -14,7 +15,12 @@ import {
   listDecisionsForSnapshot,
 } from "@/lib/auditTaskLayer";
 import { generateSnapshotPdfBlob } from "@/lib/auditPdfExport";
-import { SummaryConfidence, fetchReadOnlySummaryReadMode } from "@/lib/approverTaskLayer";
+import {
+  PmpArea15ComplianceSummary,
+  SummaryConfidence,
+  fetchReadOnlySummaryReadMode,
+} from "@/lib/approverTaskLayer";
+import { exportPmpArea15Workbook } from "@/lib/pmpArea15Export";
 import {
   ISO19650_REFERENCE_ONLY_LABEL,
   ISO19650_REFERENCE_ROWS,
@@ -62,10 +68,12 @@ export default function AuditSnapshotDetailPage() {
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
   const [exportInfo, setExportInfo] = useState<string | null>(null);
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [xlsxGenerating, setXlsxGenerating] = useState(false);
   const [backendSummary, setBackendSummary] = useState<{
     total_score: number | null;
     confidence: SummaryConfidence | null;
     breakdown: Array<{ perspective_id: string; score: number | null }>;
+    compliance: PmpArea15ComplianceSummary | null;
   } | null>(null);
 
   useEffect(() => {
@@ -125,6 +133,7 @@ export default function AuditSnapshotDetailPage() {
             total_score: summaryResult.data.total_score,
             confidence: summaryResult.data.confidence,
             breakdown: summaryResult.data.breakdown,
+            compliance: summaryResult.data.compliance,
           };
         } else {
           summary = null;
@@ -198,6 +207,33 @@ export default function AuditSnapshotDetailPage() {
     anchor.remove();
     URL.revokeObjectURL(url);
     setExportInfo("Export JSON selesai (download started).");
+  }
+
+  async function onExportPmpXlsx() {
+    if (!snapshotView || !backendSummary?.compliance) {
+      setExportInfo("Bridge PMP Area 15 belum tersedia untuk export Excel.");
+      return;
+    }
+
+    try {
+      setXlsxGenerating(true);
+      setExportInfo("Generating PMP Area 15 Excel...");
+
+      const fileName = await exportPmpArea15Workbook({
+        summary: backendSummary.compliance,
+        project_label: project?.name || project?.code || snapshotView.snapshot.project_id,
+        project_id: snapshotView.snapshot.project_id,
+        period_label: periodLabel,
+        period_id: snapshotView.snapshot.period_id || null,
+        snapshot_id: snapshotView.snapshot_id,
+      });
+
+      setExportInfo(`Excel generated (${fileName}).`);
+    } catch (e) {
+      setExportInfo(e instanceof Error ? e.message : "Failed to generate PMP Area 15 Excel.");
+    } finally {
+      setXlsxGenerating(false);
+    }
   }
 
   async function onExportPdf() {
@@ -314,6 +350,11 @@ export default function AuditSnapshotDetailPage() {
           ))}
         </div>
       </section>
+
+      <PmpArea15CompliancePanel
+        summary={backendSummary?.compliance ?? null}
+        title="PMP Area 15 Governance Readout"
+      />
 
       <section className="task-panel">
         <h2>Evidence Review Counts</h2>
@@ -444,6 +485,9 @@ export default function AuditSnapshotDetailPage() {
         <div className="wizard-actions">
           <button type="button" onClick={onExportJson}>
             Export JSON
+          </button>
+          <button type="button" onClick={() => void onExportPmpXlsx()} disabled={xlsxGenerating || !backendSummary?.compliance}>
+            {xlsxGenerating ? "Generating Excel..." : "Export PMP Area 15 Excel"}
           </button>
           <button type="button" onClick={onExportPdf} disabled={pdfGenerating}>
             Export PDF

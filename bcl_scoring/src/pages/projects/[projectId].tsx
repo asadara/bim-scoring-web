@@ -2,9 +2,13 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 
+import PmpArea15ActionList from "@/components/PmpArea15ActionList";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
 import Role1Layout from "@/components/Role1Layout";
 import { canWriteRole1Evidence } from "@/lib/accessControl";
+import { fetchReadOnlySummaryReadMode } from "@/lib/approverTaskLayer";
 import { getPrimaryActionText, useAppLanguage } from "@/lib/language";
+import { exportPmpArea15Workbook } from "@/lib/pmpArea15Export";
 import {
   DataMode,
   NA_TEXT,
@@ -31,6 +35,10 @@ export default function ProjectRole1HomePage() {
   const [evidenceRows, setEvidenceRows] = useState<ReturnType<typeof mapEvidenceRowsWithReview>>([]);
   const [evidenceMode, setEvidenceMode] = useState<DataMode>("backend");
   const [evidenceMessage, setEvidenceMessage] = useState<string | null>(null);
+  const [summaryCompliance, setSummaryCompliance] = useState<Awaited<ReturnType<typeof fetchReadOnlySummaryReadMode>>["data"]["compliance"]>(null);
+  const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
+  const [exportInfo, setExportInfo] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
     const scopedIds = Array.isArray(credential.scoped_project_ids)
@@ -101,6 +109,35 @@ export default function ProjectRole1HomePage() {
     };
   }, [context, projectId]);
 
+  useEffect(() => {
+    if (!context || typeof projectId !== "string") return;
+
+    let mounted = true;
+    const refresh = () => {
+      fetchReadOnlySummaryReadMode(projectId, context.active_period?.id ?? null)
+        .then((result) => {
+          if (!mounted) return;
+          setSummaryCompliance(result.data.compliance);
+          setSummaryMessage(result.backend_message);
+        })
+        .catch((e) => {
+          if (!mounted) return;
+          setSummaryCompliance(null);
+          setSummaryMessage(e instanceof Error ? e.message : "Summary not available");
+        });
+    };
+
+    refresh();
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [context, projectId]);
+
   const counts = useMemo(() => buildEvidenceCounts(evidenceRows), [evidenceRows]);
 
   if (loading) {
@@ -142,8 +179,35 @@ export default function ProjectRole1HomePage() {
   const canWriteEvidence = canWriteRole1Evidence(credential.role);
   const hasActivePeriod = Boolean(context.active_period?.id);
   const canAddEvidence = canWriteEvidence && !context.period_locked && hasActivePeriod;
+  const activePeriod = context.active_period;
   const projectDisplayName = context.project?.name || context.project?.code || projectId;
   const headerTitle = `Evidence Tasks - ${projectDisplayName}`;
+
+  async function onExportPmpArea15() {
+    if (!summaryCompliance || typeof projectId !== "string") {
+      setExportInfo("Bridge PMP Area 15 belum tersedia untuk diekspor.");
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      const fileName = await exportPmpArea15Workbook({
+        summary: summaryCompliance,
+        project_label: projectDisplayName,
+        project_id: projectId,
+        period_label:
+          activePeriod && activePeriod.year !== null && activePeriod.week !== null
+            ? `${activePeriod.year} W${activePeriod.week}`
+            : activePeriod?.id || null,
+        period_id: activePeriod?.id ?? null,
+      });
+      setExportInfo(`Export Excel selesai (${fileName}).`);
+    } catch (e) {
+      setExportInfo(e instanceof Error ? e.message : "Gagal generate Excel PMP Area 15.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <Role1Layout
@@ -239,6 +303,24 @@ export default function ProjectRole1HomePage() {
           </p>
         ) : null}
 
+      </section>
+
+      <PmpArea15ActionList projectId={projectId} summary={summaryCompliance} />
+
+      <PmpArea15CompliancePanel summary={summaryCompliance} title="PMP Area 15 Governance Readout" />
+
+      <section className="task-panel">
+        <h2>Generate PMP Area 15</h2>
+        <p>
+          Output Excel dibuat dari BIM Scoring dan bridge compliance, bukan dari input manual pada file Excel.
+        </p>
+        {summaryMessage ? <p className="task-note">{summaryMessage}</p> : null}
+        <div className="wizard-actions">
+          <button type="button" onClick={() => void onExportPmpArea15()} disabled={!summaryCompliance || isExporting}>
+            {isExporting ? "Generating Excel..." : "Export PMP Area 15 (.xlsx)"}
+          </button>
+        </div>
+        {exportInfo ? <p className="task-note action-feedback">{exportInfo}</p> : null}
       </section>
 
     </Role1Layout>

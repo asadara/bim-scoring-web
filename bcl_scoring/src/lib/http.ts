@@ -1,4 +1,5 @@
 import { getApiBaseUrlFromEnv } from "@/lib/runtimeEnv";
+import { getStoredCredential } from "@/lib/userCredential";
 
 export type SafeFetchFailKind = "backend_unavailable" | "http_error" | "parse_error";
 
@@ -175,6 +176,15 @@ export async function safeFetchJson<T>(
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const headers = new Headers(init?.headers);
+    const credential = getStoredCredential();
+    if (!headers.has("x-actor-role") && credential.role) {
+      headers.set("x-actor-role", credential.role);
+    }
+    if (!headers.has("x-actor-id") && credential.user_id) {
+      headers.set("x-actor-id", credential.user_id);
+    }
+
     // Respect external cancel signals while still enforcing our timeout.
     if (init?.signal) {
       if (init.signal.aborted) {
@@ -184,7 +194,7 @@ export async function safeFetchJson<T>(
       }
     }
 
-    const response = await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, headers, signal: controller.signal });
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");

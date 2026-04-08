@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import ApproverLayout from "@/components/ApproverLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
 import { canWriteRole3Approval } from "@/lib/accessControl";
 import { NA_TEXT, formatProjectLabel } from "@/lib/role1TaskLayer";
 import { ApproverProjectContext, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
@@ -168,6 +169,8 @@ export default function ProjectApprovalContextPage() {
           ))}
         </div>
       </section>
+
+      <PmpArea15CompliancePanel summary={context.summary.compliance} />
 
       <section className="task-panel">
         <h2>Evidence Review Status</h2>
