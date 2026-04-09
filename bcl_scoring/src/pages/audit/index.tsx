@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuditorLayout from "@/components/AuditorLayout";
 import InfoTooltip from "@/components/InfoTooltip";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
 import {
   AuditGovernanceEvent,
   AuditSnapshotView,
@@ -11,6 +12,7 @@ import {
   fetchAuditSnapshotsReadMode,
   getSnapshotLockStatus,
 } from "@/lib/auditTaskLayer";
+import { fetchReadOnlySummaryReadMode, type PmpArea15ComplianceSummary } from "@/lib/approverTaskLayer";
 import { toUserFacingErrorMessage } from "@/lib/http";
 import {
   DataMode,
@@ -116,6 +118,9 @@ export default function AuditHomePage() {
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
   const [snapshotProjectFilter, setSnapshotProjectFilter] = useState<string>("");
   const [snapshotQuery, setSnapshotQuery] = useState<string>("");
+  const [pmpAuditSummary, setPmpAuditSummary] = useState<PmpArea15ComplianceSummary | null>(null);
+  const [pmpAuditMessage, setPmpAuditMessage] = useState<string | null>(null);
+  const [pmpAuditLoading, setPmpAuditLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -296,6 +301,41 @@ export default function AuditHomePage() {
     });
   }, [projectNameById, snapshotProjectFilter, snapshotQuery, snapshots]);
 
+  useEffect(() => {
+    let mounted = true;
+    const activeSnapshot = visibleSnapshots[0] || null;
+
+    (async () => {
+      if (!activeSnapshot?.snapshot.project_id || !activeSnapshot?.snapshot.period_id) {
+        setPmpAuditLoading(false);
+        setPmpAuditSummary(null);
+        setPmpAuditMessage("Belum ada snapshot audit yang bisa dipakai untuk preview PMP Area 15.");
+        return;
+      }
+
+      setPmpAuditLoading(true);
+      try {
+        const result = await fetchReadOnlySummaryReadMode(
+          activeSnapshot.snapshot.project_id,
+          activeSnapshot.snapshot.period_id
+        );
+        if (!mounted) return;
+        setPmpAuditSummary(result.data.compliance);
+        setPmpAuditMessage(result.backend_message);
+      } catch (e) {
+        if (!mounted) return;
+        setPmpAuditSummary(null);
+        setPmpAuditMessage(e instanceof Error ? e.message : "Preview PMP Area 15 tidak tersedia untuk audit.");
+      } finally {
+        if (mounted) setPmpAuditLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [visibleSnapshots]);
+
   const coverageRows = useMemo(() => {
     const ids = new Set<string>();
     projects.forEach((project) => ids.add(project.id));
@@ -443,6 +483,19 @@ export default function AuditHomePage() {
           )}
         </div>
       </section>
+
+      <PmpArea15CompliancePanel
+        summary={pmpAuditSummary}
+        title="PMP Area 15 Audit Readout"
+        showControls={false}
+      />
+      <p className="task-note">
+        {visibleSnapshots[0]
+          ? `Sumber audit readout mengikuti snapshot terbaru yang terlihat: ${visibleSnapshots[0].snapshot_id}.`
+          : "Audit readout akan aktif setelah minimal satu snapshot tersedia."}
+      </p>
+      {pmpAuditLoading ? <p className="task-note">Memuat readout PMP Area 15 untuk audit...</p> : null}
+      {pmpAuditMessage ? <p className="task-note">{pmpAuditMessage}</p> : null}
 
       <section className="task-panel" id="snapshot-ledger">
         <div className="task-panel-inline-help">

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import DashboardPerspectiveChart from "@/components/DashboardPerspectiveChart";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
+import { fetchReadOnlySummaryReadMode, type PmpArea15ComplianceSummary } from "@/lib/approverTaskLayer";
 import { canRoleAccessPath } from "@/lib/accessControl";
 import {
   buildApiUrl,
@@ -295,6 +297,8 @@ export default function Home() {
 
   const [bundle, setBundle] = useState<BundleData | null>(null);
   const [indicatorScores, setIndicatorScores] = useState<IndicatorScoreRow[]>([]);
+  const [summaryCompliance, setSummaryCompliance] = useState<PmpArea15ComplianceSummary | null>(null);
+  const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>("");
   const [activePerspectiveId, setActivePerspectiveId] = useState<string | null>(null);
   const [performanceViewMode, setPerformanceViewMode] = useState<"list" | "chart">("list");
@@ -508,6 +512,8 @@ export default function Home() {
     setPeriods([]);
     setBundle(null);
     setIndicatorScores([]);
+    setSummaryCompliance(null);
+    setSummaryMessage(null);
     setLastSyncedAt("");
   };
 
@@ -535,6 +541,8 @@ export default function Home() {
           setSelectedPeriodId("");
           setBundle(null);
           setIndicatorScores([]);
+          setSummaryCompliance(null);
+          setSummaryMessage(null);
           return;
         }
 
@@ -571,6 +579,8 @@ export default function Home() {
           setSelectedPeriodId("");
           setBundle(null);
           setIndicatorScores([]);
+          setSummaryCompliance(null);
+          setSummaryMessage("Period belum tersedia untuk preview PMP Area 15.");
           return;
         }
 
@@ -601,21 +611,27 @@ export default function Home() {
       setLoading(true);
       setError(null);
       try {
-        const bundleData = await fetchBundle(selectedProjectId, year, week);
-
-        const perspectiveScores = await Promise.all(
-          PERSPECTIVES.map((item) =>
-            fetchIndicatorScoresForPerspective(selectedProjectId, selectedPeriodId, item.id)
-              .catch(() => [])
-          )
-        );
+        const [bundleData, perspectiveScores, summaryResult] = await Promise.all([
+          fetchBundle(selectedProjectId, year, week),
+          Promise.all(
+            PERSPECTIVES.map((item) =>
+              fetchIndicatorScoresForPerspective(selectedProjectId, selectedPeriodId, item.id)
+                .catch(() => [])
+            )
+          ),
+          fetchReadOnlySummaryReadMode(selectedProjectId, selectedPeriodId),
+        ]);
 
         if (cancelled) return;
         setBundle(bundleData);
         setIndicatorScores(perspectiveScores.flat());
+        setSummaryCompliance(summaryResult.data.compliance);
+        setSummaryMessage(summaryResult.backend_message);
         setLastSyncedAt(new Date().toISOString());
       } catch (e) {
         if (cancelled) return;
+        setSummaryCompliance(null);
+        setSummaryMessage(null);
         setError(toUserFacingErrorMessage(e, "Gagal memuat ringkasan dashboard."));
       } finally {
         if (!cancelled) setLoading(false);
@@ -835,6 +851,13 @@ export default function Home() {
         </section>
 
         {error && <p className="error-box">{error}</p>}
+
+        <PmpArea15CompliancePanel
+          summary={summaryCompliance}
+          title="PMP Area 15 Governance Readout"
+          showControls={false}
+        />
+        {summaryMessage ? <p className="task-note">{summaryMessage}</p> : null}
 
         <section className="dashboard-executive-kpi-row">
           <article className="dashboard-kpi-card">

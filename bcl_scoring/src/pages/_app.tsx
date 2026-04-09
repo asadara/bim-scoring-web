@@ -163,6 +163,8 @@ export default function App({ Component, pageProps }: AppProps) {
       currentPath.startsWith("/admin/") ||
       currentPath === "/me" ||
       currentPath.startsWith("/me/") ||
+      currentPath === "/pmp-area15" ||
+      currentPath.startsWith("/pmp-area15/") ||
       currentPath === "/projects" ||
       currentPath.startsWith("/projects/") ||
       currentPath === "/ho/review" ||

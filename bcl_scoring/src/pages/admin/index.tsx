@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import CorporateTopbar from "@/components/CorporateTopbar";
 import HeaderContextCard from "@/components/HeaderContextCard";
+import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
+import { fetchReadOnlySummaryReadMode, type PmpArea15ComplianceSummary } from "@/lib/approverTaskLayer";
 import {
   AdminConfigLock,
   AdminIndicator,
@@ -193,6 +195,33 @@ function upsertWeekAnchorConfigKey(configKey: string | null | undefined, anchor:
   return `${raw}; week_anchor=${anchor}`;
 }
 
+function selectPreviewPeriod(rows: AdminScoringPeriod[]): AdminScoringPeriod | null {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+
+  const activeOpen = rows.find((item) => String(item.status || "").trim().toUpperCase() === "OPEN");
+  if (activeOpen) return activeOpen;
+
+  return [...rows].sort((a, b) => {
+    const yearA = Number.isFinite(Number(a.year)) ? Number(a.year) : 0;
+    const yearB = Number.isFinite(Number(b.year)) ? Number(b.year) : 0;
+    if (yearA !== yearB) return yearB - yearA;
+
+    const weekA = Number.isFinite(Number(a.week)) ? Number(a.week) : 0;
+    const weekB = Number.isFinite(Number(b.week)) ? Number(b.week) : 0;
+    if (weekA !== weekB) return weekB - weekA;
+
+    return String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || ""));
+  })[0] || null;
+}
+
+function formatPreviewPeriodLabel(period: AdminScoringPeriod | null): string {
+  if (!period) return "-";
+  if (Number.isFinite(Number(period.year)) && Number.isFinite(Number(period.week))) {
+    return `${period.year} W${String(period.week).padStart(2, "0")}`;
+  }
+  return period.id || "-";
+}
+
 function resolveUserAssignedRole(userId: string, mappings: AdminRoleMapping[]): AppRole {
   const roles = mappings
     .filter((item) => item.user_id === userId && item.is_active !== false)
@@ -217,6 +246,7 @@ export default function AdminControlPanelPage() {
   const [working, setWorking] = useState(false);
   const [periodLoading, setPeriodLoading] = useState(false);
   const [indicatorLoading, setIndicatorLoading] = useState(false);
+  const [pmpPreviewLoading, setPmpPreviewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [periodFeedback, setPeriodFeedback] = useState<{
@@ -279,6 +309,9 @@ export default function AdminControlPanelPage() {
   const [cleanupIncludeSnapshots, setCleanupIncludeSnapshots] = useState(true);
   const [cleanupIncludeStorage, setCleanupIncludeStorage] = useState(true);
   const [cleanupResult, setCleanupResult] = useState<AdminTestDataCleanupResult | null>(null);
+  const [pmpPreviewSummary, setPmpPreviewSummary] = useState<PmpArea15ComplianceSummary | null>(null);
+  const [pmpPreviewMessage, setPmpPreviewMessage] = useState<string | null>(null);
+  const [pmpPreviewPeriodLabel, setPmpPreviewPeriodLabel] = useState<string>("-");
 
   const sortedPerspectiveOptions = useMemo(() => {
     return perspectives
@@ -557,6 +590,48 @@ export default function AdminControlPanelPage() {
       mounted = false;
     };
   }, [session, periodProjectFilter]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const projectId = toNonEmptyString(editingProjectId);
+      if (!projectId) {
+        setPmpPreviewLoading(false);
+        setPmpPreviewSummary(null);
+        setPmpPreviewMessage(null);
+        setPmpPreviewPeriodLabel("-");
+        return;
+      }
+
+      const previewPeriod = periodProjectFilter === projectId ? selectPreviewPeriod(periods) : null;
+      setPmpPreviewPeriodLabel(formatPreviewPeriodLabel(previewPeriod));
+
+      if (!previewPeriod?.id) {
+        setPmpPreviewLoading(false);
+        setPmpPreviewSummary(null);
+        setPmpPreviewMessage("Belum ada scoring period yang bisa dipakai untuk preview bridge PMP Area 15.");
+        return;
+      }
+
+      setPmpPreviewLoading(true);
+      try {
+        const result = await fetchReadOnlySummaryReadMode(projectId, previewPeriod.id);
+        if (!mounted) return;
+        setPmpPreviewSummary(result.data.compliance);
+        setPmpPreviewMessage(result.backend_message);
+      } catch (e) {
+        if (!mounted) return;
+        setPmpPreviewSummary(null);
+        setPmpPreviewMessage(e instanceof Error ? e.message : "Preview PMP Area 15 tidak tersedia.");
+      } finally {
+        if (mounted) setPmpPreviewLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [editingProjectId, periodProjectFilter, periods]);
 
   async function runAction(action: () => Promise<void>, successMessage: string) {
     setWorking(true);
@@ -1771,90 +1846,157 @@ export default function AdminControlPanelPage() {
           </table>
         </div>
 
-        {editingProjectId ? (
-          <form className="field-grid" onSubmit={(event) => void handleSaveProjectSetting(event)}>
-            <label>
-              Code Workspace
-              <input
-                value={projectSettingForm.code}
-                onChange={(event) =>
-                  setProjectSettingForm((prev) => ({ ...prev, code: event.target.value }))
-                }
-                placeholder="Contoh: GED-UNP"
-              />
-            </label>
-            <label>
-              Nama Workspace
-              <input
-                value={projectSettingForm.name}
-                onChange={(event) =>
-                  setProjectSettingForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-                placeholder="Nama Workspace"
-                required
-              />
-            </label>
-            <label>
-              Phase Workspace
-              <input
-                value={projectSettingForm.phase}
-                onChange={(event) =>
-                  setProjectSettingForm((prev) => ({ ...prev, phase: event.target.value }))
-                }
-                placeholder="Contoh: Design Development"
-              />
-            </label>
-            <label>
-              Hari Mulai Periode (Anchor Mingguan)
-              <select
-                value={projectSettingForm.week_anchor}
-                onChange={(event) =>
-                  setProjectSettingForm((prev) => ({
-                    ...prev,
-                    week_anchor: event.target.value as WeekAnchor,
-                  }))
-                }
-              >
-                {WEEK_ANCHOR_OPTIONS.map((item) => (
-                  <option key={`project-setting-${item.value}`} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Kunci Konfigurasi (lanjutan, opsional)
-              <input
-                value={projectSettingForm.config_key}
-                onChange={(event) =>
-                  setProjectSettingForm((prev) => ({ ...prev, config_key: event.target.value }))
-                }
-                placeholder="Contoh: workspace_type=test"
-              />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={projectSettingForm.is_active}
-                onChange={(event) =>
-                  setProjectSettingForm((prev) => ({ ...prev, is_active: event.target.checked }))
-                }
-              />
-              {" "}
-              Workspace aktif
-            </label>
+        {!editingProjectId ? (
+          <div className="task-panel">
+            <h3>Setting PMP Area 15</h3>
             <p className="inline-note">
-              Saat disimpan, nilai anchor mingguan otomatis ditulis ke <code>config_key</code>.
+              Pilih salah satu workspace pada tabel di atas untuk membuka editor setting dan preview bridge
+              PMP Area 15.
             </p>
-            <div className="wizard-actions">
-              <button type="submit" className="action-primary" disabled={working}>
-                Simpan Setting Workspace
-              </button>
-              <button type="button" disabled={working} onClick={() => handleCloseProjectSettingEditor()}>
-                Batal
-              </button>
+            <div className="task-grid-3">
+              <article className="summary-card">
+                <span>Workspace dipilih</span>
+                <strong>Belum ada</strong>
+                <small>Klik baris workspace untuk mulai mengatur bridge PMP15</small>
+              </article>
+              <article className="summary-card">
+                <span>Preview period</span>
+                <strong>-</strong>
+                <small>Preview aktif setelah workspace dipilih</small>
+              </article>
+              <article className="summary-card">
+                <span>Bridge availability</span>
+                <strong>Pending</strong>
+                <small>Menunggu pemilihan workspace</small>
+              </article>
             </div>
-          </form>
+          </div>
+        ) : null}
+
+        {editingProjectId ? (
+          <>
+            <form className="field-grid" onSubmit={(event) => void handleSaveProjectSetting(event)}>
+              <label>
+                Code Workspace
+                <input
+                  value={projectSettingForm.code}
+                  onChange={(event) =>
+                    setProjectSettingForm((prev) => ({ ...prev, code: event.target.value }))
+                  }
+                  placeholder="Contoh: GED-UNP"
+                />
+              </label>
+              <label>
+                Nama Workspace
+                <input
+                  value={projectSettingForm.name}
+                  onChange={(event) =>
+                    setProjectSettingForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="Nama Workspace"
+                  required
+                />
+              </label>
+              <label>
+                Phase Workspace
+                <input
+                  value={projectSettingForm.phase}
+                  onChange={(event) =>
+                    setProjectSettingForm((prev) => ({ ...prev, phase: event.target.value }))
+                  }
+                  placeholder="Contoh: Design Development"
+                />
+              </label>
+              <label>
+                Hari Mulai Periode (Anchor Mingguan)
+                <select
+                  value={projectSettingForm.week_anchor}
+                  onChange={(event) =>
+                    setProjectSettingForm((prev) => ({
+                      ...prev,
+                      week_anchor: event.target.value as WeekAnchor,
+                    }))
+                  }
+                >
+                  {WEEK_ANCHOR_OPTIONS.map((item) => (
+                    <option key={`project-setting-${item.value}`} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Kunci Konfigurasi (lanjutan, opsional)
+                <input
+                  value={projectSettingForm.config_key}
+                  onChange={(event) =>
+                    setProjectSettingForm((prev) => ({ ...prev, config_key: event.target.value }))
+                  }
+                  placeholder="Contoh: workspace_type=test"
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={projectSettingForm.is_active}
+                  onChange={(event) =>
+                    setProjectSettingForm((prev) => ({ ...prev, is_active: event.target.checked }))
+                  }
+                />
+                {" "}
+                Workspace aktif
+              </label>
+              <p className="inline-note">
+                Saat disimpan, nilai anchor mingguan otomatis ditulis ke <code>config_key</code>.
+              </p>
+              <div className="wizard-actions">
+                <button type="submit" className="action-primary" disabled={working}>
+                  Simpan Setting Workspace
+                </button>
+                <button type="button" disabled={working} onClick={() => handleCloseProjectSettingEditor()}>
+                  Batal
+                </button>
+              </div>
+            </form>
+
+            <div className="task-panel">
+              <h3>Setting PMP Area 15</h3>
+              <p className="inline-note">
+                Bridge PMP Area 15 mengikuti <code>config_key</code> workspace di atas. Ubah nilai itu untuk
+                mengarahkan baseline/config project yang memuat blok <code>pmp_area15</code>, lalu cek preview
+                berikut pada period yang sedang dipakai.
+              </p>
+              <div className="task-grid-3">
+                <article className="summary-card">
+                  <span>Config key aktif</span>
+                  <strong>{toNonEmptyString(projectSettingForm.config_key) || "-"}</strong>
+                  <small>Pointer ke config project backend</small>
+                </article>
+                <article className="summary-card">
+                  <span>Preview period</span>
+                  <strong>{pmpPreviewPeriodLabel}</strong>
+                  <small>Dipilih dari period OPEN atau period terbaru</small>
+                </article>
+                <article className="summary-card">
+                  <span>Bridge availability</span>
+                  <strong>{pmpPreviewSummary ? "Available" : "Pending"}</strong>
+                  <small>
+                    {pmpPreviewSummary
+                      ? `Hold point ${pmpPreviewSummary.hold_point_ready ? "ready" : "blocked"}`
+                      : "Menunggu summary backend"}
+                  </small>
+                </article>
+              </div>
+              {pmpPreviewLoading ? <p className="task-note">Memuat preview PMP Area 15...</p> : null}
+              {pmpPreviewMessage ? <p className="task-note">{pmpPreviewMessage}</p> : null}
+            </div>
+
+            <PmpArea15CompliancePanel
+              summary={pmpPreviewSummary}
+              title="PMP Area 15 Bridge Preview"
+              showControls={false}
+            />
+          </>
         ) : null}
 
         {showProjectCreateForm && (

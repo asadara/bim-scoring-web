@@ -113,6 +113,7 @@ const ROLE_LABELS: Record<AppLanguage, Record<AppRole, string>> = {
 const MAIN_NAV_LABELS: Record<AppLanguage, Record<string, string>> = {
   id: {
     "/": "Dashboard",
+    "/pmp-area15": "PMP Area 15",
     "/me": "Akun Saya",
     "/projects": "Koordinator BIM Proyek",
     "/ho/review": "Koordinator BIM HO",
@@ -122,6 +123,7 @@ const MAIN_NAV_LABELS: Record<AppLanguage, Record<string, string>> = {
   },
   en: {
     "/": "Dashboard",
+    "/pmp-area15": "PMP Area 15",
     "/me": "My Account",
     "/projects": "BIM Project Coordinator",
     "/ho/review": "BIM HO Coordinator",
