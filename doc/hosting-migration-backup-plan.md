@@ -103,7 +103,7 @@ Jika verifikasi gagal pada wave mana pun:
   - `bcl_scoring/scripts/render-smoke-check.mjs`
   - `bcl_scoring/scripts/custom-domain-cutover-check.mjs`
   - `bcl_scoring/scripts/render-custom-domain.mjs`
-- CI guard E2E tersedia untuk PR/manual:
+- CI guard E2E tersedia untuk eksekusi manual:
   - `.github/workflows/e2e-role-flow.yml`
 - Gap utama:
   - Domain produksi final untuk cutover belum ditetapkan.

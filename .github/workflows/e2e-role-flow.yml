@@ -1,12 +1,6 @@
 name: E2E Role Flow
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "bcl_scoring/**"
-      - ".github/workflows/e2e-role-flow.yml"
   workflow_dispatch:
 
 concurrency:
