@@ -374,7 +374,7 @@ function fallbackSummaryFromPrototypeSnapshots(
             score: row.score,
           }))
         : [],
-      compliance: null,
+      compliance: toPmpArea15ComplianceSummary(latest.compliance_payload),
     },
     mode: "prototype",
     backend_message: PROTOTYPE_WRITE_DISABLED_MESSAGE,

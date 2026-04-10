@@ -212,6 +212,7 @@ export type PrototypeSnapshotRecord = {
   final_bim_score: number | null;
   breakdown: Array<{ perspective_id: string; score: number | null }>;
   evidence_counts: ReviewStatusCount;
+  compliance_payload?: Record<string, unknown> | null;
   note: "Prototype snapshot (not used for audit/compliance)";
 };
 

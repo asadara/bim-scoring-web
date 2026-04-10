@@ -98,6 +98,7 @@ type StoreSnapshotRecord = {
   final_bim_score: number | null;
   breakdown: Array<{ perspective_id: string; score: number | null }>;
   evidence_counts: StoreReviewStatusCount;
+  compliance_payload?: Record<string, unknown> | null;
   note: "Prototype snapshot (not used for audit/compliance)";
 };
 
@@ -403,6 +404,12 @@ function normalizeSnapshotRecord(row: unknown): StoreSnapshotRecord | null {
     (isObject(row.evidence_counts) ? row.evidence_counts : null) ||
     (isObject(payload.evidence_counts) ? payload.evidence_counts : null) ||
     {};
+  const compliancePayload =
+    (isObject(row.compliance_payload) ? row.compliance_payload : null) ||
+    (isObject(row.compliance) ? row.compliance : null) ||
+    (isObject(payload.compliance_payload) ? payload.compliance_payload : null) ||
+    (isObject(payload.compliance) ? payload.compliance : null) ||
+    null;
   const evidenceCounts: StoreReviewStatusCount = {
     ACCEPTABLE: asFiniteNumber(countsRaw.ACCEPTABLE) ?? 0,
     NEEDS_REVISION: asFiniteNumber(countsRaw.NEEDS_REVISION) ?? 0,
@@ -425,6 +432,7 @@ function normalizeSnapshotRecord(row: unknown): StoreSnapshotRecord | null {
       asFiniteNumber(scoringSummary.total_score),
     breakdown,
     evidence_counts: evidenceCounts,
+    compliance_payload: compliancePayload,
     note: "Prototype snapshot (not used for audit/compliance)",
   };
 }
