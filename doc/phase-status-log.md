@@ -17,7 +17,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Blueprint alignment remediation (R1) pada codebase: implementasi Step 1-6 selesai.
 - Paket contract/regression blueprint-critical terbaru: lulus (`tests=20, pass=20, fail=0`).
 - E2E browser lintas role + hardening scenario (reject flow, post-approval lock, snapshot export): lulus (`npm run e2e`, `3 passed`).
-- CI gate Stage 7 aktif: PR gate ke `main` + nightly schedule untuk Playwright E2E (`.github/workflows/e2e-role-flow.yml`).
+- CI gate Stage 7 terbatas: PR gate ke `main` tetap aktif; nightly schedule Playwright E2E dinonaktifkan untuk menghindari noise email (`.github/workflows/e2e-role-flow.yml`).
 - Rollout remediation API/Web sudah selesai dan terverifikasi pasca-deploy pada endpoint produksi.
 - Landing utama sudah diselaraskan ke dashboard BCL (legacy) pada route root (`/`) dengan kompatibilitas route lama (`/bcl/index.html`).
 - Stage 8 custom domain cutover pack siap (checklist + smoke script), aktivasi domain masih menunggu eksekusi DNS provider.
@@ -69,7 +69,7 @@ Log status phase proyek sampai checkpoint saat ini.
 - Custom domain cutover smoke script: `bcl_scoring/scripts/custom-domain-cutover-check.mjs`
 - Render custom domain API script: `bcl_scoring/scripts/render-custom-domain.mjs`
 - E2E browser spec lintas role: `bcl_scoring/e2e/role-flow.spec.ts`
-- E2E CI workflow (PR + nightly): `.github/workflows/e2e-role-flow.yml`
+- E2E CI workflow (PR + manual): `.github/workflows/e2e-role-flow.yml`
 - Frontend operational baseline: `bcl_scoring/README.md`
 - Backend write readiness reference: `doc/backend-write-readiness.md`
 - Blueprint remediation plan + status step: `doc/blueprint-alignment-remediation-plan.md`

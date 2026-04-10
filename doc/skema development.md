@@ -58,13 +58,13 @@
 | 4. Setup Frontend | COMPLETE | Frontend Next.js live di Render, route root menampilkan dashboard utama (`https://bim-scoring-web.onrender.com/`). |
 | 5. Implement Logic | COMPLETE | Formula scoring inline blueprint + weekly cumulative + confidence; guard role/write aktif. |
 | 6. Integrasi BCL | COMPLETE | Dashboard legacy (`bcl/index.html` + `dashboard.js`) sudah dimount di route root Next.js dan asset dipublish dari `public/bcl`. |
-| 7. Testing | COMPLETE (Hardening v2) | Contract/regression API lulus (`tests=20, pass=20, fail=0`); smoke deploy web+api otomatis (`bcl_scoring/scripts/render-smoke-check.mjs`); E2E browser lintas role + multi-skenario reject/lock/export lulus (`npm run e2e`, 3 passed); CI workflow PR gate + nightly schedule aktif (`.github/workflows/e2e-role-flow.yml`). |
+| 7. Testing | COMPLETE (Hardening v2) | Contract/regression API lulus (`tests=20, pass=20, fail=0`); smoke deploy web+api otomatis (`bcl_scoring/scripts/render-smoke-check.mjs`); E2E browser lintas role + multi-skenario reject/lock/export lulus (`npm run e2e`, 3 passed); CI workflow dibatasi ke PR/manual dan nightly schedule dimatikan untuk mengurangi noise email (`.github/workflows/e2e-role-flow.yml`). |
 | 8. Deploy | PARTIAL (Render Primary Locked, OCI Backup Recorded) | Jalur deploy aktif dikunci di Render (`https://bimscoringnke.onrender.com` + API Render), smoke check lintas route/API lulus, OCI tetap dicatat sebagai cadangan sesuai `doc/hosting-migration-backup-plan.md`, write mode tetap controlled (`NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE=false`). |
 | 9. Iterasi | IN PROGRESS | Dashboard sudah tersedia; ekspansi indikator BIM Use dan paket laporan lanjutan belum selesai penuh. |
 
 ## Backlog Prioritas Lanjutan
 
-1. Stage 7 (Testing Hardening+): monitor stabilitas pipeline E2E (flake watch) dan tambah retry policy hanya jika ditemukan noise konsisten.
+1. Stage 7 (Testing Hardening+): monitor stabilitas pipeline E2E saat PR/manual run (flake watch) dan tambah retry policy hanya jika ditemukan noise konsisten.
 2. Stage 8 (Deploy Finalization): pertahankan Render sebagai primary, dan lakukan readiness review berkala untuk OCI standby sesuai `doc/hosting-migration-backup-plan.md`.
 3. Stage 8 (Go-Live Write Mode): siapkan release gate untuk transisi terkontrol dari read-only ke backend write mode (dengan rollback plan).
 4. Stage 9 (Iterasi Indikator): tambah indikator aktif per BIM Use agar coverage scoring tidak hanya baseline indikator template.

@@ -7,8 +7,6 @@ on:
     paths:
       - "bcl_scoring/**"
       - ".github/workflows/e2e-role-flow.yml"
-  schedule:
-    - cron: "30 1 * * *"
   workflow_dispatch:
 
 concurrency:
