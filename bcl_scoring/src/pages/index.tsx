@@ -842,7 +842,7 @@ export default function Home() {
             </span>
           </div>
 
-          {periods.length === 0 ? (
+          {selectedProjectId && !loading && !error && periods.length === 0 ? (
             <p className="inline-note">
               Project ini belum memiliki scoring period. Tambahkan period lewat{" "}
               {canAccessAdmin ? <Link href="/admin">Admin Control Panel</Link> : "Admin Control Panel"}.
