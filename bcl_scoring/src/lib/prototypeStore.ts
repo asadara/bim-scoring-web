@@ -15,6 +15,7 @@ const LEGACY_SNAPSHOT_KEY = "bim:role3:snapshots:v1";
 
 type StoreEvidenceStatus = "DRAFT" | "SUBMITTED" | "NEEDS_REVISION";
 type StoreEvidenceType = "FILE" | "URL" | "TEXT";
+type StoreEvidenceStorageProvider = "SUPABASE" | "GOOGLE_DRIVE" | "EXTERNAL_CDE";
 type StoreReviewOutcome = "ACCEPTABLE" | "NEEDS REVISION" | "REJECTED";
 type StoreApprovalDecision = "APPROVE PERIOD" | "REJECT APPROVAL";
 
@@ -42,6 +43,7 @@ type StoreEvidenceItem = {
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
+  storage_provider: StoreEvidenceStorageProvider | null;
   storage_label: string;
 };
 
@@ -200,6 +202,13 @@ function normalizeEvidenceRow(row: unknown): StoreEvidenceItem | null {
   const typeValue = asString(row.type).trim();
   const type: StoreEvidenceType =
     typeValue === "URL" || typeValue === "TEXT" ? typeValue : "FILE";
+  const storageProviderRaw = asString(row.storage_provider || row.storageProvider).trim().toUpperCase().replace(/[\s-]+/g, "_");
+  const storageProvider: StoreEvidenceStorageProvider | null =
+    storageProviderRaw === "SUPABASE" ||
+    storageProviderRaw === "GOOGLE_DRIVE" ||
+    storageProviderRaw === "EXTERNAL_CDE"
+      ? storageProviderRaw
+      : null;
 
   return {
     id,
@@ -225,6 +234,7 @@ function normalizeEvidenceRow(row: unknown): StoreEvidenceItem | null {
     created_at: asString(row.created_at) || new Date().toISOString(),
     updated_at: asString(row.updated_at) || new Date().toISOString(),
     submitted_at: asNullableString(row.submitted_at),
+    storage_provider: storageProvider,
     storage_label: "Local draft (prototype, not used in scoring)",
   };
 }

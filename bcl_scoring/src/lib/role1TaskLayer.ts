@@ -57,6 +57,7 @@ export type PeriodStatus = CanonicalPeriodStatus;
 export type EvidenceStatus = "DRAFT" | "SUBMITTED" | "NEEDS_REVISION";
 export type EvidenceLifecycleStatus = CanonicalEvidenceLifecycleStatus;
 export type EvidenceType = "FILE" | "URL" | "TEXT";
+export type EvidenceStorageProvider = "SUPABASE" | "GOOGLE_DRIVE" | "EXTERNAL_CDE";
 export type ReviewOutcome = "ACCEPTABLE" | "NEEDS REVISION" | "REJECTED";
 export type ApprovalDecision = "APPROVE PERIOD" | "REJECT APPROVAL";
 export type DataMode = "backend" | "prototype";
@@ -140,6 +141,7 @@ export type LocalEvidenceItem = {
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
+  storage_provider: EvidenceStorageProvider | null;
   storage_label: string;
 };
 
@@ -157,6 +159,7 @@ export type EvidenceDraftInput = {
   file_view_url?: string | null;
   file_download_url?: string | null;
   file_reference_url?: string | null;
+  storage_provider?: EvidenceStorageProvider | null;
   status: EvidenceStatus;
   review_reason?: string | null;
 };
@@ -1043,6 +1046,37 @@ function inferEvidenceType(rawType: unknown, row: Record<string, unknown>): Evid
   return "FILE";
 }
 
+function normalizeEvidenceStorageProvider(value: unknown): EvidenceStorageProvider | null {
+  const normalized = asString(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized === "SUPABASE" || normalized === "SUPABASE_STORAGE") return "SUPABASE";
+  if (normalized === "GOOGLE_DRIVE" || normalized === "GDRIVE") return "GOOGLE_DRIVE";
+  if (normalized === "EXTERNAL_CDE" || normalized === "CDE" || normalized === "EXTERNAL") return "EXTERNAL_CDE";
+  return null;
+}
+
+function inferEvidenceStorageProvider(input: {
+  type: EvidenceType;
+  uri?: string | null;
+  explicit?: unknown;
+}): EvidenceStorageProvider | null {
+  const explicit = normalizeEvidenceStorageProvider(input.explicit);
+  if (explicit) return explicit;
+  const uri = asNullableString(input.uri);
+  if (input.type === "FILE" && uri && !/^https?:/i.test(uri) && !/^[a-z][a-z0-9+.-]*:/i.test(uri)) {
+    return "SUPABASE";
+  }
+  if (input.type === "URL" && extractGoogleDriveFileId(uri)) return "GOOGLE_DRIVE";
+  if (input.type === "URL" && uri) return "EXTERNAL_CDE";
+  return null;
+}
+
+function getStorageProviderLabel(provider: EvidenceStorageProvider | null): string {
+  if (provider === "SUPABASE") return "Supabase private storage";
+  if (provider === "GOOGLE_DRIVE") return "Google Drive";
+  if (provider === "EXTERNAL_CDE") return "External CDE/link";
+  return "Database";
+}
+
 function inferEvidenceStatus(rawStatus: unknown): EvidenceStatus {
   const value = asString(rawStatus).trim().toUpperCase();
   if (value === "NEEDS_REVISION" || value === "NEEDS REVISION") return "NEEDS_REVISION";
@@ -1067,6 +1101,11 @@ function mapFlatEvidenceRows(
       const title = asString(item.title || item.name || id).trim();
       const description = asString(item.description || item.notes || "").trim();
       const url = asNullableString(item.external_url || item.url || item.uri);
+      const storageProvider = inferEvidenceStorageProvider({
+        type,
+        uri: url,
+        explicit: item.storage_provider || item.storageProvider,
+      });
 
       return {
         id,
@@ -1093,7 +1132,8 @@ function mapFlatEvidenceRows(
         created_at: createdAt,
         updated_at: updatedAt,
         submitted_at: status === "SUBMITTED" ? updatedAt : null,
-        storage_label: "Database",
+        storage_provider: storageProvider,
+        storage_label: getStorageProviderLabel(storageProvider),
       } satisfies LocalEvidenceItem;
     })
     .filter((row): row is LocalEvidenceItem => Boolean(row));
@@ -1245,6 +1285,11 @@ function toLocalEvidence(input: EvidenceDraftInput): LocalEvidenceItem {
   const now = new Date().toISOString();
   const id = input.id || crypto.randomUUID();
   const normalizedStatus = normalizeEvidenceStatus(input.status);
+  const storageProvider = inferEvidenceStorageProvider({
+    type: input.type,
+    uri: resolveEvidenceUri(input),
+    explicit: input.storage_provider,
+  });
 
   return {
     id,
@@ -1269,7 +1314,8 @@ function toLocalEvidence(input: EvidenceDraftInput): LocalEvidenceItem {
     created_at: now,
     updated_at: now,
     submitted_at: normalizedStatus === "SUBMITTED" ? now : null,
-    storage_label: "Database",
+    storage_provider: storageProvider,
+    storage_label: getStorageProviderLabel(storageProvider),
   };
 }
 
@@ -1334,6 +1380,7 @@ type BackendEvidenceWriteResponse = {
   type: string | null;
   title: string | null;
   uri: string | null;
+  storage_provider: string | null;
   notes: string | null;
 };
 
@@ -1537,6 +1584,8 @@ function extractGoogleDriveFileId(input: string | null): string | null {
     if (fromQuery && /^[a-zA-Z0-9_-]{10,}$/.test(fromQuery)) return fromQuery;
     const byPath = url.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
     if (byPath?.[1]) return byPath[1];
+    const byFolderPath = url.pathname.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+    if (byFolderPath?.[1]) return byFolderPath[1];
   } catch {
     return null;
   }
@@ -1611,6 +1660,11 @@ function syncLocalEvidenceFromBackend(params: {
   const now = new Date().toISOString();
   const notes = asNullableString(params.backend.notes);
   const uri = asNullableString(params.backend.uri);
+  const storageProvider = inferEvidenceStorageProvider({
+    type,
+    uri,
+    explicit: params.backend.storage_provider || params.draft.storage_provider,
+  });
 
   const next: LocalEvidenceItem = {
     id: evidenceId || (existing?.id || crypto.randomUUID()),
@@ -1639,7 +1693,8 @@ function syncLocalEvidenceFromBackend(params: {
     submitted_at:
       asNullableString(params.backend.submitted_at) ||
       (status === "SUBMITTED" ? asNullableString(params.backend.updated_at) || now : null),
-    storage_label: "Local draft (prototype, not used in scoring)",
+    storage_provider: storageProvider,
+    storage_label: getStorageProviderLabel(storageProvider),
   };
 
   return upsertLocalEvidenceRecord(next, params.removeIds || []);
@@ -1666,6 +1721,11 @@ async function createEvidenceToBackend(input: EvidenceDraftInput): Promise<Backe
     type: input.type,
     title: input.title.trim(),
     uri: resolveEvidenceUri(input),
+    storage_provider: inferEvidenceStorageProvider({
+      type: input.type,
+      uri: resolveEvidenceUri(input),
+      explicit: input.storage_provider,
+    }),
     notes: resolveEvidenceNotes(input),
   };
   return await callBackendWrite<BackendEvidenceWriteResponse>({
@@ -1692,6 +1752,11 @@ async function updateEvidenceToBackend(input: EvidenceDraftInput, ifMatchVersion
     type: input.type,
     title: input.title.trim(),
     uri: resolveEvidenceUri(input),
+    storage_provider: inferEvidenceStorageProvider({
+      type: input.type,
+      uri: resolveEvidenceUri(input),
+      explicit: input.storage_provider,
+    }),
     notes: resolveEvidenceNotes(input),
   };
   return await callBackendWrite<BackendEvidenceWriteResponse>({
@@ -1777,6 +1842,7 @@ export async function saveFileEvidenceWithBackendUpload(
       file_reference_url: null,
       file_view_url: null,
       file_download_url: null,
+      storage_provider: "SUPABASE",
     });
     const upload = await requestEvidenceFileUpload(draftInput, file);
     await uploadFileToSignedStorage(upload, file);

@@ -131,12 +131,62 @@ const INITIAL_FORM: WizardForm = {
 };
 
 function renderTypeHint(type: WizardForm["type"]): string {
-  if (type === "URL") return "Isi external_url (link eksternal).";
+  if (type === "URL") return "Isi external_url untuk Google Drive atau CDE, terutama evidence berukuran besar.";
   if (type === "TEXT") return "Isi text content. Konten ditampilkan sebagai plain text.";
   if (type === "FILE") {
-    return "Pilih jenis file, lalu upload biner lokal (prototype) atau isi URL referensi.";
+    return `Pilih jenis file, lalu upload biner sampai ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)} atau gunakan URL Drive/CDE.`;
   }
   return "Pilih tipe evidence untuk melihat field input yang dibutuhkan.";
+}
+
+function parseHttpUrl(value: string): URL | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function isGoogleDriveUrl(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  return host === "drive.google.com" || host.endsWith(".drive.google.com") || host === "docs.google.com";
+}
+
+function extractGoogleDriveFileIdFromUrl(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(raw)) return raw;
+  const url = parseHttpUrl(raw);
+  if (!url || !isGoogleDriveUrl(url)) return null;
+  const fromQuery = url.searchParams.get("id");
+  if (fromQuery && /^[a-zA-Z0-9_-]{10,}$/.test(fromQuery)) return fromQuery;
+  const filePath = url.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (filePath?.[1]) return filePath[1];
+  const folderPath = url.pathname.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+  if (folderPath?.[1]) return folderPath[1];
+  return null;
+}
+
+function validateExternalEvidenceUrl(value: string): string | null {
+  const url = parseHttpUrl(value);
+  if (!url) return "URL evidence wajib menggunakan http(s).";
+  if (isGoogleDriveUrl(url) && !extractGoogleDriveFileIdFromUrl(value)) {
+    return "Link Google Drive tidak valid. Gunakan link file atau folder Drive yang memiliki ID.";
+  }
+  return null;
+}
+
+function inferStorageProviderFromForm(form: WizardForm): "SUPABASE" | "GOOGLE_DRIVE" | "EXTERNAL_CDE" | null {
+  const fileReference = form.file_reference_url.trim();
+  if (form.type === "FILE" && fileReference && !/^https?:/i.test(fileReference) && !/^[a-z][a-z0-9+.-]*:/i.test(fileReference)) {
+    return "SUPABASE";
+  }
+  if (form.type === "URL" && extractGoogleDriveFileIdFromUrl(form.external_url)) return "GOOGLE_DRIVE";
+  if (form.type === "URL" && form.external_url.trim()) return "EXTERNAL_CDE";
+  return null;
 }
 
 function inferFileType(value: string): WizardForm["file_type"] {
@@ -523,6 +573,10 @@ export default function AddEvidencePage() {
       if (form.type === "URL" && !form.external_url.trim()) {
         return "Tipe URL wajib mengisi external_url.";
       }
+      if (form.type === "URL") {
+        const urlError = validateExternalEvidenceUrl(form.external_url);
+        if (urlError) return urlError;
+      }
       if (form.type === "TEXT" && !form.text_content.trim()) {
         return "Tipe TEXT wajib mengisi text content.";
       }
@@ -541,6 +595,10 @@ export default function AddEvidencePage() {
         /^(data|javascript|vbscript|file):/i.test(form.file_reference_url.trim())
       ) {
         return "Mode production tidak menerima data/local URI. Pilih file untuk upload storage atau gunakan HTTPS URL.";
+      }
+      if (form.type === "FILE" && /^https?:/i.test(form.file_reference_url.trim())) {
+        const urlError = validateExternalEvidenceUrl(form.file_reference_url);
+        if (urlError) return urlError;
       }
     }
     return null;
@@ -601,9 +659,12 @@ export default function AddEvidencePage() {
     }
     if (isRealBackendWriteEnabled()) {
       if (file.size > BACKEND_FILE_SIZE_LIMIT_BYTES) {
+        setSelectedBinaryFile(null);
+        setLocalFileMeta({ name: file.name, size: file.size });
         setSubmitError(
-          `Ukuran file ${formatBytes(file.size)} melebihi batas upload ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)}.`
+          `Ukuran file ${formatBytes(file.size)} melebihi batas upload ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)}. Simpan file di Google Drive/CDE, pilih tipe URL, lalu isi external_url.`
         );
+        setSubmitInfo("Evidence besar tidak disalin ke Supabase storage agar kuota dan waktu upload tetap terkendali.");
         return;
       }
       setSelectedBinaryFile(file);
@@ -756,6 +817,10 @@ export default function AddEvidencePage() {
         file_view_url: form.file_view_url || null,
         file_download_url: form.file_download_url || null,
         file_reference_url: form.file_reference_url || null,
+        storage_provider:
+          form.type === "FILE" && selectedBinaryFile && isRealBackendWriteEnabled()
+            ? "SUPABASE"
+            : inferStorageProviderFromForm(form),
         status: "DRAFT" as const,
         review_reason: null,
       };
@@ -1175,6 +1240,10 @@ export default function AddEvidencePage() {
                       disabled={fieldDisabled}
                       placeholder="https://..."
                     />
+                    <span className="inline-note">
+                      Gunakan URL untuk evidence besar (&gt; {formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)}).
+                      Link Google Drive akan di-auto-share ke reviewer jika integrasi aktif.
+                    </span>
                   </label>
                 ) : null}
 
@@ -1292,8 +1361,16 @@ export default function AddEvidencePage() {
             {form.type === "FILE" ? (
               <p className="inline-note">
                 {isRealBackendWriteEnabled()
-                  ? `Upload file biner akan dikirim ke private storage (batas ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)} per file).`
+                  ? `Upload file biner akan dikirim ke private storage Supabase (batas ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)} per file).`
                   : `Upload file biner saat ini disimpan di browser local storage (batas ${formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).`}
+              </p>
+            ) : null}
+            {form.type === "URL" && form.external_url.trim() ? (
+              <p className="inline-note">
+                Storage provider:{" "}
+                <strong>
+                  {extractGoogleDriveFileIdFromUrl(form.external_url) ? "Google Drive" : "External CDE/link"}
+                </strong>
               </p>
             ) : null}
             {form.type === "FILE" && localFileMeta ? (
