@@ -26,6 +26,7 @@ import {
   callBackendWrite,
   classifyBackendIssue,
 } from "@/lib/backendWriteClient";
+import { getSupabaseBrowserClient, isAuthConfigured } from "@/lib/authClient";
 import { getStoredCredential } from "@/lib/userCredential";
 import {
   CanonicalEvidenceLifecycleStatus,
@@ -46,6 +47,7 @@ export const NA_TEXT = "N/A";
 export const NO_BIM_USE_ID = "__NOT_AVAILABLE__";
 export const LOCKED_READ_ONLY_ERROR = "LOCKED (read-only)";
 export const PROTOTYPE_WRITE_DISABLED_MESSAGE = "Prototype mode (backend write disabled)";
+const EVIDENCE_STORAGE_BUCKET = "bim-evidence";
 
 export function isRealBackendWriteEnabled(): boolean {
   return FEATURE_REAL_BACKEND_WRITE;
@@ -1335,9 +1337,42 @@ type BackendEvidenceWriteResponse = {
   notes: string | null;
 };
 
+type BackendEvidenceUploadRequestResponse = {
+  upload_token: string;
+  evidence_id: string;
+  period_id: string;
+  project_id: string;
+  path: string;
+  content_type: string;
+  size_bytes: number;
+  expires_at: string;
+  signed_upload?: {
+    signedUrl?: string;
+    signedURL?: string;
+    path?: string;
+    token?: string;
+  } | null;
+};
+
 type GoogleDriveAutoShareResponse = {
   shared_count?: number | null;
   failed_count?: number | null;
+};
+
+type EvidenceSignedViewResponse = {
+  ok?: boolean;
+  data?: {
+    evidence_id?: string | null;
+    path?: string | null;
+    view?: {
+      signedUrl?: string;
+      signedURL?: string;
+    } | null;
+  } | null;
+  view?: {
+    signedUrl?: string;
+    signedURL?: string;
+  } | null;
 };
 
 function toStoredEvidenceStatus(raw: unknown): EvidenceStatus {
@@ -1353,6 +1388,26 @@ function toBackendReviewOutcome(raw: unknown): ReviewOutcome | null {
   if (value === "NEEDS_REVISION" || value === "NEEDS REVISION") return "NEEDS REVISION";
   if (value === "REJECTED") return "REJECTED";
   return null;
+}
+
+function extractSignedViewUrl(payload: EvidenceSignedViewResponse): string | null {
+  const view = payload.data?.view || payload.view || null;
+  const value = view?.signedUrl || view?.signedURL || null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export async function fetchEvidenceSignedViewUrl(evidenceId: string): Promise<string> {
+  const normalized = asString(evidenceId).trim();
+  if (!normalized) throw new Error("Evidence id is required");
+  const result = await safeFetchJson<EvidenceSignedViewResponse>(
+    buildApiUrl(`/evidence/signed-view?evidence_id=${encodeURIComponent(normalized)}`)
+  );
+  if (!result.ok) {
+    throw new Error(result.error || "Signed view URL tidak tersedia.");
+  }
+  const url = extractSignedViewUrl(result.data);
+  if (!url) throw new Error("Signed view URL tidak tersedia.");
+  return url;
 }
 
 function requirePeriodId(periodId: string | null): string {
@@ -1373,6 +1428,102 @@ function resolveEvidenceUri(input: EvidenceDraftInput): string | null {
     );
   }
   return null;
+}
+
+function rejectInlineFileUri(input: EvidenceDraftInput): void {
+  const uri = resolveEvidenceUri(input);
+  if (!uri) return;
+  if (/^(data|javascript|vbscript|file):/i.test(uri.trim())) {
+    throw new Error("File evidence production wajib memakai storage upload, bukan data/local URI.");
+  }
+}
+
+function normalizeFileContentType(file: File): string {
+  const contentType = String(file.type || "").trim().toLowerCase();
+  return contentType || "application/octet-stream";
+}
+
+function extractSignedUploadUrl(signed: BackendEvidenceUploadRequestResponse["signed_upload"]): string | null {
+  const value = signed?.signedUrl || signed?.signedURL || null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function uploadFileToSignedStorage(
+  request: BackendEvidenceUploadRequestResponse,
+  file: File
+): Promise<void> {
+  const signedPath = request.signed_upload?.path || request.path;
+  const signedToken = request.signed_upload?.token || null;
+  const contentType = normalizeFileContentType(file);
+
+  if (isAuthConfigured() && signedPath && signedToken) {
+    const supabase = getSupabaseBrowserClient();
+    const { error } = await supabase.storage
+      .from(EVIDENCE_STORAGE_BUCKET)
+      .uploadToSignedUrl(signedPath, signedToken, file, {
+        contentType,
+      });
+    if (!error) return;
+  }
+
+  const signedUrl = extractSignedUploadUrl(request.signed_upload);
+  if (!signedUrl) {
+    throw new Error("Signed upload URL tidak tersedia dari backend.");
+  }
+
+  const response = await fetch(signedUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType,
+    },
+    body: file,
+  });
+  if (!response.ok) {
+    throw new Error(`Storage upload failed (${response.status})`);
+  }
+}
+
+async function requestEvidenceFileUpload(
+  input: EvidenceDraftInput,
+  file: File
+): Promise<BackendEvidenceUploadRequestResponse> {
+  const periodId = requirePeriodId(input.period_id);
+  const payload = {
+    period_id: periodId,
+    filename: file.name,
+    content_type: normalizeFileContentType(file),
+    size_bytes: file.size,
+  };
+  return await callBackendWrite<BackendEvidenceUploadRequestResponse>({
+    path: `/v2/projects/${encodeURIComponent(input.project_id)}/evidence/upload/request`,
+    method: "POST",
+    actorRole: "role1",
+    body: payload,
+    idempotencyScope: "evidence-upload-request",
+    idempotencyPayload: payload,
+  });
+}
+
+async function finalizeEvidenceFileUpload(params: {
+  input: EvidenceDraftInput;
+  upload: BackendEvidenceUploadRequestResponse;
+}): Promise<BackendEvidenceWriteResponse> {
+  const periodId = requirePeriodId(params.input.period_id);
+  const payload = {
+    upload_token: params.upload.upload_token,
+    period_id: periodId,
+    indicator_ids: [...params.input.indicator_ids],
+    title: params.input.title.trim(),
+    notes: resolveEvidenceNotes(params.input),
+  };
+  return await callBackendWrite<BackendEvidenceWriteResponse>({
+    path: `/v2/projects/${encodeURIComponent(params.input.project_id)}/evidence/upload/finalize`,
+    method: "POST",
+    actorRole: "role1",
+    body: payload,
+    idempotencyScope: "evidence-upload-finalize",
+    idempotencyPayload: payload,
+  });
 }
 
 function extractGoogleDriveFileId(input: string | null): string | null {
@@ -1508,6 +1659,7 @@ function normalizeWriteError(error: unknown): Error {
 
 async function createEvidenceToBackend(input: EvidenceDraftInput): Promise<BackendEvidenceWriteResponse> {
   const periodId = requirePeriodId(input.period_id);
+  rejectInlineFileUri(input);
   const payload = {
     period_id: periodId,
     indicator_ids: [...input.indicator_ids],
@@ -1530,6 +1682,7 @@ async function updateEvidenceToBackend(input: EvidenceDraftInput, ifMatchVersion
   const periodId = requirePeriodId(input.period_id);
   const evidenceId = asString(input.id || "").trim();
   if (!evidenceId) throw new Error("Evidence id is required for update");
+  rejectInlineFileUri(input);
 
   const payload = {
     evidence_id: evidenceId,
@@ -1597,6 +1750,56 @@ export async function saveEvidenceWithBackendWrite(input: EvidenceDraftInput): P
         input.id && input.id !== writtenDraft.evidence_id && localExisting?.status === "DRAFT"
           ? [input.id]
           : [],
+    });
+  } catch (error) {
+    throw normalizeWriteError(error);
+  }
+}
+
+export async function saveFileEvidenceWithBackendUpload(
+  input: EvidenceDraftInput,
+  file: File,
+  options: { submit?: boolean } = {}
+): Promise<LocalEvidenceItem> {
+  assertRole1WritableProject(input.project_id);
+  if (!FEATURE_REAL_BACKEND_WRITE) {
+    return saveLocalEvidence({
+      ...input,
+      status: options.submit ? "SUBMITTED" : "DRAFT",
+    });
+  }
+  if (input.type !== "FILE") throw new Error("Storage upload hanya berlaku untuk evidence FILE.");
+  if (input.id) throw new Error("Upload file baru untuk evidence revisi belum didukung; buat evidence baru atau submit draft yang ada.");
+
+  try {
+    const draftInput = toDraftForWrite({
+      ...input,
+      file_reference_url: null,
+      file_view_url: null,
+      file_download_url: null,
+    });
+    const upload = await requestEvidenceFileUpload(draftInput, file);
+    await uploadFileToSignedStorage(upload, file);
+    const writtenDraft = await finalizeEvidenceFileUpload({ input: draftInput, upload });
+    const draftSynced = syncLocalEvidenceFromBackend({
+      draft: input,
+      backend: writtenDraft,
+    });
+    if (!options.submit) return draftSynced;
+
+    const submitVersion = asNumber(writtenDraft.version);
+    if (submitVersion === null) throw new Error("Evidence version is required for submit");
+    const submitted = await submitEvidenceToBackend({
+      period_id: draftSynced.period_id,
+      evidence_id: draftSynced.id,
+      if_match_version: submitVersion,
+    });
+    return syncLocalEvidenceFromBackend({
+      draft: {
+        ...input,
+        id: draftSynced.id,
+      },
+      backend: submitted,
     });
   } catch (error) {
     throw normalizeWriteError(error);

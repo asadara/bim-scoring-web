@@ -12,6 +12,7 @@ import {
   NA_TEXT,
   ReviewOutcome,
   formatBimUseDisplay,
+  fetchEvidenceSignedViewUrl,
   getLocalEvidenceWithReviewById,
   isRealBackendWriteEnabled,
   mapEvidenceRowsWithReview,
@@ -67,6 +68,13 @@ function isSafeAttachmentHref(href: string): { ok: boolean; reason: string | nul
   return { ok: false, reason: "Blocked protocol (allowed: https/http/blob/data).", dataMime: null };
 }
 
+function isStorageReference(value: string | null | undefined): boolean {
+  const normalized = String(value || "").trim();
+  if (!normalized) return false;
+  if (/^(https?:|data:|blob:)/i.test(normalized)) return false;
+  return normalized.includes("/evidence/");
+}
+
 function classifyExternalUrl(href: string): { label: string; host: string | null; isGoogleDrive: boolean } {
   try {
     const url = new URL(href);
@@ -90,7 +98,10 @@ function classifyExternalUrl(href: string): { label: string; host: string | null
   }
 }
 
-function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvidenceWithReviewById>>) {
+function renderEvidenceContent(
+  item: NonNullable<ReturnType<typeof getLocalEvidenceWithReviewById>>,
+  onOpenStorageEvidence: () => void
+) {
   if (item.type === "URL") {
     const externalUrl = item.external_url || "";
     const urlMeta = externalUrl ? classifyExternalUrl(externalUrl) : null;
@@ -145,11 +156,12 @@ function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvide
     return {
       ...entry,
       ...safety,
+      isStorage: isStorageReference(entry.href),
     };
   });
 
-  const allowed = checked.filter((entry) => entry.ok);
-  const blocked = checked.filter((entry) => !entry.ok);
+  const allowed = checked.filter((entry) => entry.ok || entry.isStorage);
+  const blocked = checked.filter((entry) => !entry.ok && !entry.isStorage);
 
   return (
     <>
@@ -161,6 +173,13 @@ function renderEvidenceContent(item: NonNullable<ReturnType<typeof getLocalEvide
             const isDataUrl = entry.href.toLowerCase().startsWith("data:");
             const extension = getFileExtensionFromMime(entry.dataMime);
             const downloadName = `evidence-attachment-${index + 1}.${extension}`;
+            if (entry.isStorage) {
+              return (
+                <button type="button" key={`${entry.label}-${index}`} onClick={onOpenStorageEvidence}>
+                  {entry.label}
+                </button>
+              );
+            }
             return (
               <a
                 key={`${entry.label}-${index}`}
@@ -202,6 +221,17 @@ export default function HoEvidenceReviewPage() {
   const [formInfo, setFormInfo] = useState<string | null>(null);
   const [bannerHint, setBannerHint] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function onOpenStorageEvidence() {
+    if (!evidence) return;
+    try {
+      const signedUrl = await fetchEvidenceSignedViewUrl(evidence.id);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+      setBannerHint(null);
+    } catch (err) {
+      setBannerHint(err instanceof Error ? err.message : "Signed file URL tidak tersedia.");
+    }
+  }
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string" || typeof evidenceId !== "string") return;
@@ -453,7 +483,7 @@ export default function HoEvidenceReviewPage() {
           Current lifecycle: <strong>{currentLifecycleLabel}</strong>
         </p>
 
-        {renderEvidenceContent(evidence)}
+        {renderEvidenceContent(evidence, onOpenStorageEvidence)}
       </section>
 
       <section className="task-panel">

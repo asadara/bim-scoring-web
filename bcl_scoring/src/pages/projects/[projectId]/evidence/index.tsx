@@ -10,6 +10,7 @@ import {
   NA_TEXT,
   formatBimUseDisplay,
   fetchEvidenceListReadMode,
+  fetchEvidenceSignedViewUrl,
   fetchRole1Context,
   mapEvidenceRowsWithReview,
   statusLabel,
@@ -64,7 +65,33 @@ function renderOpenUrlAction(href: string | null | undefined, label: string) {
   );
 }
 
-function renderEvidenceValue(item: LocalEvidenceWithReview) {
+function isStorageReference(value: string | null | undefined): boolean {
+  const normalized = String(value || "").trim();
+  if (!normalized) return false;
+  if (/^(https?:|data:|blob:)/i.test(normalized)) return false;
+  return normalized.includes("/evidence/");
+}
+
+function renderStorageOpenAction(
+  item: LocalEvidenceWithReview,
+  href: string | null | undefined,
+  label: string,
+  onOpenStorageEvidence: (item: LocalEvidenceWithReview) => void
+) {
+  if (isStorageReference(href)) {
+    return (
+      <button type="button" onClick={() => onOpenStorageEvidence(item)}>
+        {label}
+      </button>
+    );
+  }
+  return renderOpenUrlAction(href, label);
+}
+
+function renderEvidenceValue(
+  item: LocalEvidenceWithReview,
+  onOpenStorageEvidence: (item: LocalEvidenceWithReview) => void
+) {
   if (item.type === "TEXT") {
     return (
       <p>
@@ -103,14 +130,14 @@ function renderEvidenceValue(item: LocalEvidenceWithReview) {
         ) : NA_TEXT}
       </p>
       <div className="item-actions">
-        {renderOpenUrlAction(item.file_view_url, "Open File")}
-        {renderOpenUrlAction(item.file_download_url, "Download File")}
+        {renderStorageOpenAction(item, item.file_view_url, "Open File", onOpenStorageEvidence)}
+        {renderStorageOpenAction(item, item.file_download_url, "Download File", onOpenStorageEvidence)}
         {item.file_reference_url?.startsWith("data:") ? (
           <a href={item.file_reference_url} target="_blank" rel="noopener noreferrer">
             Open Local File
           </a>
         ) : (
-          renderOpenUrlAction(item.file_reference_url, "Open Reference URL")
+          renderStorageOpenAction(item, item.file_reference_url, "Open Reference URL", onOpenStorageEvidence)
         )}
       </div>
     </>
@@ -136,6 +163,16 @@ export default function MyEvidenceListPage() {
   const [items, setItems] = useState<EvidenceViewItem[]>([]);
   const [evidenceMode, setEvidenceMode] = useState<DataMode>("backend");
   const [evidenceMessage, setEvidenceMessage] = useState<string | null>(null);
+
+  async function onOpenStorageEvidence(item: LocalEvidenceWithReview) {
+    try {
+      const signedUrl = await fetchEvidenceSignedViewUrl(item.id);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+      setEvidenceMessage(null);
+    } catch (err) {
+      setEvidenceMessage(err instanceof Error ? err.message : "Signed file URL tidak tersedia.");
+    }
+  }
 
   useEffect(() => {
     if (!router.isReady || typeof projectId !== "string") return;
@@ -363,7 +400,7 @@ export default function MyEvidenceListPage() {
                     <p>
                       Lifecycle status: <strong>{effectiveStatusLabel(item.effective_status)}</strong>
                     </p>
-                    {renderEvidenceValue(item)}
+                    {renderEvidenceValue(item, onOpenStorageEvidence)}
 
                     {item.latest_review_outcome ? (
                       <p>

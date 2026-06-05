@@ -15,6 +15,7 @@ import {
   fetchRole1Context,
   getLocalEvidenceById,
   isRealBackendWriteEnabled,
+  saveFileEvidenceWithBackendUpload,
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
 } from "@/lib/role1TaskLayer";
@@ -40,6 +41,7 @@ type WizardForm = {
 };
 
 const LOCAL_FILE_SIZE_LIMIT_BYTES = 2 * 1024 * 1024; // 2 MB (localStorage-safe for prototype)
+const BACKEND_FILE_SIZE_LIMIT_BYTES = 25 * 1024 * 1024;
 
 const STEP_LABELS = [
   "Step 1 - Select indicator",
@@ -251,6 +253,7 @@ export default function AddEvidencePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [context, setContext] = useState<Awaited<ReturnType<typeof fetchRole1Context>> | null>(null);
   const [localFileMeta, setLocalFileMeta] = useState<{ name: string; size: number } | null>(null);
+  const [selectedBinaryFile, setSelectedBinaryFile] = useState<File | null>(null);
   const [showGapProposalForm, setShowGapProposalForm] = useState(false);
   const [gapProposedBimUse, setGapProposedBimUse] = useState("");
   const [gapReason, setGapReason] = useState("");
@@ -348,6 +351,7 @@ export default function AddEvidencePage() {
           file_reference_url: hit.file_reference_url || "",
         });
         setLocalFileMeta(null);
+        setSelectedBinaryFile(null);
       } catch (fetchErr) {
         if (cancelled) return;
         setSubmitError(fetchErr instanceof Error ? fetchErr.message : "Gagal memuat evidence dari backend.");
@@ -379,6 +383,7 @@ export default function AddEvidencePage() {
       });
       setStep(1);
       setLocalFileMeta(null);
+      setSelectedBinaryFile(null);
       setShowGapProposalForm(false);
       setSubmitError(null);
       return;
@@ -394,6 +399,7 @@ export default function AddEvidencePage() {
     setSubmitInfo(null);
     setStep(1);
     setLocalFileMeta(null);
+    setSelectedBinaryFile(null);
     setShowGapProposalForm(false);
     setForm((prev) => {
       if (prev.bim_use_id === selectedBimUseIdFromQuery) return prev;
@@ -522,11 +528,19 @@ export default function AddEvidencePage() {
       }
       if (
         form.type === "FILE" &&
+        !(isRealBackendWriteEnabled() && selectedBinaryFile) &&
         !form.file_view_url.trim() &&
         !form.file_download_url.trim() &&
         !form.file_reference_url.trim()
       ) {
         return "Tipe FILE wajib mengisi view_url/download_url atau single reference URL.";
+      }
+      if (
+        form.type === "FILE" &&
+        isRealBackendWriteEnabled() &&
+        /^(data|javascript|vbscript|file):/i.test(form.file_reference_url.trim())
+      ) {
+        return "Mode production tidak menerima data/local URI. Pilih file untuk upload storage atau gunakan HTTPS URL.";
       }
     }
     return null;
@@ -571,6 +585,10 @@ export default function AddEvidencePage() {
       type,
       file_type: type === "FILE" ? prev.file_type : "",
     }));
+    if (type !== "FILE") {
+      setSelectedBinaryFile(null);
+      setLocalFileMeta(null);
+    }
     setSubmitError(null);
     setSubmitInfo(null);
   }
@@ -578,6 +596,28 @@ export default function AddEvidencePage() {
   function onSelectLocalBinaryFile(file: File | null) {
     if (!file) {
       setLocalFileMeta(null);
+      setSelectedBinaryFile(null);
+      return;
+    }
+    if (isRealBackendWriteEnabled()) {
+      if (file.size > BACKEND_FILE_SIZE_LIMIT_BYTES) {
+        setSubmitError(
+          `Ukuran file ${formatBytes(file.size)} melebihi batas upload ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)}.`
+        );
+        return;
+      }
+      setSelectedBinaryFile(file);
+      setLocalFileMeta({ name: file.name, size: file.size });
+      setForm((prev) => ({
+        ...prev,
+        file_reference_url: "",
+        file_view_url: "",
+        file_download_url: "",
+        file_type: prev.file_type || inferFileTypeFromFileMeta(file) || "OTHER",
+        title: prev.title || file.name,
+      }));
+      setSubmitError(null);
+      setSubmitInfo(`File "${file.name}" siap diupload ke storage saat disimpan.`);
       return;
     }
     if (file.size > LOCAL_FILE_SIZE_LIMIT_BYTES) {
@@ -720,9 +760,11 @@ export default function AddEvidencePage() {
         review_reason: null,
       };
       saved =
-        status === "DRAFT"
-          ? await saveEvidenceWithBackendWrite(payload)
-          : await submitEvidenceWithBackendWrite(payload);
+        form.type === "FILE" && selectedBinaryFile && isRealBackendWriteEnabled()
+          ? await saveFileEvidenceWithBackendUpload(payload, selectedBinaryFile, { submit: status === "SUBMITTED" })
+          : status === "DRAFT"
+            ? await saveEvidenceWithBackendWrite(payload)
+            : await submitEvidenceWithBackendWrite(payload);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save evidence.";
       setSubmitError(message);
@@ -735,6 +777,8 @@ export default function AddEvidencePage() {
     }
 
     setForm((prev) => ({ ...prev, evidence_id: saved.id }));
+    setSelectedBinaryFile(null);
+    setLocalFileMeta(null);
     setSubmitError(null);
     setBannerHint(null);
     setSubmitInfo(
@@ -1153,7 +1197,7 @@ export default function AddEvidencePage() {
                       Jenis file: <strong>{form.file_type || "Belum dipilih"}</strong>
                     </p>
                     <label htmlFor="file-binary-upload">
-                      Upload binary file (prototype local)
+                      Upload binary file {isRealBackendWriteEnabled() ? "(storage)" : "(prototype local)"}
                       <input
                         id="file-binary-upload"
                         type="file"
@@ -1247,18 +1291,22 @@ export default function AddEvidencePage() {
             <p className="inline-note">Evidence akan direview dan tidak langsung memengaruhi skor.</p>
             {form.type === "FILE" ? (
               <p className="inline-note">
-                Upload file biner saat ini disimpan di browser local storage (batas {formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).
+                {isRealBackendWriteEnabled()
+                  ? `Upload file biner akan dikirim ke private storage (batas ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)} per file).`
+                  : `Upload file biner saat ini disimpan di browser local storage (batas ${formatBytes(LOCAL_FILE_SIZE_LIMIT_BYTES)} per file).`}
               </p>
             ) : null}
             {form.type === "FILE" && localFileMeta ? (
               <p className="inline-note">
-                File lokal aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)}).
+                File aktif: <strong>{localFileMeta.name}</strong> ({formatBytes(localFileMeta.size)}).
               </p>
             ) : null}
             {form.type === "FILE" && form.file_reference_url.startsWith("data:") ? (
               <p className="inline-note">Reference URL saat ini menggunakan binary data URL (local prototype).</p>
             ) : null}
-            <p className="prototype-badge">Local draft (prototype, not used in scoring)</p>
+            <p className="prototype-badge">
+              {isRealBackendWriteEnabled() ? "Backend storage write" : "Local draft (prototype, not used in scoring)"}
+            </p>
           </>
         )}
 
