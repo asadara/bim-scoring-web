@@ -21,6 +21,7 @@ import {
 } from "@/lib/prototypeStore";
 import { SafeFetchFail, buildApiUrl, safeFetchJson } from "@/lib/http";
 import { FEATURE_REAL_BACKEND_WRITE } from "@/lib/featureFlags";
+import { getPrototypeFallbackAllowed } from "@/lib/runtimeEnv";
 import {
   BackendWriteError,
   callBackendWrite,
@@ -47,10 +48,15 @@ export const NA_TEXT = "N/A";
 export const NO_BIM_USE_ID = "__NOT_AVAILABLE__";
 export const LOCKED_READ_ONLY_ERROR = "LOCKED (read-only)";
 export const PROTOTYPE_WRITE_DISABLED_MESSAGE = "Prototype mode (backend write disabled)";
+export const PROTOTYPE_MODE_DISABLED_MESSAGE = "Prototype/local fallback is disabled for this environment";
 const EVIDENCE_STORAGE_BUCKET = "bim-evidence";
 
 export function isRealBackendWriteEnabled(): boolean {
   return FEATURE_REAL_BACKEND_WRITE;
+}
+
+export function isPrototypeFallbackAllowed(): boolean {
+  return getPrototypeFallbackAllowed();
 }
 
 export type PeriodStatus = CanonicalPeriodStatus;
@@ -644,7 +650,7 @@ function fallbackProjectPeriodsFromPrototype(projectId: string): ScoringPeriod[]
 export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[]>> {
   const response = await safeFetchJson<unknown>(buildApiUrl("/projects"));
   if (!response.ok) {
-    if (!isRealBackendWriteEnabled()) {
+    if (isPrototypeFallbackAllowed()) {
       const fallbackRows = listPrototypeProjectIdsFromStore().map((projectId) =>
         fallbackProjectFromPrototype(projectId)
       );
@@ -659,7 +665,7 @@ export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
-    if (!isRealBackendWriteEnabled()) {
+    if (isPrototypeFallbackAllowed()) {
       const fallbackRows = listPrototypeProjectIdsFromStore().map((projectId) =>
         fallbackProjectFromPrototype(projectId)
       );
@@ -695,7 +701,7 @@ export async function fetchProjectsReadMode(): Promise<ReadResult<ProjectRecord[
     });
   }
 
-  if (!isRealBackendWriteEnabled() && mapped.length === 0) {
+  if (isPrototypeFallbackAllowed() && mapped.length === 0) {
     const fallbackRows = listPrototypeProjectIdsFromStore().map((projectId) =>
       fallbackProjectFromPrototype(projectId)
     );
@@ -801,7 +807,7 @@ export async function fetchProjectQueueSummaryReadMode(): Promise<ReadResult<Pro
 export async function fetchProjectReadMode(projectId: string): Promise<ReadResult<ProjectRecord>> {
   const response = await safeFetchJson<unknown>(buildApiUrl(`/projects/${encodeURIComponent(projectId)}`));
   if (!response.ok) {
-    if (!isRealBackendWriteEnabled()) {
+    if (isPrototypeFallbackAllowed()) {
       return {
         data: fallbackProjectFromPrototype(projectId),
         mode: "prototype",
@@ -822,7 +828,7 @@ export async function fetchProjectReadMode(projectId: string): Promise<ReadResul
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
-    if (!isRealBackendWriteEnabled()) {
+    if (isPrototypeFallbackAllowed()) {
       return {
         data: fallbackProjectFromPrototype(projectId),
         mode: "prototype",
@@ -874,7 +880,7 @@ export async function fetchProjectPeriodsReadMode(projectId: string): Promise<Re
     buildApiUrl(`/projects/${encodeURIComponent(projectId)}/periods`)
   );
   if (!response.ok) {
-    if (!isRealBackendWriteEnabled()) {
+    if (isPrototypeFallbackAllowed()) {
       return {
         data: fallbackProjectPeriodsFromPrototype(projectId),
         mode: "prototype",
@@ -886,7 +892,7 @@ export async function fetchProjectPeriodsReadMode(projectId: string): Promise<Re
 
   const unwrapped = unwrapPayload(response.data);
   if (!unwrapped.ok) {
-    if (!isRealBackendWriteEnabled()) {
+    if (isPrototypeFallbackAllowed()) {
       return {
         data: fallbackProjectPeriodsFromPrototype(projectId),
         mode: "prototype",
@@ -922,7 +928,7 @@ export async function fetchProjectPeriodsReadMode(projectId: string): Promise<Re
     });
   }
 
-  if (!isRealBackendWriteEnabled() && mapped.length === 0) {
+  if (isPrototypeFallbackAllowed() && mapped.length === 0) {
     return {
       data: fallbackProjectPeriodsFromPrototype(projectId),
       mode: "prototype",
@@ -1168,7 +1174,7 @@ export async function fetchEvidenceListReadMode(
 ): Promise<ReadResult<LocalEvidenceItem[]>> {
   // In prototype mode, evidence lives in local storage and must be read consistently
   // by Role 1/2/3 flows without forcing backend endpoints.
-  if (!isRealBackendWriteEnabled()) {
+  if (isPrototypeFallbackAllowed()) {
     return {
       data: listLocalEvidence(projectId, periodId),
       mode: "prototype",

@@ -8,7 +8,7 @@ const LEGACY_RENDER_HOSTS = new Set([
 
 const CANONICAL_HOST = "bcl-scoring.asadara83.workers.dev";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const host = (request.headers.get("host") || "").toLowerCase().trim();
   if (!LEGACY_RENDER_HOSTS.has(host)) {
     return NextResponse.next();

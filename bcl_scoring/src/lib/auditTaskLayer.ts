@@ -7,7 +7,7 @@ import {
   PROTOTYPE_WRITE_DISABLED_MESSAGE,
   ReviewStatusCount,
   getPrototypePeriodLock,
-  isRealBackendWriteEnabled,
+  isPrototypeFallbackAllowed,
   listPrototypeApprovalDecisions,
   listPrototypeSnapshots,
 } from "@/lib/role1TaskLayer";
@@ -209,7 +209,7 @@ export async function fetchAuditSnapshotsReadMode(): Promise<{
   const backendResult = await fetchBackendSnapshots();
   if (backendResult.data.length > 0) return backendResult;
 
-  if (!isRealBackendWriteEnabled()) {
+  if (isPrototypeFallbackAllowed()) {
     return {
       data: listAuditSnapshots(),
       mode: "prototype",

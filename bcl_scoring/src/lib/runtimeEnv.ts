@@ -35,7 +35,7 @@ function parseBoolean(value: string | undefined): boolean | null {
     return false;
   }
   throw new Error(
-    `Invalid NEXT_PUBLIC_FEATURE_REAL_BACKEND_WRITE value "${value}". Allowed: true/false/1/0/on/off/yes/no`
+    `Invalid boolean env value "${value}". Allowed: true/false/1/0/on/off/yes/no`
   );
 }
 
@@ -75,8 +75,19 @@ export function getFeatureRealBackendWrite(): boolean {
   return false;
 }
 
+export function getPrototypeFallbackAllowed(): boolean {
+  const override = parseBoolean(process.env.NEXT_PUBLIC_ALLOW_PROTOTYPE_FALLBACK);
+  if (override !== null) return override;
+  try {
+    return getAppEnvironment() !== "production";
+  } catch {
+    return false;
+  }
+}
+
 export function validatePublicRuntimeEnv(): void {
   getAppEnvironment();
   getApiBaseUrlFromEnv();
   getFeatureRealBackendWrite();
+  getPrototypeFallbackAllowed();
 }

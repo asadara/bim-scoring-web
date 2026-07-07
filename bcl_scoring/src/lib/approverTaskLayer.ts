@@ -15,9 +15,11 @@
   fetchProjectPeriodsReadMode,
   formatPeriodLabel,
   getPrototypePeriodLock,
+  isPrototypeFallbackAllowed,
   isRealBackendWriteEnabled,
   listPrototypeApprovalDecisions,
   listPrototypeSnapshots,
+  PROTOTYPE_MODE_DISABLED_MESSAGE,
   PROTOTYPE_WRITE_DISABLED_MESSAGE,
   resolvePeriodLockWithPrototype,
   resolvePeriodStatusLabelWithPrototype,
@@ -402,7 +404,7 @@ export async function fetchReadOnlySummaryReadMode(projectId: string, periodId: 
     };
   }
 
-  if (!isRealBackendWriteEnabled()) {
+  if (isPrototypeFallbackAllowed()) {
     const fallback = fallbackSummaryFromPrototypeSnapshots(projectId, periodId);
     if (fallback) return fallback;
   }
@@ -859,6 +861,9 @@ export async function applyApproverDecision(input: {
     throw new Error(LOCKED_READ_ONLY_ERROR);
   }
   if (!isRealBackendWriteEnabled()) {
+    if (!isPrototypeFallbackAllowed()) {
+      throw new Error(PROTOTYPE_MODE_DISABLED_MESSAGE);
+    }
     const decisionRecord = appendPrototypeApprovalDecision({
       project_id: input.project_id,
       period_id: input.period_id,

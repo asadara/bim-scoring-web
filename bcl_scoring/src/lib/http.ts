@@ -1,5 +1,6 @@
 import { getApiBaseUrlFromEnv } from "@/lib/runtimeEnv";
 import { getStoredCredential } from "@/lib/userCredential";
+import { getSupabaseAccessToken } from "@/lib/authToken";
 
 export type SafeFetchFailKind = "backend_unavailable" | "http_error" | "parse_error";
 
@@ -183,6 +184,12 @@ export async function safeFetchJson<T>(
     }
     if (!headers.has("x-actor-id") && credential.user_id) {
       headers.set("x-actor-id", credential.user_id);
+    }
+    if (!headers.has("authorization")) {
+      const accessToken = await getSupabaseAccessToken();
+      if (accessToken) {
+        headers.set("authorization", `Bearer ${accessToken}`);
+      }
     }
 
     // Respect external cancel signals while still enforcing our timeout.

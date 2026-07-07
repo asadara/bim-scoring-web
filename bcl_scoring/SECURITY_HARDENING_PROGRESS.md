@@ -9,11 +9,11 @@ Scope repo ini: frontend Next.js/OpenNext/Cloudflare untuk BIM Scoring.
 | Prioritas | Item | Status | Catatan |
 | --- | --- | --- | --- |
 | P0 | Patch dependency frontend (`next`, `jspdf`, `wrangler`) | Partial | Updated to patched/current versions, removed vulnerable `xlsx`, and ran `npm audit fix`; residual: Next/PostCSS advisory tied to OpenNext/Next with no safe non-force path. |
-| P0 | Server-side auth trust boundary | Pending | Jangan percaya role dari localStorage/header client untuk write/admin. |
+| P0 | Server-side auth trust boundary | Done | Frontend sekarang menyertakan Supabase bearer token ke API; enforcement authoritative berada di Cloudflare Gateway/API repo. |
 | P1 | Production fallback policy | Done | Real backend write defaults to disabled unless explicitly enabled via env. |
-| P1 | Prototype/local fallback containment | Pending | Production perlu fail-closed atau banner/blocking eksplisit untuk data non-authoritative. |
+| P1 | Prototype/local fallback containment | Done | Prototype/local fallback default nonaktif di production dan hanya aktif jika `NEXT_PUBLIC_ALLOW_PROTOTYPE_FALLBACK=true`. |
 | P2 | Lint quality gate | Done | `npm run lint` passes clean after ignoring generated/static artifacts and removing dead admin code. |
-| P3 | Next middleware convention | Pending | Next 16 build warns that `middleware` should migrate to `proxy`. |
+| P3 | Next middleware convention | Done | Redirect host legacy dipindah dari `middleware.ts` ke konvensi `proxy.ts`. |
 
 ## Monitoring Notes
 

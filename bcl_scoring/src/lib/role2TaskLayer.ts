@@ -12,7 +12,9 @@ import {
   fetchProjectPeriodsReadMode,
   fetchProjectReadMode,
   getLocalEvidenceById,
+  isPrototypeFallbackAllowed,
   isRealBackendWriteEnabled,
+  PROTOTYPE_MODE_DISABLED_MESSAGE,
   listAllLocalEvidenceWithReview,
   listLocalEvidenceWithReview,
   mapEvidenceRowsWithReview,
@@ -165,11 +167,14 @@ export async function applyReviewWrite(input: {
   reviewed_by?: string;
 }): Promise<LocalEvidenceItem | null> {
   const evidence = getLocalEvidenceById(input.evidence_id);
-  if (!isRealBackendWriteEnabled() && !evidence) {
+  if (!isRealBackendWriteEnabled() && isPrototypeFallbackAllowed() && !evidence) {
     throw new Error("Evidence context not found.");
   }
 
   if (!isRealBackendWriteEnabled()) {
+    if (!isPrototypeFallbackAllowed()) {
+      throw new Error(PROTOTYPE_MODE_DISABLED_MESSAGE);
+    }
     applyPrototypeReview(input);
     return getLocalEvidenceById(input.evidence_id);
   }

@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/http";
+import { getSupabaseAccessToken } from "@/lib/authToken";
 
 export type BackendActorRole = "role1" | "role2" | "role3";
 
@@ -173,6 +174,7 @@ export async function callBackendWrite<T>(params: {
 
   let response: Response;
   try {
+    const accessToken = await getSupabaseAccessToken();
     response = await fetch(buildApiUrl(params.path), {
       method: params.method,
       headers: {
@@ -180,6 +182,7 @@ export async function callBackendWrite<T>(params: {
         "X-Request-Id": requestId,
         "X-Actor-Id": params.actorId || DEFAULT_ACTOR_ID[params.actorRole],
         "X-Actor-Role": ACTOR_ROLE_HEADER_VALUE[params.actorRole],
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify(payload),
     });
