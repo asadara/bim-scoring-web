@@ -1,5 +1,7 @@
 import { PmpArea15ComplianceSummary } from "@/lib/approverTaskLayer";
 
+type CellValue = string | number | boolean | null | undefined;
+
 type PmpArea15WorkbookInput = {
   summary: PmpArea15ComplianceSummary;
   project_label: string;
@@ -28,9 +30,222 @@ function safeFileSegment(value: string | null | undefined): string {
     .slice(0, 80) || "na";
 }
 
-export async function exportPmpArea15Workbook(input: PmpArea15WorkbookInput): Promise<string> {
-  const XLSX = await import("xlsx");
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
 
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function encodeUtf8(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function escapeXml(value: CellValue): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function columnName(index: number): string {
+  let value = index + 1;
+  let name = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    value = Math.floor((value - 1) / 26);
+  }
+  return name;
+}
+
+function objectRowsToSheetRows(rows: Array<Record<string, CellValue>>, fallback: Record<string, CellValue>): CellValue[][] {
+  const sourceRows = rows.length > 0 ? rows : [fallback];
+  const headers = Object.keys(sourceRows[0]);
+  return [
+    headers,
+    ...sourceRows.map((row) => headers.map((header) => row[header])),
+  ];
+}
+
+function buildSheetXml(rows: CellValue[][]): string {
+  const body = rows
+    .map((row, rowIndex) => {
+      const cells = row
+        .map((cell, cellIndex) => {
+          const ref = `${columnName(cellIndex)}${rowIndex + 1}`;
+          if (typeof cell === "number" && Number.isFinite(cell)) {
+            return `<c r="${ref}"><v>${cell}</v></c>`;
+          }
+          return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(cell)}</t></is></c>`;
+        })
+        .join("");
+      return `<row r="${rowIndex + 1}">${cells}</row>`;
+    })
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>${body}</sheetData>
+</worksheet>`;
+}
+
+function pushUint16(bytes: number[], value: number) {
+  bytes.push(value & 0xff, (value >>> 8) & 0xff);
+}
+
+function pushUint32(bytes: number[], value: number) {
+  bytes.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+}
+
+function toZip(parts: Array<{ path: string; content: string }>): Blob {
+  const chunks: Uint8Array[] = [];
+  const centralDirectory: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const part of parts) {
+    const nameBytes = encodeUtf8(part.path);
+    const dataBytes = encodeUtf8(part.content);
+    const checksum = crc32(dataBytes);
+    const localHeader: number[] = [];
+    pushUint32(localHeader, 0x04034b50);
+    pushUint16(localHeader, 20);
+    pushUint16(localHeader, 0);
+    pushUint16(localHeader, 0);
+    pushUint16(localHeader, 0);
+    pushUint16(localHeader, 33);
+    pushUint32(localHeader, checksum);
+    pushUint32(localHeader, dataBytes.length);
+    pushUint32(localHeader, dataBytes.length);
+    pushUint16(localHeader, nameBytes.length);
+    pushUint16(localHeader, 0);
+    const localHeaderBytes = new Uint8Array([...localHeader, ...nameBytes]);
+    chunks.push(localHeaderBytes, dataBytes);
+
+    const centralHeader: number[] = [];
+    pushUint32(centralHeader, 0x02014b50);
+    pushUint16(centralHeader, 20);
+    pushUint16(centralHeader, 20);
+    pushUint16(centralHeader, 0);
+    pushUint16(centralHeader, 0);
+    pushUint16(centralHeader, 0);
+    pushUint16(centralHeader, 33);
+    pushUint32(centralHeader, checksum);
+    pushUint32(centralHeader, dataBytes.length);
+    pushUint32(centralHeader, dataBytes.length);
+    pushUint16(centralHeader, nameBytes.length);
+    pushUint16(centralHeader, 0);
+    pushUint16(centralHeader, 0);
+    pushUint16(centralHeader, 0);
+    pushUint16(centralHeader, 0);
+    pushUint32(centralHeader, 0);
+    pushUint32(centralHeader, offset);
+    centralDirectory.push(new Uint8Array([...centralHeader, ...nameBytes]));
+
+    offset += localHeaderBytes.length + dataBytes.length;
+  }
+
+  const centralOffset = offset;
+  const centralSize = centralDirectory.reduce((total, chunk) => total + chunk.length, 0);
+  chunks.push(...centralDirectory);
+
+  const endRecord: number[] = [];
+  pushUint32(endRecord, 0x06054b50);
+  pushUint16(endRecord, 0);
+  pushUint16(endRecord, 0);
+  pushUint16(endRecord, parts.length);
+  pushUint16(endRecord, parts.length);
+  pushUint32(endRecord, centralSize);
+  pushUint32(endRecord, centralOffset);
+  pushUint16(endRecord, 0);
+  chunks.push(new Uint8Array(endRecord));
+
+  const blobParts: BlobPart[] = chunks.map((chunk) => {
+    const copy = new Uint8Array(chunk.byteLength);
+    copy.set(chunk);
+    return copy.buffer as ArrayBuffer;
+  });
+  return new Blob(blobParts, {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+function buildWorkbookBlob(sheets: Array<{ name: string; rows: CellValue[][] }>): Blob {
+  const worksheetParts = sheets.map((sheet, index) => ({
+    path: `xl/worksheets/sheet${index + 1}.xml`,
+    content: buildSheetXml(sheet.rows),
+  }));
+  const sheetDefinitions = sheets
+    .map(
+      (sheet, index) =>
+        `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`
+    )
+    .join("");
+  const sheetRelationships = sheets
+    .map(
+      (_sheet, index) =>
+        `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`
+    )
+    .join("");
+  const contentTypeOverrides = sheets
+    .map(
+      (_sheet, index) =>
+        `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
+    )
+    .join("");
+
+  return toZip([
+    {
+      path: "[Content_Types].xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  ${contentTypeOverrides}
+</Types>`,
+    },
+    {
+      path: "_rels/.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`,
+    },
+    {
+      path: "xl/workbook.xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>${sheetDefinitions}</sheets>
+</workbook>`,
+    },
+    {
+      path: "xl/_rels/workbook.xml.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${sheetRelationships}
+</Relationships>`,
+    },
+    ...worksheetParts,
+  ]);
+}
+
+export async function exportPmpArea15Workbook(input: PmpArea15WorkbookInput): Promise<string> {
   const overviewRows = [
     ["Field", "Value"],
     ["Project", input.project_label],
@@ -82,23 +297,11 @@ export async function exportPmpArea15Workbook(input: PmpArea15WorkbookInput): Pr
     blockers: control.blockers.join("; "),
   }));
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(overviewRows), "PMP15 Overview");
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(phaseRows.length > 0 ? phaseRows : [{ phase: "N/A" }]),
-    "PMP15 Phases"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(controlRows.length > 0 ? controlRows : [{ control_id: "N/A" }]),
-    "PMP15 Controls"
-  );
-
-  const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = buildWorkbookBlob([
+    { name: "PMP15 Overview", rows: overviewRows },
+    { name: "PMP15 Phases", rows: objectRowsToSheetRows(phaseRows, { phase: "N/A" }) },
+    { name: "PMP15 Controls", rows: objectRowsToSheetRows(controlRows, { control_id: "N/A" }) },
+  ]);
 
   const fileName = [
     "pmp-area15",

@@ -1113,16 +1113,6 @@ export default function AdminControlPanelPage() {
     }, successMessage);
   }
 
-  async function handleSetProjectActive(projectId: string, nextActive: boolean) {
-    await runAction(async () => {
-      await updateAdminProject(session, projectId, { is_active: nextActive });
-      await reloadBase(session);
-      if (periodProjectFilter === projectId) {
-        await reloadPeriodsForProject(session, projectId);
-      }
-    }, nextActive ? "Workspace diaktifkan." : "Workspace dinonaktifkan.");
-  }
-
   async function handleDeleteIndicator(id: string) {
     await runAction(async () => {
       await deleteAdminIndicator(session, id);
@@ -1314,8 +1304,6 @@ export default function AdminControlPanelPage() {
                   }
                   return requestedRole === currentRole;
                 })();
-                const cannotApproveRole1WithoutTestWorkspace =
-                  requestedRole === "role1" && isRole1WorkspaceSwitchToTest && !testWorkspaceProject;
                 const requestSubmittedAt = formatDateTime(item.requested_role_submitted_at);
                 const isActiveRow = editingUserId === item.id;
                 return (
