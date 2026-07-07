@@ -15,7 +15,7 @@ npm run smoke:id-routes
 
 Optional env override:
 ```bash
-WEB_BASE_URL=https://bim-scoring-web.onrender.com API_BASE_URL=https://bim-scoring-api.onrender.com npm run smoke:id-routes
+WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev API_BASE_URL=https://bcl-api-gateway.asadara83.workers.dev npm run smoke:id-routes
 ```
 
 What is validated by the script:

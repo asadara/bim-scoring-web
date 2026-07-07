@@ -22,10 +22,6 @@ function logInfo(message) {
   console.log(`[INFO] ${message}`);
 }
 
-function logWarn(message) {
-  console.warn(`[WARN] ${message}`);
-}
-
 function logFail(message) {
   console.error(`[FAIL] ${message}`);
 }
@@ -164,7 +160,7 @@ async function main() {
   }
 
   if (/onrender\.com$/i.test(new URL(apiBase).hostname)) {
-    logWarn("API_BASE_URL still points to onrender.com. This is acceptable only for temporary transition.");
+    throw new Error("API_BASE_URL points to legacy onrender.com. Render is decommissioned; use the Cloudflare API gateway.");
   }
 
   logInfo(`WEB_BASE_URL=${webBase}`);

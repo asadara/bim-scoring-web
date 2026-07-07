@@ -10,10 +10,6 @@ function fail(msg) {
   console.error(`[FAIL] ${msg}`);
 }
 
-function warn(msg) {
-  console.warn(`[WARN] ${msg}`);
-}
-
 async function fetchWithTimeout(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
@@ -84,7 +80,8 @@ async function main() {
   }
 
   if (/onrender\.com$/i.test(new URL(apiBase).hostname)) {
-    warn("API_BASE_URL still points to onrender.com. This is acceptable only for temporary transition.");
+    fail("API_BASE_URL points to legacy onrender.com. Render is decommissioned; use the Cloudflare API gateway.");
+    process.exit(1);
   }
 
   const checks = [

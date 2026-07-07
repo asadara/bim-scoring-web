@@ -119,9 +119,9 @@ WEB_BASE_URL=https://bcl-scoring.asadara83.workers.dev API_BASE_URL=https://api.
 WEB_BASE_URL=https://app.<domain-custom-anda> API_BASE_URL=https://api.<domain-custom-anda> npm run smoke:id-routes
 ```
 
-### Render Custom Domain Control (Legacy / Transition)
+### Render Custom Domain Control (Legacy / Disabled)
 
-Using Render API credentials (`RENDER_API_KEY`, `RENDER_WEB_SERVICE_ID`):
+Render/onrender is no longer an active runtime path. Keep these commands only for historical cleanup if the Render service record still exists in the dashboard:
 
 ```bash
 npm run render:domain:list
@@ -139,8 +139,7 @@ CUSTOM_DOMAIN=<domain-custom-anda> npm run render:domain:wait
 ## Landing Page Deployment Note
 
 - Root landing page published from `src/pages/index.tsx`.
-- Render deployment checklist is documented at:
-  - `../doc/landing-page-render-deploy-checklist.md`
+- Cloudflare is the active deployment target. Historical Render deployment notes remain in `../doc/` for audit context only.
 
 ## Explicit Non-Claims
 

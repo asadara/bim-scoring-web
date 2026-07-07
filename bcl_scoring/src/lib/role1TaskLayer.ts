@@ -39,7 +39,7 @@ import {
   reviewOutcomeToEvidenceStatus,
 } from "@/lib/statusModel";
 import { addJakartaDays, formatJakartaYmd } from "@/lib/jakartaTime";
-// Period schedule is managed by backend (Supabase/Render) and selected by date range (Jakarta).
+// Period schedule is managed by the backend data plane (Supabase/Cloudflare) and selected by date range (Jakarta).
 
 export { normalizePrototypePeriodId } from "@/lib/prototypeStore";
 
