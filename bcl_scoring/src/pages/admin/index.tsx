@@ -1017,7 +1017,7 @@ export default function AdminControlPanelPage() {
 
   async function applyRole1ScopedUserRole(userId: string, targetProjectId: string | null) {
     const scopedProjectId = toNonEmptyString(targetProjectId || "");
-    await applyGlobalUserRole(userId, "role1");
+    await deactivateHigherPriorityMappings(userId, "role1");
 
     const allRole1Mappings = roleMappings.filter(
       (item) =>
@@ -1027,8 +1027,7 @@ export default function AdminControlPanelPage() {
 
     if (!scopedProjectId) {
       for (const mapping of allRole1Mappings) {
-        const mappingProjectId = toNonEmptyString(mapping.project_id || "");
-        if (mappingProjectId && mapping.is_active !== false) {
+        if (mapping.is_active !== false) {
           await updateAdminRoleMapping(session, mapping.id, { is_active: false });
         }
       }
@@ -1037,7 +1036,7 @@ export default function AdminControlPanelPage() {
 
     for (const mapping of allRole1Mappings) {
       const mappingProjectId = toNonEmptyString(mapping.project_id || "");
-      if (!mappingProjectId || mappingProjectId === scopedProjectId || mapping.is_active === false) continue;
+      if (mappingProjectId === scopedProjectId || mapping.is_active === false) continue;
       await updateAdminRoleMapping(session, mapping.id, { is_active: false });
     }
 
@@ -1061,7 +1060,17 @@ export default function AdminControlPanelPage() {
   async function handleAssignUserRole(userId: string) {
     const nextRole = userRoleDraftById[userId] || "viewer";
     await runAction(async () => {
-      await applyGlobalUserRole(userId, nextRole);
+      if (nextRole === "role1") {
+        const user = users.find((item) => item.id === userId) || null;
+        const requestedProjectIds = normalizeRequestedProjectIds(user?.requested_project_ids);
+        const targetProjectId = requestedProjectIds[0] || toNonEmptyString(testWorkspaceProject?.id || "");
+        if (!targetProjectId) {
+          throw new Error("Role 1 wajib memiliki scope workspace. Buat workspace ujicoba atau approve pengajuan scope user.");
+        }
+        await applyRole1ScopedUserRole(userId, targetProjectId);
+      } else {
+        await applyGlobalUserRole(userId, nextRole);
+      }
       await reloadBase(session);
     }, `Role user diperbarui ke ${getRoleLabel(nextRole)}.`);
   }
