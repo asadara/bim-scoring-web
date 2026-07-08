@@ -7,7 +7,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import PmpArea15CompliancePanel from "@/components/PmpArea15CompliancePanel";
 import { canWriteRole3Approval } from "@/lib/accessControl";
 import { NA_TEXT, formatProjectLabel } from "@/lib/role1TaskLayer";
-import { ApproverProjectContext, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
+import { ApproverProjectContext, evaluateApprovalGates, fetchApproverProjectContext } from "@/lib/approverTaskLayer";
 import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel } from "@/lib/userCredential";
 
@@ -110,11 +110,23 @@ export default function ProjectApprovalContextPage() {
     confidence?.confidence !== null && confidence?.confidence !== undefined
       ? String(confidence.confidence)
       : "Pending";
+  const approvalGate = evaluateApprovalGates({
+    breakdown: context.summary.breakdown,
+    confidence_coverage: context.summary.confidence?.coverage ?? null,
+    evidence_counts: context.evidence_counts,
+    pmp_area15: context.summary.compliance,
+  });
+  const decisionCtaLabel = approvalGate.is_eligible ? "Open Decision Package" : "Review Blockers";
+  const decisionCtaHref = approvalGate.is_eligible
+    ? `/approve/projects/${projectId}/decision`
+    : context.evidence_counts.AWAITING_REVIEW > 0
+      ? `/approve/projects/${projectId}/awaiting-review`
+      : `/approve/projects/${projectId}/decision`;
 
   return (
     <ApproverLayout
-      title="Period Approval"
-      subtitle="Ringkasan period read-only untuk keputusan approval level period."
+      title="Approval Package"
+      subtitle="Ringkasan score window aktif untuk keputusan BIM Manager."
       projectId={typeof projectId === "string" ? projectId : null}
       projectName={formatProjectLabel(context.project)}
       periodLabel={context.period_label}
@@ -124,18 +136,48 @@ export default function ProjectApprovalContextPage() {
     >
       <section className="task-panel">
         <div className="wizard-actions">
-          <Link href="/approve">Kembali ke Daftar Project Approval</Link>
+          <Link href="/approve">Kembali ke Approval Cockpit</Link>
         </div>
       </section>
 
-      <section className="task-panel">
-        <p>
-          Period status: <span className={statusClass}>{context.period_status_label || NA_TEXT}</span>
-        </p>
+      <section className="task-panel approval-package-strip">
+        <div>
+          <p className="task-kicker">Decision package status</p>
+          <h2>{approvalGate.is_eligible ? "Ready for BIM Manager decision" : "Blocked before final decision"}</h2>
+          <p>
+            Period status: <span className={statusClass}>{context.period_status_label || NA_TEXT}</span>
+          </p>
+        </div>
+        <div className="approval-package-actions">
+          <Link
+            className={`primary-cta ${context.period_locked || !canWriteRole3Approval(credential.role) ? "disabled-link" : ""}`}
+            href={context.period_locked || !canWriteRole3Approval(credential.role) ? "#" : decisionCtaHref}
+            aria-disabled={context.period_locked || !canWriteRole3Approval(credential.role)}
+            onClick={(event) => {
+              if (context.period_locked || !canWriteRole3Approval(credential.role)) event.preventDefault();
+            }}
+          >
+            {decisionCtaLabel}
+          </Link>
+          {context.evidence_counts.AWAITING_REVIEW > 0 ? (
+            <Link href={`/approve/projects/${projectId}/awaiting-review`}>Evidence pending HO review</Link>
+          ) : null}
+        </div>
         {context.period_status_label === NA_TEXT ? (
           <p className="warning-box">Period status: {NA_TEXT}</p>
         ) : null}
       </section>
+
+      {!approvalGate.is_eligible ? (
+        <section className="task-panel">
+          <h2>Blocker Checklist</h2>
+          <div className="warning-box">
+            {approvalGate.failures.map((item, index) => (
+              <p key={`${item}-${index}`}>{item}</p>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="task-panel">
         <h2>Read-only Summary</h2>
@@ -204,7 +246,7 @@ export default function ProjectApprovalContextPage() {
       </section>
 
       <section className="task-panel">
-        <h2>Approval Decision</h2>
+        <h2>Manager Decision</h2>
         {!canWriteRole3Approval(credential.role) ? (
           <p className="read-only-banner">
             Mode read-only aktif untuk role <strong>{getRoleLabel(credential.role)}</strong>. Aksi Approve/Reject
@@ -214,13 +256,13 @@ export default function ProjectApprovalContextPage() {
         <div className="wizard-actions">
           <Link
             className={`primary-cta ${context.period_locked || !canWriteRole3Approval(credential.role) ? "disabled-link" : ""}`}
-            href={context.period_locked || !canWriteRole3Approval(credential.role) ? "#" : `/approve/projects/${projectId}/decision`}
+            href={context.period_locked || !canWriteRole3Approval(credential.role) ? "#" : decisionCtaHref}
             aria-disabled={context.period_locked || !canWriteRole3Approval(credential.role)}
             onClick={(event) => {
               if (context.period_locked || !canWriteRole3Approval(credential.role)) event.preventDefault();
             }}
           >
-            Approve / Reject Period
+            {decisionCtaLabel}
           </Link>
         </div>
 

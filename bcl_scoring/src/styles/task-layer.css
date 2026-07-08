@@ -2485,6 +2485,95 @@ table td.table-col-long {
   color: var(--task-muted);
 }
 
+.approval-cockpit {
+  display: grid;
+  gap: 16px;
+}
+
+.approval-cockpit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--task-line);
+  padding-bottom: 12px;
+}
+
+.approval-cockpit-toolbar button {
+  min-height: 36px;
+  border: 1px solid var(--task-line);
+  border-radius: 8px;
+  background: var(--task-surface);
+  color: var(--task-ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.approval-cockpit-toolbar button:hover,
+.approval-cockpit-toolbar button:focus-visible,
+.approval-cockpit-toolbar .approval-filter-active {
+  border-color: var(--task-primary);
+  background: #e9f5f2;
+  color: var(--task-primary);
+}
+
+.approval-package-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.approval-package-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.approval-decision-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 20px;
+  align-items: start;
+}
+
+.approval-decision-main {
+  min-width: 0;
+}
+
+.approval-decision-aside {
+  position: sticky;
+  top: 16px;
+  border-left: 1px solid var(--task-line);
+  padding-left: 18px;
+}
+
+.approval-decision-aside dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.approval-decision-aside div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--task-line);
+  padding-bottom: 10px;
+}
+
+.approval-decision-aside dt {
+  color: var(--task-muted);
+}
+
+.approval-decision-aside dd {
+  margin: 0;
+  font-weight: 800;
+  text-align: right;
+}
+
 .pmp-action-list {
   display: grid;
   gap: 10px;
@@ -3561,6 +3650,23 @@ table td.table-col-long {
 }
 
 @media (max-width: 720px) {
+  .approval-package-strip,
+  .approval-decision-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-package-actions {
+    justify-content: flex-start;
+  }
+
+  .approval-decision-aside {
+    position: static;
+    border-left: 0;
+    border-top: 1px solid var(--task-line);
+    padding-top: 16px;
+    padding-left: 0;
+  }
+
   .dashboard-brand-cluster {
     width: 100%;
   }

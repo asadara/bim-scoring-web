@@ -27,6 +27,15 @@ import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel } from "@/lib/userCredential";
 
 const DECISIONS: ApprovalDecision[] = ["APPROVE PERIOD", "REJECT APPROVAL"];
+const DECISION_LABEL: Record<ApprovalDecision, string> = {
+  "APPROVE PERIOD": "Approve & Lock Package",
+  "REJECT APPROVAL": "Return to HO",
+};
+
+const DECISION_HELP: Record<ApprovalDecision, string> = {
+  "APPROVE PERIOD": "Finalisasi score window, lock period, dan buat snapshot audit.",
+  "REJECT APPROVAL": "Kembalikan package ke HO dengan alasan yang harus ditindaklanjuti.",
+};
 
 export default function ApprovalDecisionPage() {
   const router = useRouter();
@@ -203,8 +212,8 @@ export default function ApprovalDecisionPage() {
 
   return (
     <ApproverLayout
-      title="Approve / Reject Period"
-      subtitle="Keputusan final level period untuk legitimasi organisasi."
+      title="Finalize Score Package"
+      subtitle="Putuskan package score window aktif: approve untuk lock snapshot, atau return ke HO untuk perbaikan."
       projectId={typeof projectId === "string" ? projectId : null}
       projectName={formatProjectLabel(contextValue.project)}
       periodLabel={contextValue.period_label}
@@ -213,7 +222,7 @@ export default function ApprovalDecisionPage() {
       backendMessage={bannerHint || contextValue.backend_message}
     >
       <section className="task-panel">
-        <p className="warning-box">Approval akan mengunci period dan membentuk rekam jejak final.</p>
+        <p className="warning-box">Approve akan mengunci package dan membentuk snapshot final. Return to HO menjaga period tetap OPEN.</p>
         <div className="task-panel-inline-help">
           <InfoTooltip
             id="role3-decision-snapshot-info"
@@ -292,8 +301,9 @@ export default function ApprovalDecisionPage() {
         showControls={false}
       />
 
-      <section className="task-panel">
-        <h2>Konfirmasi Keputusan</h2>
+      <section className="task-panel approval-decision-workspace">
+        <div className="approval-decision-main">
+        <h2>Decision Controls</h2>
         <div className="field-grid">
           <label htmlFor="approval-decision">
             Decision
@@ -310,11 +320,14 @@ export default function ApprovalDecisionPage() {
                   value={item}
                   disabled={item === "APPROVE PERIOD" && approveBlockedByPolicy}
                 >
-                  {item}
+                  {DECISION_LABEL[item]}
                 </option>
               ))}
             </select>
           </label>
+          {decision ? (
+            <p className="inline-note">{DECISION_HELP[decision]}</p>
+          ) : null}
           <label htmlFor="approval-reason">
             Reason (required)
             <textarea
@@ -322,7 +335,7 @@ export default function ApprovalDecisionPage() {
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               disabled={!canWrite || locked || blockedByBackend || isSubmitting}
-              placeholder="Tuliskan alasan keputusan approval"
+              placeholder={decision === "REJECT APPROVAL" ? "Tuliskan arahan perbaikan untuk HO" : "Tuliskan dasar approval final"}
             />
           </label>
         </div>
@@ -334,13 +347,39 @@ export default function ApprovalDecisionPage() {
             onClick={() => void onConfirm()}
             disabled={!canWrite || locked || blockedByBackend || isSubmitting}
           >
-            Konfirmasi Keputusan
+            {decision ? DECISION_LABEL[decision] : "Konfirmasi Keputusan"}
           </button>
-          <Link href={`/approve/projects/${projectIdValue}`}>Back to Period Approval</Link>
+          <Link href={`/approve/projects/${projectIdValue}`}>Back to Package Context</Link>
         </div>
 
         {formError ? <p className="error-box">{formError}</p> : null}
         {formInfo ? <p className="task-note action-feedback">{formInfo}</p> : null}
+        </div>
+        <aside className="approval-decision-aside" aria-label="Decision package summary">
+          <p className="task-kicker">Package summary</p>
+          <dl>
+            <div>
+              <dt>Score</dt>
+              <dd>{contextValue.summary.total_score ?? NA_TEXT}</dd>
+            </div>
+            <div>
+              <dt>Awaiting review</dt>
+              <dd>{approvalGate.metrics.awaiting_review_count}</dd>
+            </div>
+            <div>
+              <dt>Coverage</dt>
+              <dd>
+                {approvalGate.metrics.coverage_ratio === null
+                  ? NA_TEXT
+                  : `${Math.round(approvalGate.metrics.coverage_ratio * 100)}%`}
+              </dd>
+            </div>
+            <div>
+              <dt>PMP hold point</dt>
+              <dd>{approvalGate.metrics.pmp_hold_point_ready ? "Ready" : "Blocked"}</dd>
+            </div>
+          </dl>
+        </aside>
       </section>
 
       <section className="task-panel" key={historyVersion}>
