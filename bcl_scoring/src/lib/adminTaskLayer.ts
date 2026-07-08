@@ -209,9 +209,12 @@ async function requestAdmin<T>(
     headers.set("content-type", "application/json");
   }
   const accessToken = await getSupabaseAccessToken();
-  if (accessToken) {
-    headers.set("authorization", `Bearer ${accessToken}`);
+  if (!accessToken) {
+    throw new Error(
+      "Sesi login Supabase tidak ditemukan. Sign out lalu sign in ulang memakai akun admin aktif sebelum membuka panel admin."
+    );
   }
+  headers.set("authorization", `Bearer ${accessToken}`);
 
   const response = await fetch(buildApiUrl(path), {
     ...init,
