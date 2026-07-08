@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/http";
+import { getSupabaseAccessToken } from "@/lib/authToken";
 
 export type AdminSession = {
   actorId: string;
@@ -206,6 +207,10 @@ async function requestAdmin<T>(
   headers.set("x-actor-id", session.actorId);
   if (!(init.body instanceof FormData)) {
     headers.set("content-type", "application/json");
+  }
+  const accessToken = await getSupabaseAccessToken();
+  if (accessToken) {
+    headers.set("authorization", `Bearer ${accessToken}`);
   }
 
   const response = await fetch(buildApiUrl(path), {
