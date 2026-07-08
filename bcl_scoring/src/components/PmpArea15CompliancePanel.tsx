@@ -62,9 +62,9 @@ export default function PmpArea15CompliancePanel({
               <small>PMP format generation gate</small>
             </article>
             <article className="summary-card">
-              <span>Hold point readiness</span>
+              <span>Hold point readout</span>
               <strong>{formatBooleanLabel(summary.hold_point_ready)}</strong>
-              <small>Audit and gate release signal</small>
+              <small>Advisory signal, not approval blocker</small>
             </article>
             <article className="summary-card">
               <span>Overall score</span>
@@ -82,6 +82,21 @@ export default function PmpArea15CompliancePanel({
               <span>Total BIM score</span>
               <strong>{summary.total_bim_score_100 ?? NA_TEXT}</strong>
               <small>Read-only engine result</small>
+            </article>
+            <article className="summary-card">
+              <span>PMP15 input</span>
+              <strong>{summary.scoring_adjustment?.pmp_score_0_5 ?? NA_TEXT}</strong>
+              <small>{summary.scoring_adjustment?.input_available ? "Optional score available" : "Optional, not required"}</small>
+            </article>
+            <article className="summary-card">
+              <span>PMP15 bonus</span>
+              <strong>{summary.scoring_adjustment?.bonus_score_100 ?? 0}</strong>
+              <small>Max {summary.scoring_adjustment?.max_bonus_score_100 ?? 5} score points</small>
+            </article>
+            <article className="summary-card">
+              <span>Adjusted score</span>
+              <strong>{summary.scoring_adjustment?.adjusted_total_score_100 ?? summary.total_bim_score_100 ?? NA_TEXT}</strong>
+              <small>Base BIM + optional PMP15</small>
             </article>
           </div>
 

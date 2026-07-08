@@ -95,6 +95,28 @@ export type PmpArea15ComplianceSummary = {
   export_ready: boolean;
   hold_point_ready: boolean;
   total_bim_score_100: number | null;
+  scoring_adjustment: {
+    mode: string;
+    input_available: boolean;
+    input_required: boolean;
+    blocks_approval: boolean;
+    base_total_score_100: number | null;
+    pmp_score_0_5: number | null;
+    pmp_score_100: number | null;
+    bonus_score_100: number;
+    adjusted_total_score_100: number | null;
+    max_bonus_score_100: number;
+    input: {
+      input_id: string | null;
+      project_id: string | null;
+      period_id: string | null;
+      status: string | null;
+      source_reference: string | null;
+      notes: string | null;
+      input_by: string | null;
+      input_at: string | null;
+    } | null;
+  } | null;
   phase_summaries: PmpArea15PhaseSummary[];
   controls: PmpArea15ControlSummary[];
   mapping_status: {
@@ -269,6 +291,8 @@ function toPmpArea15ComplianceSummary(value: unknown): PmpArea15ComplianceSummar
   if (Object.keys(root).length === 0) return null;
 
   const mappingStatusRoot = safeObject(root.mapping_status);
+  const adjustmentRoot = safeObject(root.scoring_adjustment);
+  const adjustmentInputRoot = safeObject(adjustmentRoot.input);
   const phaseRows = Array.isArray(root.phase_summaries) ? root.phase_summaries : [];
   const controlRows = Array.isArray(root.controls) ? root.controls : [];
 
@@ -282,6 +306,32 @@ function toPmpArea15ComplianceSummary(value: unknown): PmpArea15ComplianceSummar
     export_ready: root.export_ready === true,
     hold_point_ready: root.hold_point_ready === true,
     total_bim_score_100: asNumber(root.total_bim_score_100),
+    scoring_adjustment: Object.keys(adjustmentRoot).length > 0
+      ? {
+        mode: asString(adjustmentRoot.mode).trim() || "optional_additive",
+        input_available: adjustmentRoot.input_available === true,
+        input_required: adjustmentRoot.input_required === true,
+        blocks_approval: adjustmentRoot.blocks_approval === true,
+        base_total_score_100: asNumber(adjustmentRoot.base_total_score_100),
+        pmp_score_0_5: asNumber(adjustmentRoot.pmp_score_0_5),
+        pmp_score_100: asNumber(adjustmentRoot.pmp_score_100),
+        bonus_score_100: asNumber(adjustmentRoot.bonus_score_100) ?? 0,
+        adjusted_total_score_100: asNumber(adjustmentRoot.adjusted_total_score_100),
+        max_bonus_score_100: asNumber(adjustmentRoot.max_bonus_score_100) ?? 5,
+        input: Object.keys(adjustmentInputRoot).length > 0
+          ? {
+            input_id: asString(adjustmentInputRoot.input_id).trim() || null,
+            project_id: asString(adjustmentInputRoot.project_id).trim() || null,
+            period_id: asString(adjustmentInputRoot.period_id).trim() || null,
+            status: asString(adjustmentInputRoot.status).trim() || null,
+            source_reference: asString(adjustmentInputRoot.source_reference).trim() || null,
+            notes: asString(adjustmentInputRoot.notes).trim() || null,
+            input_by: asString(adjustmentInputRoot.input_by).trim() || null,
+            input_at: asString(adjustmentInputRoot.input_at).trim() || null,
+          }
+          : null,
+      }
+      : null,
     phase_summaries: phaseRows.map((entry) => {
       const item = safeObject(entry);
       return {
@@ -487,13 +537,6 @@ export function evaluateApprovalGates(input: {
   const pmpHoldPointReady = input.pmp_area15?.hold_point_ready === true;
 
   const failures: string[] = [];
-  if (!pmpBridgeAvailable) {
-    failures.push("Bridge PMP Area 15 belum tersedia.");
-  } else if (!pmpHoldPointReady) {
-    failures.push(
-      `Hold point PMP Area 15 belum ready (status ${input.pmp_area15?.overall_status || NA_TEXT}).`
-    );
-  }
   if (awaitingReviewCount > 0) {
     failures.push(`Awaiting review harus 0 (saat ini ${awaitingReviewCount})`);
   }

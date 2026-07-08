@@ -229,7 +229,8 @@ export default function ApprovalDecisionPage() {
             label="Informasi keputusan approval Role 3"
             lines={[
               "Keputusan approval/reject diproses pada level period.",
-              "Jika APPROVE PERIOD lolos gate, snapshot final akan direkam.",
+              "Jika APPROVE PERIOD lolos gate operasional, snapshot final akan direkam.",
+              "PMP Area 15 dibaca sebagai input/readout kalibrasi dan tidak mengunci approval.",
               "Sumber data snapshot: database backend.",
             ]}
           />
@@ -276,9 +277,9 @@ export default function ApprovalDecisionPage() {
             <small>Must be 0</small>
           </article>
           <article className="summary-card">
-            <span>PMP Hold Point</span>
-            <strong>{approvalGate.metrics.pmp_hold_point_ready ? "Ready" : "Blocked"}</strong>
-            <small>{approvalGate.metrics.pmp_bridge_available ? "Bridge active" : "Bridge unavailable"}</small>
+            <span>PMP15 Readout</span>
+            <strong>{approvalGate.metrics.pmp_hold_point_ready ? "Ready" : "Needs input"}</strong>
+            <small>{approvalGate.metrics.pmp_bridge_available ? "Advisory only" : "Optional input"}</small>
           </article>
           <article className="summary-card">
             <span>Gate Status</span>
@@ -297,7 +298,7 @@ export default function ApprovalDecisionPage() {
 
       <PmpArea15CompliancePanel
         summary={contextValue.summary.compliance}
-        title="PMP Area 15 Readiness Before Decision"
+        title="PMP Area 15 Optional Calibration"
         showControls={false}
       />
 
@@ -375,8 +376,8 @@ export default function ApprovalDecisionPage() {
               </dd>
             </div>
             <div>
-              <dt>PMP hold point</dt>
-              <dd>{approvalGate.metrics.pmp_hold_point_ready ? "Ready" : "Blocked"}</dd>
+              <dt>PMP15</dt>
+              <dd>{approvalGate.metrics.pmp_hold_point_ready ? "Ready" : "Advisory"}</dd>
             </div>
           </dl>
         </aside>

@@ -17,6 +17,11 @@ import {
   type ProjectRecord,
   type ScoringPeriod,
 } from "@/lib/role1TaskLayer";
+import {
+  listPmpArea15Inputs,
+  submitPmpArea15Input,
+  type PmpArea15InputRow,
+} from "@/lib/pmpArea15InputClient";
 import { useCredential } from "@/lib/useCredential";
 
 function sortProjects(rows: ProjectRecord[]): ProjectRecord[] {
@@ -37,6 +42,23 @@ function pickInitialPeriod(rows: ScoringPeriod[]): ScoringPeriod | null {
   return selectActivePeriod(rows) || rows[0] || null;
 }
 
+function formatDateText(value: string | null): string {
+  if (!value) return NA_TEXT;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("id-ID", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function canWritePmpArea15Input(role: string): boolean {
+  return role === "admin" || role === "role2" || role === "role3";
+}
+
 export default function PmpArea15LandingPage() {
   const credential = useCredential();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -44,12 +66,23 @@ export default function PmpArea15LandingPage() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [summary, setSummary] = useState<PmpArea15ComplianceSummary | null>(null);
+  const [inputRows, setInputRows] = useState<PmpArea15InputRow[]>([]);
+  const [inputTableReady, setInputTableReady] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingPeriods, setLoadingPeriods] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingInputs, setLoadingInputs] = useState(false);
   const [dataMode, setDataMode] = useState<DataMode>("backend");
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inputMessage, setInputMessage] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [scoreDraft, setScoreDraft] = useState("");
+  const [statusDraft, setStatusDraft] = useState("SUBMITTED");
+  const [sourceDraft, setSourceDraft] = useState("");
+  const [notesDraft, setNotesDraft] = useState("");
+  const [isSubmittingInput, setIsSubmittingInput] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const scopedProjectIds = useMemo(
     () =>
@@ -67,6 +100,8 @@ export default function PmpArea15LandingPage() {
     () => periods.find((item) => item.id === selectedPeriodId) || null,
     [periods, selectedPeriodId]
   );
+  const latestInput = inputRows[0] || null;
+  const canWriteInput = canWritePmpArea15Input(credential.role);
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +195,77 @@ export default function PmpArea15LandingPage() {
     return () => {
       mounted = false;
     };
-  }, [selectedProjectId, selectedPeriodId]);
+  }, [selectedProjectId, selectedPeriodId, refreshKey]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!selectedProjectId || !selectedPeriodId) {
+        setInputRows([]);
+        setInputTableReady(true);
+        setLoadingInputs(false);
+        setScoreDraft("");
+        setSourceDraft("");
+        setNotesDraft("");
+        return;
+      }
+
+      try {
+        setLoadingInputs(true);
+        setInputError(null);
+        const result = await listPmpArea15Inputs(selectedProjectId, selectedPeriodId);
+        if (!mounted) return;
+        setInputRows(result.rows);
+        setInputTableReady(result.table_ready);
+        const latest = result.rows[0] || null;
+        setScoreDraft(latest?.score_0_5 === null || typeof latest?.score_0_5 === "undefined" ? "" : String(latest.score_0_5));
+        setStatusDraft(latest?.status || "SUBMITTED");
+        setSourceDraft(latest?.source_reference || "");
+        setNotesDraft(latest?.notes || "");
+      } catch (e) {
+        if (!mounted) return;
+        setInputRows([]);
+        setInputError(e instanceof Error ? e.message : "Gagal memuat input PMP Area 15.");
+      } finally {
+        if (mounted) setLoadingInputs(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedProjectId, selectedPeriodId, refreshKey]);
+
+  async function onSubmitInput() {
+    setInputError(null);
+    setInputMessage(null);
+
+    if (!selectedProjectId || !selectedPeriodId) {
+      setInputError("Pilih workspace dan period lebih dulu.");
+      return;
+    }
+    const score = Number(scoreDraft);
+    if (!Number.isFinite(score) || score < 0 || score > 5) {
+      setInputError("Score PMP15 wajib angka 0 sampai 5.");
+      return;
+    }
+
+    try {
+      setIsSubmittingInput(true);
+      await submitPmpArea15Input(selectedProjectId, selectedPeriodId, {
+        score_0_5: score,
+        status: statusDraft,
+        source_reference: sourceDraft,
+        notes: notesDraft,
+      });
+      setInputMessage("Input PMP Area 15 tersimpan. Summary dikalibrasi ulang.");
+      setRefreshKey((value) => value + 1);
+    } catch (e) {
+      setInputError(e instanceof Error ? e.message : "Gagal menyimpan input PMP Area 15.");
+    } finally {
+      setIsSubmittingInput(false);
+    }
+  }
 
   const connectionLabel =
     dataMode === "backend" ? "Connected (live data)" : dataMode === "prototype" ? "Read mode fallback" : null;
@@ -184,12 +289,11 @@ export default function PmpArea15LandingPage() {
             <p className="task-kicker">Governance Bridge</p>
             <h1>PMP Area 15</h1>
             <p className="task-subtitle">
-              Halaman khusus untuk membuka ringkasan governance PMP Area 15 tanpa perlu mencari section di Dashboard,
-              Admin, atau Audit.
+              Input eksternal PMP Area 15 sebagai kalibrasi optional untuk BIM Scoring tanpa mengunci keputusan Role 3.
             </p>
             <div className="landing-chip-row">
               <span className="status-chip status-na">Single access point</span>
-              <span className="status-chip status-na">Read-only governance summary</span>
+              <span className="status-chip status-na">Optional score calibration</span>
             </div>
           </div>
 
@@ -250,6 +354,148 @@ export default function PmpArea15LandingPage() {
         </p>
         {backendMessage ? <p className="task-note">{backendMessage}</p> : null}
         {error ? <p className="error-box">{error}</p> : null}
+      </section>
+
+      <section className="task-panel">
+        <h2>Input Score PMP Area 15</h2>
+        {!canWriteInput ? (
+          <p className="read-only-banner">
+            Role <strong>{credential.role}</strong> hanya dapat membaca input PMP Area 15.
+          </p>
+        ) : null}
+        {!inputTableReady ? (
+          <p className="warning-box">
+            Tabel input PMP Area 15 belum tersedia di Supabase. Jalankan migrasi{" "}
+            <code>docs/ops/sql/create-pmp-area15-inputs.sql</code> sebelum menyimpan score.
+          </p>
+        ) : null}
+        {latestInput ? (
+          <div className="task-grid-3">
+            <article className="summary-card">
+              <span>Latest PMP15 score</span>
+              <strong>{latestInput.score_0_5 ?? NA_TEXT}</strong>
+              <small>{latestInput.score_100 ?? NA_TEXT}/100</small>
+            </article>
+            <article className="summary-card">
+              <span>Status</span>
+              <strong>{latestInput.status || NA_TEXT}</strong>
+              <small>{formatDateText(latestInput.input_at || latestInput.updated_at)}</small>
+            </article>
+            <article className="summary-card">
+              <span>Adjusted BIM score</span>
+              <strong>
+                {summary?.scoring_adjustment?.adjusted_total_score_100 ??
+                  summary?.total_bim_score_100 ??
+                  NA_TEXT}
+              </strong>
+              <small>Bonus {summary?.scoring_adjustment?.bonus_score_100 ?? 0}</small>
+            </article>
+          </div>
+        ) : (
+          <p className="inline-note">
+            Belum ada input PMP Area 15 untuk project dan period ini. BIM score tetap berjalan normal tanpa bonus.
+          </p>
+        )}
+
+        <div className="field-grid">
+          <label htmlFor="pmp15-score">
+            PMP15 score (0-5)
+            <input
+              id="pmp15-score"
+              type="number"
+              min="0"
+              max="5"
+              step="0.1"
+              value={scoreDraft}
+              onChange={(event) => setScoreDraft(event.target.value)}
+              disabled={!canWriteInput || !inputTableReady || !selectedProjectId || !selectedPeriodId || isSubmittingInput}
+            />
+          </label>
+          <label htmlFor="pmp15-status">
+            Status dokumen PMP
+            <select
+              id="pmp15-status"
+              value={statusDraft}
+              onChange={(event) => setStatusDraft(event.target.value)}
+              disabled={!canWriteInput || !inputTableReady || isSubmittingInput}
+            >
+              <option value="DRAFT">DRAFT</option>
+              <option value="SUBMITTED">SUBMITTED</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="REVISED">REVISED</option>
+            </select>
+          </label>
+          <label htmlFor="pmp15-source">
+            Referensi sumber
+            <input
+              id="pmp15-source"
+              value={sourceDraft}
+              onChange={(event) => setSourceDraft(event.target.value)}
+              placeholder="Contoh: PMP workbook rev. 02 / link dokumen"
+              disabled={!canWriteInput || !inputTableReady || isSubmittingInput}
+            />
+          </label>
+        </div>
+        <label htmlFor="pmp15-notes">
+          Catatan kalibrasi
+          <textarea
+            id="pmp15-notes"
+            value={notesDraft}
+            onChange={(event) => setNotesDraft(event.target.value)}
+            placeholder="Ringkas dasar score PMP15 eksternal."
+            disabled={!canWriteInput || !inputTableReady || isSubmittingInput}
+          />
+        </label>
+        <div className="wizard-actions">
+          <button
+            type="button"
+            className="action-primary"
+            onClick={() => void onSubmitInput()}
+            disabled={!canWriteInput || !inputTableReady || !selectedProjectId || !selectedPeriodId || isSubmittingInput}
+          >
+            {isSubmittingInput ? "Menyimpan..." : "Simpan Input PMP15"}
+          </button>
+        </div>
+        {loadingInputs ? <p className="task-note">Memuat riwayat input PMP15...</p> : null}
+        {inputMessage ? <p className="task-note action-feedback">{inputMessage}</p> : null}
+        {inputError ? <p className="error-box">{inputError}</p> : null}
+      </section>
+
+      <section className="task-panel">
+        <h2>Riwayat Input PMP15</h2>
+        {inputRows.length === 0 ? (
+          <p className="empty-state">Belum ada input PMP15 untuk period ini.</p>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="audit-table responsive-stack-table">
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Input By</th>
+                  <th>Referensi</th>
+                  <th>Catatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inputRows.map((item, index) => (
+                  <tr key={item.id || `${item.input_at}-${index}`}>
+                    <td>{formatDateText(item.input_at || item.updated_at || item.created_at)}</td>
+                    <td>
+                      {item.score_0_5 ?? NA_TEXT}
+                      <small> / {item.score_100 ?? NA_TEXT}</small>
+                    </td>
+                    <td>{item.status || NA_TEXT}</td>
+                    <td>{item.input_by || item.created_by || NA_TEXT}</td>
+                    <td>{item.source_reference || NA_TEXT}</td>
+                    <td>{item.notes || NA_TEXT}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {loadingSummary ? <p className="task-note">Memuat bridge PMP Area 15...</p> : null}
