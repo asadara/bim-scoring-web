@@ -19,8 +19,9 @@ import {
   saveFileEvidenceWithBackendUpload,
   saveEvidenceWithBackendWrite,
   submitEvidenceWithBackendWrite,
+  statusLabel,
 } from "@/lib/role1TaskLayer";
-import type { IndicatorRecord } from "@/lib/role1TaskLayer";
+import type { IndicatorRecord, LocalEvidenceItem } from "@/lib/role1TaskLayer";
 import { submitRole2BimUseProposal } from "@/lib/role2ProposalClient";
 import { useCredential } from "@/lib/useCredential";
 import { getRoleLabel, isManualRoleSwitchEnabled, setStoredCredential } from "@/lib/userCredential";
@@ -138,6 +139,17 @@ function renderTypeHint(type: WizardForm["type"]): string {
     return `Pilih jenis file, lalu upload biner sampai ${formatBytes(BACKEND_FILE_SIZE_LIMIT_BYTES)} atau gunakan URL Drive/CDE.`;
   }
   return "Pilih tipe evidence untuk melihat field input yang dibutuhkan.";
+}
+
+function normalizeQualityKey(value: string): string {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function sameEvidenceBimUse(left: string, right: string): boolean {
+  return normalizeQualityKey(left || NO_BIM_USE_ID) === normalizeQualityKey(right || NO_BIM_USE_ID);
 }
 
 function parseHttpUrl(value: string): URL | null {
@@ -312,6 +324,7 @@ export default function AddEvidencePage() {
   const [gapError, setGapError] = useState<string | null>(null);
   const [gapInfo, setGapInfo] = useState<string | null>(null);
   const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
+  const [existingEvidenceRows, setExistingEvidenceRows] = useState<LocalEvidenceItem[]>([]);
   const [evidenceOptionsByBimUseId, setEvidenceOptionsByBimUseId] = useState<Record<string, string[]>>({});
   const [evidenceOptionLibraryMessage, setEvidenceOptionLibraryMessage] = useState<string | null>(null);
   const scopedProjectId = useMemo(() => {
@@ -475,10 +488,12 @@ export default function AddEvidencePage() {
           const key = String(item.bim_use_id || "").trim() || NO_BIM_USE_ID;
           nextCountByBimUse[key] = (nextCountByBimUse[key] || 0) + 1;
         }
+        setExistingEvidenceRows(result.data);
         setBimUseEvidenceCountById(nextCountByBimUse);
       })
       .catch(() => {
         if (!mounted) return;
+        setExistingEvidenceRows([]);
         setBimUseEvidenceCountById({});
       });
 
@@ -563,6 +578,58 @@ export default function AddEvidencePage() {
     if (form.indicator_ids.length === 0) return null;
     return indicators.find((indicator) => indicator.id === form.indicator_ids[0]) || null;
   }, [form.indicator_ids, indicators]);
+  const indicatorCoverageByBimUseId = useMemo(() => {
+    const map: Record<string, { covered: number; total: number; missing: IndicatorRecord[] }> = {};
+    if (!context) return map;
+
+    for (const group of context.bim_uses) {
+      const coveredIndicatorIds = new Set<string>();
+      for (const evidence of existingEvidenceRows) {
+        if (!sameEvidenceBimUse(evidence.bim_use_id || NO_BIM_USE_ID, group.bim_use_id)) continue;
+        for (const indicatorId of evidence.indicator_ids) {
+          if (indicatorId) coveredIndicatorIds.add(indicatorId);
+        }
+      }
+
+      const missing = group.indicators.filter((indicator) => !coveredIndicatorIds.has(indicator.id));
+      map[group.bim_use_id] = {
+        covered: Math.max(0, group.indicators.length - missing.length),
+        total: group.indicators.length,
+        missing,
+      };
+    }
+
+    return map;
+  }, [context, existingEvidenceRows]);
+  const selectedBimUseCoverage = useMemo(() => {
+    if (!selectedBimUse) return null;
+    return indicatorCoverageByBimUseId[selectedBimUse.bim_use_id] || null;
+  }, [indicatorCoverageByBimUseId, selectedBimUse]);
+  const selectedIndicatorEvidenceItems = useMemo(() => {
+    const indicatorId = form.indicator_ids[0] || "";
+    if (!indicatorId) return [] as LocalEvidenceItem[];
+    return existingEvidenceRows
+      .filter((item) => item.id !== form.evidence_id)
+      .filter((item) => item.indicator_ids.includes(indicatorId))
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  }, [existingEvidenceRows, form.evidence_id, form.indicator_ids]);
+  const duplicateEvidenceItems = useMemo(() => {
+    const selectedIndicatorId = form.indicator_ids[0] || "";
+    const selectedBimUseId = form.bim_use_id || NO_BIM_USE_ID;
+    const selectedTitle = normalizeQualityKey(form.title || form.evidence_option);
+    const selectedOption = normalizeQualityKey(form.evidence_option || form.title);
+    if (!selectedIndicatorId || (!selectedTitle && !selectedOption)) return [] as LocalEvidenceItem[];
+
+    return existingEvidenceRows
+      .filter((item) => item.id !== form.evidence_id)
+      .filter((item) => item.indicator_ids.includes(selectedIndicatorId))
+      .filter((item) => sameEvidenceBimUse(item.bim_use_id || NO_BIM_USE_ID, selectedBimUseId))
+      .filter((item) => {
+        const itemTitle = normalizeQualityKey(item.title);
+        return Boolean((selectedTitle && itemTitle === selectedTitle) || (selectedOption && itemTitle === selectedOption));
+      })
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  }, [existingEvidenceRows, form.bim_use_id, form.evidence_id, form.evidence_option, form.indicator_ids, form.title]);
   const selectedBimUseLabel = selectedBimUse?.label || "Belum dipilih";
   const selectedIndicatorLabel = selectedIndicator
     ? `${selectedIndicator.code} - ${selectedIndicator.title}`
@@ -848,6 +915,13 @@ export default function AddEvidencePage() {
       setStep(failingStep);
       return;
     }
+    if (status === "SUBMITTED" && duplicateEvidenceItems.length > 0) {
+      setSubmitError(
+        "Evidence ini terlihat duplikat untuk indikator yang sama. Simpan sebagai Draft atau revisi evidence existing sebelum submit."
+      );
+      setStep(3);
+      return;
+    }
 
     let saved;
     try {
@@ -1012,6 +1086,11 @@ export default function AddEvidencePage() {
                 {context.bim_uses.map((group) => {
                   const evidenceCount = bimUseEvidenceCountById[group.bim_use_id] || 0;
                   const evidenceOptionCount = evidenceOptionCountByBimUseId[group.bim_use_id] || 0;
+                  const coverage = indicatorCoverageByBimUseId[group.bim_use_id] || {
+                    covered: 0,
+                    total: group.indicators.length,
+                    missing: group.indicators,
+                  };
                   const cardContent = (
                     <>
                       <h3 className="bim-use-card-title">
@@ -1038,6 +1117,20 @@ export default function AddEvidencePage() {
                           <IndicatorIcon />
                         </span>
                       </p>
+                      <p className="bim-use-card-stat">
+                        <span className="bim-use-card-stat-copy">
+                          <strong>{coverage.covered}/{coverage.total}</strong>
+                          <span className="bim-use-card-stat-label">Coverage</span>
+                        </span>
+                      </p>
+                      {coverage.missing.length > 0 ? (
+                        <p className="bim-use-card-footnote">
+                          Belum ada evidence: {coverage.missing.slice(0, 2).map((item) => item.code).join(", ")}
+                          {coverage.missing.length > 2 ? ` +${coverage.missing.length - 2}` : ""}
+                        </p>
+                      ) : (
+                        <p className="bim-use-card-footnote">Semua indikator sudah punya evidence.</p>
+                      )}
                     </>
                   );
 
@@ -1142,6 +1235,49 @@ export default function AddEvidencePage() {
                     ) : (
                       <p className="inline-note">Belum ada indikator terpilih.</p>
                     )}
+                    {selectedBimUseCoverage ? (
+                      <div className="evidence-quality-panel">
+                        <p>
+                          <strong>Coverage BIM Use</strong>
+                        </p>
+                        <p>
+                          {selectedBimUseCoverage.covered}/{selectedBimUseCoverage.total} indikator sudah memiliki
+                          evidence pada period aktif.
+                        </p>
+                        {selectedBimUseCoverage.missing.length > 0 ? (
+                          <p className="inline-note">
+                            Belum tercakup:{" "}
+                            {selectedBimUseCoverage.missing
+                              .slice(0, 6)
+                              .map((indicator) => `${indicator.code} - ${indicator.title}`)
+                              .join("; ")}
+                            {selectedBimUseCoverage.missing.length > 6
+                              ? `; +${selectedBimUseCoverage.missing.length - 6} indikator lain`
+                              : ""}
+                          </p>
+                        ) : (
+                          <p className="inline-note">Semua indikator pada BIM Use ini sudah memiliki evidence.</p>
+                        )}
+                      </div>
+                    ) : null}
+                    {selectedIndicatorEvidenceItems.length > 0 ? (
+                      <div className="evidence-quality-panel evidence-quality-panel-compact">
+                        <p>
+                          <strong>Evidence existing untuk indikator ini</strong>
+                        </p>
+                        <div className="evidence-quality-list">
+                          {selectedIndicatorEvidenceItems.slice(0, 4).map((item) => (
+                            <div className="evidence-quality-row" key={item.id}>
+                              <span>{item.title || NA_TEXT}</span>
+                              <small>{statusLabel(item.status)} | {item.type}</small>
+                            </div>
+                          ))}
+                        </div>
+                        {selectedIndicatorEvidenceItems.length > 4 ? (
+                          <p className="inline-note">+{selectedIndicatorEvidenceItems.length - 4} evidence lain.</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {form.evidence_option ? (
                       <p className="inline-note">
                         Evidence terpilih: <strong>{form.evidence_option}</strong>
@@ -1281,6 +1417,26 @@ export default function AddEvidencePage() {
                     maxLength={2000}
                   />
                 </label>
+
+                {duplicateEvidenceItems.length > 0 ? (
+                  <div className="warning-box evidence-quality-panel-compact">
+                    <p>
+                      <strong>Potensi duplikat terdeteksi.</strong>
+                    </p>
+                    <p>
+                      Ada evidence dengan judul yang sama untuk indikator terpilih. Submit diblok agar review queue tidak
+                      menerima data ganda; gunakan Draft jika masih perlu cek ulang.
+                    </p>
+                    <div className="evidence-quality-list">
+                      {duplicateEvidenceItems.slice(0, 3).map((item) => (
+                        <div className="evidence-quality-row" key={item.id}>
+                          <span>{item.title || NA_TEXT}</span>
+                          <small>{statusLabel(item.status)} | {item.type}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {form.type === "URL" ? (
                   <label htmlFor="external-url-input">

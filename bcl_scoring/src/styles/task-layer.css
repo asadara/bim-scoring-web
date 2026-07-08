@@ -1467,6 +1467,14 @@ a {
   white-space: nowrap;
 }
 
+.bim-use-card-footnote {
+  margin: 2px 0 0;
+  color: var(--task-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .bim-use-card-icon {
   display: inline-flex;
   width: 18px;
@@ -1555,6 +1563,62 @@ a {
 
 .evidence-item p {
   margin: 0 0 6px;
+}
+
+.evidence-quality-panel {
+  border: 1px solid #cce3d8;
+  border-radius: 10px;
+  background: #fbfdfc;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.evidence-quality-panel p {
+  margin: 0;
+}
+
+.evidence-quality-panel-compact {
+  gap: 6px;
+}
+
+.evidence-quality-list {
+  display: grid;
+  gap: 6px;
+}
+
+.evidence-quality-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  border: 1px solid var(--task-line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 7px 8px;
+  min-width: 0;
+}
+
+.evidence-quality-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.evidence-quality-row small {
+  color: var(--task-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .evidence-quality-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .evidence-quality-row small {
+    white-space: normal;
+  }
 }
 
 .prototype-badge {
