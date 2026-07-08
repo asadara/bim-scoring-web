@@ -112,6 +112,19 @@ export type BimUseGroup = {
   indicators: IndicatorRecord[];
 };
 
+export type EvidenceOptionRecord = {
+  id: string;
+  project_id: string | null;
+  bim_use_id: string;
+  bim_use_key: string | null;
+  bim_use_label: string | null;
+  evidence_option: string;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  source: string | null;
+};
+
 export type Role1Context = {
   project: ProjectRecord;
   periods: ScoringPeriod[];
@@ -1042,6 +1055,55 @@ export async function fetchIndicatorsReadMode(projectId: string): Promise<ReadRe
 export async function fetchIndicators(projectId: string): Promise<IndicatorRecord[]> {
   const result = await fetchIndicatorsReadMode(projectId);
   return result.data;
+}
+
+function mapEvidenceOptionRows(rows: unknown[]): EvidenceOptionRecord[] {
+  return rows
+    .map((row) => {
+      const item = row as Record<string, unknown>;
+      const option = asString(item.evidence_option || item.option_label || item.title || item.name).trim();
+      const bimUseId = asString(item.bim_use_id || item.bim_use_key || item.bim_use_label).trim();
+      if (!option || !bimUseId) return null;
+      return {
+        id: asString(item.id) || `${bimUseId}:${option}`,
+        project_id: asNullableString(item.project_id),
+        bim_use_id: bimUseId,
+        bim_use_key: asNullableString(item.bim_use_key),
+        bim_use_label: asNullableString(item.bim_use_label),
+        evidence_option: option,
+        title: asString(item.title) || option,
+        description: asNullableString(item.description),
+        sort_order: asNumber(item.sort_order) ?? 1000,
+        source: asNullableString(item.source),
+      } satisfies EvidenceOptionRecord;
+    })
+    .filter((row): row is EvidenceOptionRecord => Boolean(row));
+}
+
+export async function fetchEvidenceOptionsReadMode(
+  projectId: string,
+  bimUseIds: string[] = []
+): Promise<ReadResult<EvidenceOptionRecord[]>> {
+  const query = bimUseIds.length
+    ? `?bim_use_ids=${encodeURIComponent(bimUseIds.join(","))}`
+    : "";
+  const response = await safeFetchJson<unknown>(
+    buildApiUrl(`/projects/${encodeURIComponent(projectId)}/evidence-options${query}`)
+  );
+  if (!response.ok) {
+    return backendReadResult([], toSafeErrorMessage(response));
+  }
+
+  const unwrapped = unwrapPayload(response.data);
+  if (!unwrapped.ok) {
+    return backendReadResult([], unwrapped.error);
+  }
+
+  return {
+    data: Array.isArray(unwrapped.data) ? mapEvidenceOptionRows(unwrapped.data) : [],
+    mode: "backend",
+    backend_message: null,
+  };
 }
 
 function inferEvidenceType(rawType: unknown, row: Record<string, unknown>): EvidenceType {

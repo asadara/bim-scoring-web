@@ -8,6 +8,7 @@ import {
   canRole1WriteProject,
   EvidenceType,
   fetchEvidenceListReadMode,
+  fetchEvidenceOptionsReadMode,
   fetchProjectPeriodsReadMode,
   LOCKED_READ_ONLY_ERROR,
   NA_TEXT,
@@ -311,6 +312,8 @@ export default function AddEvidencePage() {
   const [gapError, setGapError] = useState<string | null>(null);
   const [gapInfo, setGapInfo] = useState<string | null>(null);
   const [bimUseEvidenceCountById, setBimUseEvidenceCountById] = useState<Record<string, number>>({});
+  const [evidenceOptionsByBimUseId, setEvidenceOptionsByBimUseId] = useState<Record<string, string[]>>({});
+  const [evidenceOptionLibraryMessage, setEvidenceOptionLibraryMessage] = useState<string | null>(null);
   const scopedProjectId = useMemo(() => {
     if (credential.role !== "role1") return null;
     const scopedIds = Array.isArray(credential.scoped_project_ids)
@@ -484,6 +487,42 @@ export default function AddEvidencePage() {
     };
   }, [context, projectId]);
 
+  useEffect(() => {
+    if (!context || typeof projectId !== "string") return;
+
+    let mounted = true;
+    const bimUseIds = context.bim_uses
+      .map((group) => group.bim_use_id)
+      .filter((id) => id && id !== NO_BIM_USE_ID);
+
+    fetchEvidenceOptionsReadMode(projectId, bimUseIds)
+      .then((result) => {
+        if (!mounted) return;
+        const next: Record<string, string[]> = {};
+        for (const row of result.data) {
+          const keys = uniqueNonEmpty([
+            row.bim_use_id,
+            row.bim_use_key || "",
+            row.bim_use_label || "",
+          ]);
+          for (const key of keys) {
+            next[key] = uniqueNonEmpty([...(next[key] || []), row.evidence_option]);
+          }
+        }
+        setEvidenceOptionsByBimUseId(next);
+        setEvidenceOptionLibraryMessage(result.backend_message);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        setEvidenceOptionsByBimUseId({});
+        setEvidenceOptionLibraryMessage(err instanceof Error ? err.message : "Evidence option library not available");
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [context, projectId]);
+
   const selectedBimUse = useMemo(() => {
     if (!context) return null;
     return context.bim_uses.find((item) => item.bim_use_id === form.bim_use_id) || null;
@@ -492,22 +531,32 @@ export default function AddEvidencePage() {
     const map: Record<string, number> = {};
     if (!context) return map;
     for (const group of context.bim_uses) {
-      const options = resolveEvidenceOptionsForBimUse({ label: group.label, indicators: group.indicators });
+      const options =
+        evidenceOptionsByBimUseId[group.bim_use_id] ||
+        evidenceOptionsByBimUseId[normalizeEvidenceBimUseKey(group.bim_use_id)] ||
+        evidenceOptionsByBimUseId[group.label] ||
+        evidenceOptionsByBimUseId[normalizeEvidenceBimUseKey(group.label)] ||
+        resolveEvidenceOptionsForBimUse({ label: group.label, indicators: group.indicators });
       map[group.bim_use_id] = options.length;
     }
     return map;
-  }, [context]);
+  }, [context, evidenceOptionsByBimUseId]);
   const selectedBimUseEvidenceOptions = useMemo(() => {
     if (!selectedBimUse) return [] as string[];
-    const base = resolveEvidenceOptionsForBimUse({
-      label: selectedBimUse.label,
-      indicators: selectedBimUse.indicators,
-    });
+    const base =
+      evidenceOptionsByBimUseId[selectedBimUse.bim_use_id] ||
+      evidenceOptionsByBimUseId[normalizeEvidenceBimUseKey(selectedBimUse.bim_use_id)] ||
+      evidenceOptionsByBimUseId[selectedBimUse.label] ||
+      evidenceOptionsByBimUseId[normalizeEvidenceBimUseKey(selectedBimUse.label)] ||
+      resolveEvidenceOptionsForBimUse({
+        label: selectedBimUse.label,
+        indicators: selectedBimUse.indicators,
+      });
     if (form.evidence_option && !base.includes(form.evidence_option)) {
       return [form.evidence_option, ...base];
     }
     return base;
-  }, [form.evidence_option, selectedBimUse]);
+  }, [evidenceOptionsByBimUseId, form.evidence_option, selectedBimUse]);
 
   const indicators = useMemo(() => selectedBimUse?.indicators || [], [selectedBimUse]);
   const selectedIndicator = useMemo(() => {
@@ -1102,6 +1151,9 @@ export default function AddEvidencePage() {
                     ) : (
                       <p className="warning-box">Daftar evidence untuk BIM Use ini belum tersedia.</p>
                     )}
+                    {evidenceOptionLibraryMessage ? (
+                      <p className="inline-note">Evidence library fallback: {evidenceOptionLibraryMessage}</p>
+                    ) : null}
                   </>
                 ) : (
                   <p className="warning-box">Pilih BIM Use dari card workspace terlebih dahulu.</p>
