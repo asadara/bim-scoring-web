@@ -282,6 +282,16 @@ async function fetchIndicatorScoresForPerspective(
   );
 }
 
+function backendAvailableFromDataRead(): BackendHandshakeResult {
+  return {
+    status: "available",
+    service: "bcl-api-gateway",
+    endpoint: null,
+    checked_at: new Date().toISOString(),
+    message: null,
+  };
+}
+
 export default function Home() {
   const credential = useCredential();
   const language = useAppLanguage();
@@ -530,6 +540,7 @@ export default function Home() {
 
         const projectRows = await fetchEnvelope<ProjectRow[]>("/projects");
         if (cancelled) return;
+        setBackend((current) => current?.status === "available" ? current : backendAvailableFromDataRead());
 
         const safeRows = Array.isArray(projectRows) ? projectRows : [];
         const visibleRows = safeRows.filter((row) => !isTestWorkspaceProject(row));
@@ -623,6 +634,7 @@ export default function Home() {
         ]);
 
         if (cancelled) return;
+        setBackend((current) => current?.status === "available" ? current : backendAvailableFromDataRead());
         setBundle(bundleData);
         setIndicatorScores(perspectiveScores.flat());
         setSummaryCompliance(summaryResult.data.compliance);
