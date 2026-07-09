@@ -206,7 +206,8 @@ function normalizePayload(payload: unknown): unknown {
   const item = safeObject(payload);
   if (Object.prototype.hasOwnProperty.call(item, "ok")) {
     if (item.ok === false) throw new Error(asString(item.error) || "API returned ok=false");
-    return item.data;
+    if (Object.prototype.hasOwnProperty.call(item, "data")) return item.data;
+    return payload;
   }
   return payload;
 }
