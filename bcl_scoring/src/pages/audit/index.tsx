@@ -301,23 +301,60 @@ export default function AuditHomePage() {
     });
   }, [projectNameById, snapshotProjectFilter, snapshotQuery, snapshots]);
 
+  const pmpAuditSource = useMemo(() => {
+    const activeSnapshot = visibleSnapshots[0] || null;
+    if (activeSnapshot?.snapshot.project_id && activeSnapshot?.snapshot.period_id) {
+      return {
+        projectId: activeSnapshot.snapshot.project_id,
+        periodId: activeSnapshot.snapshot.period_id,
+        label: `snapshot terbaru yang terlihat: ${activeSnapshot.snapshot_id}`,
+      };
+    }
+
+    const candidates = projects.flatMap((project) =>
+      (periodsByProjectId[project.id] || [])
+        .filter((period) => Boolean(period?.id))
+        .map((period) => ({
+          projectId: project.id,
+          projectLabel: projectNameById.get(project.id) || project.name || project.code || project.id,
+          period,
+        }))
+    );
+
+    candidates.sort((a, b) => {
+      const yearDelta = Number(b.period.year || 0) - Number(a.period.year || 0);
+      if (yearDelta !== 0) return yearDelta;
+      const weekDelta = Number(b.period.week || 0) - Number(a.period.week || 0);
+      if (weekDelta !== 0) return weekDelta;
+      return String(b.period.start_date || "").localeCompare(String(a.period.start_date || ""));
+    });
+
+    const latest = candidates[0] || null;
+    if (!latest?.period.id) return null;
+
+    return {
+      projectId: latest.projectId,
+      periodId: latest.period.id,
+      label: `latest live period: ${latest.projectLabel} / ${formatPeriodLabel(latest.period)}`,
+    };
+  }, [periodsByProjectId, projectNameById, projects, visibleSnapshots]);
+
   useEffect(() => {
     let mounted = true;
-    const activeSnapshot = visibleSnapshots[0] || null;
 
     (async () => {
-      if (!activeSnapshot?.snapshot.project_id || !activeSnapshot?.snapshot.period_id) {
+      if (!pmpAuditSource?.projectId || !pmpAuditSource?.periodId) {
         setPmpAuditLoading(false);
         setPmpAuditSummary(null);
-        setPmpAuditMessage("Belum ada snapshot audit yang bisa dipakai untuk preview PMP Area 15.");
+        setPmpAuditMessage("Belum ada snapshot atau live period yang bisa dipakai untuk preview PMP Area 15.");
         return;
       }
 
       setPmpAuditLoading(true);
       try {
         const result = await fetchReadOnlySummaryReadMode(
-          activeSnapshot.snapshot.project_id,
-          activeSnapshot.snapshot.period_id
+          pmpAuditSource.projectId,
+          pmpAuditSource.periodId
         );
         if (!mounted) return;
         setPmpAuditSummary(result.data.compliance);
@@ -334,7 +371,7 @@ export default function AuditHomePage() {
     return () => {
       mounted = false;
     };
-  }, [visibleSnapshots]);
+  }, [pmpAuditSource]);
 
   const coverageRows = useMemo(() => {
     const ids = new Set<string>();
@@ -490,9 +527,9 @@ export default function AuditHomePage() {
         showControls={false}
       />
       <p className="task-note">
-        {visibleSnapshots[0]
-          ? `Sumber audit readout mengikuti snapshot terbaru yang terlihat: ${visibleSnapshots[0].snapshot_id}.`
-          : "Audit readout akan aktif setelah minimal satu snapshot tersedia."}
+        {pmpAuditSource
+          ? `Sumber audit readout mengikuti ${pmpAuditSource.label}.`
+          : "Audit readout akan aktif setelah snapshot atau live period tersedia."}
       </p>
       {pmpAuditLoading ? <p className="task-note">Memuat readout PMP Area 15 untuk audit...</p> : null}
       {pmpAuditMessage ? <p className="task-note">{pmpAuditMessage}</p> : null}
