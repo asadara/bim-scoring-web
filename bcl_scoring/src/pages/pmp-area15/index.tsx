@@ -280,7 +280,7 @@ export default function PmpArea15LandingPage() {
   const canAccessProjects = canRoleAccessPath(credential.role, "/projects");
 
   return (
-    <main className="task-shell page-corporate-shell">
+    <main className="task-shell page-corporate-shell pmp-area15-shell">
       <CorporateTopbar connectionLabel={connectionLabel} connectionTone={connectionTone} />
 
       <header className="task-header role-hero page-hero-card">
@@ -436,10 +436,11 @@ export default function PmpArea15LandingPage() {
             />
           </label>
         </div>
-        <label htmlFor="pmp15-notes">
+        <label className="pmp15-notes-field" htmlFor="pmp15-notes">
           Catatan kalibrasi
           <textarea
             id="pmp15-notes"
+            rows={3}
             value={notesDraft}
             onChange={(event) => setNotesDraft(event.target.value)}
             placeholder="Ringkas dasar score PMP15 eksternal."

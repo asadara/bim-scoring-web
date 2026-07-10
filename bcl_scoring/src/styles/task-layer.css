@@ -1138,6 +1138,39 @@ a {
   resize: vertical;
 }
 
+.pmp-area15-shell .pmp15-notes-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.pmp-area15-shell .pmp15-notes-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 86px;
+  max-width: 100%;
+  border: 1px solid #bfcfc6;
+  border-radius: 8px;
+  padding: 8px;
+  font: inherit;
+  line-height: 1.4;
+  color: var(--task-ink);
+  background: #ffffff;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.pmp-area15-shell .pmp15-notes-field textarea:disabled {
+  cursor: not-allowed;
+  color: var(--task-disabled-ink);
+  background: var(--task-disabled-bg);
+}
+
+.pmp-area15-shell .pmp15-notes-field + .wizard-actions {
+  margin-top: 12px;
+}
+
 .option-grid {
   display: grid;
   gap: 8px;
